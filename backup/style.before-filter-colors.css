@@ -1,0 +1,1023 @@
+/* style.css — Procurement Analytics
+   ระบบภาพเน้นความเป็นทางการ พื้นสว่าง ตัวอักษรอ่านง่าย และมีพื้นที่ว่างพอให้สายตาพัก
+   โครงกริดอิงระบบ 12 คอลัมน์ของ Bootstrap สีหลักคือเขียวหัวเป็ดตามอัตลักษณ์เดิมของระบบ */
+
+:root {
+  /* ---------- ระบบโทเค็นสี Enterprise light theme ---------- */
+  /* พื้นผิวและเส้นขอบ */
+  --bg: #F5F7FB;
+  --surface: #FFFFFF;
+  --surface-soft: #F8FAFC;
+  --surface-hover: #F1F5F9;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+
+  /* ตัวอักษร */
+  --text: #172033;
+  --text-soft: #334155;
+  --muted: #64748B;
+  --muted-light: #94A3B8;
+
+  /* สีหลักของแบรนด์และการกระทำ */
+  --primary: #1677FF;
+  --primary-dark: #0F5FCC;
+  --secondary: #4DA6FF;
+  --brand-teal: #0F766E;
+
+  /* สีตามความหมาย (semantic) */
+  --success: #16803C;
+  --success-soft: #ECFDF3;
+  --warning: #D97706;
+  --warning-soft: #FFF7ED;
+  --danger: #DC3545;
+  --danger-soft: #FEF2F2;
+  --violet: #7C3AED;
+  --violet-soft: #F5F3FF;
+  --cyan: #0891B2;
+  --cyan-soft: #ECFEFF;
+
+  /* เงาและมุมโค้งมาตรฐาน */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, .06);
+  --shadow-focus: 0 0 0 3px rgba(22, 119, 255, .18);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* ---------- ชื่อตัวแปรเดิม: คงไว้เป็น alias ----------
+     selector เดิมทุกจุดที่อ้าง var(--teal), var(--blue) ฯลฯ ยังทำงานเหมือนเดิม
+     ค่าที่ตรงกับของเดิมเป๊ะ (--card, --teal, --purple, --slate) จึงไม่กระทบภาพเดิมเลย
+     ค่าที่ขยับเล็กน้อย (--blue, --orange, --red, --green) คือการรวมโทนสีเข้าระบบใหม่ตามที่ระบุ
+
+     หมายเหตุ --slate: ชุดโทเค็นใหม่ที่กำหนดมาให้ค่า --slate ตรงกับ --muted (#64748B) พอดี
+     แต่ --slate เดิมของไฟล์นี้คือ #94a3b8 ซึ่งตรงกับ --muted-light เป๊ะ และถูกใช้เป็นสีเทาอ่อน
+     ในหลายจุด (ลูกศรเรียงตาราง, เส้นขอบ hover, badge-none) การ alias ไปยัง --muted-light
+     จึงรักษาโทนภาพเดิมไว้ได้ตรงกว่า สอดคล้องกับคำสั่ง "เปลี่ยน reference เดิมอย่างปลอดภัย" */
+  --card: var(--surface);
+  --teal: var(--brand-teal);
+  --teal-dark: #115e59;
+  --orange: var(--warning);
+  --red: var(--danger);
+  --yellow: #ca8a04;
+  --purple: var(--violet);
+  --indigo: #4338ca;
+  --blue: var(--primary);
+  --green: var(--success);
+  --slate: var(--muted-light);
+
+  /* ระยะห่างและมุมโค้งที่ตั้งไว้ในเวอร์ชันก่อนหน้า ผูกเข้ากับระบบโทเค็นใหม่ */
+  --gap-section: 22px;
+  --radius-card: var(--radius-lg);
+}
+
+body {
+  font-family: 'IBM Plex Sans Thai', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: .94rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -.005em; }
+
+/* ตัวเลขทั้งหน้าใช้ความกว้างเท่ากัน คอลัมน์ตัวเลขจึงเรียงตรงกัน */
+.metric, .kpi .v, .legend-count, td.text-end, th.text-end {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ลิงก์ข้ามไปเนื้อหาหลัก สำหรับผู้ใช้คีย์บอร์ด */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 2000;
+  background: var(--teal); color: #fff;
+  padding: 10px 16px; border-radius: 0 0 10px 0;
+  text-decoration: none; font-size: .9rem;
+}
+.skip-link:focus { left: 0; }
+
+/* ---------- โครงหน้า ---------- */
+
+.main-content { padding-top: 4px; }
+.section-block { scroll-margin-top: 76px; }
+
+/* ป้ายกำกับกลุ่มเครื่องมือ ช่วยให้สายตาแยกโซนได้โดยไม่ต้องใช้เส้นหนา */
+.section-label {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 8px;
+}
+
+/* ---------- หน้าจอตอนโหลด ---------- */
+
+.boot-screen {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+  background: var(--bg);
+}
+.boot-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 38px 44px;
+  box-shadow: 0 10px 34px rgba(15, 23, 42, .06);
+  max-width: 480px;
+}
+.boot-brand {
+  font-weight: 600; color: var(--teal);
+  letter-spacing: .2px; font-size: 1.02rem;
+}
+.boot-message { font-size: .92rem; }
+.text-teal { color: var(--teal); }
+
+.loading-box { padding: 36px; text-align: center; color: var(--muted); }
+
+/* ข้อความ "ไม่มีข้อมูล" ที่มีกรอบ เพื่อให้แยกออกจาก widget ที่พัง */
+.empty-state {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .88rem;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: #fbfbfa;
+}
+
+/* ---------- แถบบนสุด ---------- */
+
+.topbar {
+  position: sticky; top: 0; z-index: 1020;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, .04);
+}
+/* เส้นสีบางด้านบนเป็นตัวยึดอัตลักษณ์องค์กร */
+.topbar::before {
+  content: '';
+  display: block; height: 3px;
+  background: linear-gradient(90deg, var(--teal) 0%, var(--teal-dark) 55%, var(--indigo) 100%);
+}
+.topbar-inner { min-height: 46px; }
+
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand strong { color: var(--teal); letter-spacing: .2px; }
+
+/* ตราสัญลักษณ์ตัวย่อ ใช้แทนโลโก้ภาพเพื่อให้ไฟล์ยังเป็น static ล้วน */
+.brand-mark {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #fff; font-weight: 700; font-size: .74rem; letter-spacing: .5px;
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.brand-sub {
+  font-size: .7rem; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.meta-line {
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.topbar-actions .btn { font-weight: 500; }
+
+/* ปุ่มการกระทำหลัก ใช้สีทึบเพื่อให้ลำดับความสำคัญชัด */
+.btn-primary-action.btn-outline-secondary {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.btn-primary-action.btn-outline-secondary:hover,
+.btn-primary-action.btn-outline-secondary:focus {
+  background: var(--teal-dark);
+  border-color: var(--teal-dark);
+  color: #fff;
+}
+.btn-neutral.btn-outline-secondary {
+  border-color: var(--border-strong);
+  color: #334155;
+  background: #fff;
+}
+.btn-neutral.btn-outline-secondary:hover {
+  background: #f1f5f9;
+  border-color: var(--slate);
+  color: #0f172a;
+}
+
+@media (max-width: 575.98px) {
+  .brand-sub { display: none; }
+  .topbar-actions { width: 100%; }
+  .topbar-actions .btn { flex: 1; }
+}
+
+/* ---------- ตัวกรองส่วนกลาง ---------- */
+
+.filter-bar { padding: 14px 16px; }
+.filter-bar .form-label { font-size: .78rem; color: var(--muted); margin-bottom: 2px; }
+.filter-summary { font-size: .84rem; color: var(--muted); }
+.chip {
+  display: inline-block;
+  background: #ecfdf5; color: var(--teal);
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 1px 9px; margin-right: 4px;
+  font-size: .78rem;
+}
+
+/* ---------- ส่วนหัวแต่ละแท็บ ---------- */
+
+/* ส่วนหัวแต่ละแท็บใช้พื้นสว่างและแถบสีด้านซ้ายแทนการไล่สีเข้ม
+   อ่านง่ายกว่าในการใช้งานต่อเนื่องนาน และเข้ากับงานเอกสารราชการมากกว่า */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo {
+  border-radius: var(--radius-card);
+  padding: 18px 22px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.hero h1, .hero-fraud h1, .hero-contractor h1,
+.hero-anomaly h1, .hero-demo h1 { color: var(--text); }
+.hero .small, .hero-fraud .small, .hero-contractor .small,
+.hero-anomaly .small, .hero-demo .small { color: var(--muted); }
+
+.hero            { border-left-color: var(--teal);   background: linear-gradient(90deg, #f0fdfa 0%, #fff 42%); }
+.hero-fraud      { border-left-color: var(--red);    background: linear-gradient(90deg, #fef2f2 0%, #fff 42%); }
+.hero-contractor { border-left-color: var(--green);  background: linear-gradient(90deg, #f0fdf4 0%, #fff 42%); }
+.hero-anomaly    { border-left-color: var(--indigo); background: linear-gradient(90deg, #eef2ff 0%, #fff 42%); }
+.hero-demo       { border-left-color: var(--purple); background: linear-gradient(90deg, #f5f3ff 0%, #fff 42%); }
+
+/* แท็บสาธิตมีพื้นหลังลายทางจาง เพื่อไม่ให้เข้าใจผิดว่าเป็นข้อมูลจริง */
+.demo-pane {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(124, 58, 237, .035) 0 12px, transparent 12px 24px);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  margin: -12px;
+}
+
+/* ---------- การ์ด ---------- */
+
+/* การ์ดใช้เงาบางและขอบคม เน้นความสะอาดแบบระบบงานองค์กร
+   ไม่ใช้เงาฟุ้งเพราะทำให้หน้าที่มีการ์ดจำนวนมากดูรก */
+.cardx {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+  transition: box-shadow .15s, border-color .15s;
+}
+.cardx:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .06); }
+
+.card-title-row {
+  display: flex; justify-content: space-between;
+  align-items: center; gap: 8px; margin-bottom: 6px;
+}
+/* หัวการ์ดมีเส้นคั่นบาง ช่วยแยกหัวเรื่องออกจากเนื้อหาโดยไม่เพิ่มความหนัก */
+.cardx .card-title-row {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.cardx .card-title-row h2 { letter-spacing: -.01em; }
+
+/* การ์ดตัวชี้วัด เน้นให้อ่านจากบนลงล่าง: ป้าย ▸ ตัวเลข ▸ คำอธิบาย */
+.kpi {
+  padding: 16px 18px;
+  border-left: 3px solid var(--teal);
+  height: 100%;
+}
+.kpi .v {
+  font-size: 1.62rem; font-weight: 700; line-height: 1.2;
+  letter-spacing: -.02em; margin: 2px 0;
+}
+.kpi .small-muted:first-child {
+  font-size: .74rem; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--slate);
+}
+.analytics-kpi-grid > [class*="col-"] { display: flex; }
+.analytics-kpi-grid .cardx { width: 100%; }
+
+.small-muted { color: var(--muted); font-size: .84rem; }
+.metric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- ป้ายกำกับ ---------- */
+
+.badge { font-weight: 500; }
+.badge-critical { background: var(--red); color: #fff; }
+.badge-high     { background: var(--orange); color: #fff; }
+.badge-medium   { background: var(--yellow); color: #111827; }
+.badge-low      { background: #d1fae5; color: #065f46; }
+.badge-none     { background: #f1f5f9; color: #475569; }
+.badge-real     { background: var(--teal); color: #fff; }
+.badge-derived  { background: var(--blue); color: #fff; }
+.badge-synthetic { background: var(--purple); color: #fff; }
+
+/* ---------- แท็บ ---------- */
+
+/* แถบมุมมองใช้ทรงเหลี่ยมมนเล็กน้อยและตัวอักษรกระชับ ให้อ่านเป็นระบบเมนูงาน */
+.tab-nav-wrap { position: sticky; top: 49px; z-index: 1010; background: var(--bg); padding: 6px 0 0; }
+
+.nav-pills .nav-link {
+  color: #334155; background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: .86rem; font-weight: 500;
+  padding: 6px 14px;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.nav-pills .nav-link:hover { border-color: var(--teal); color: var(--teal); }
+.nav-pills .nav-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.nav-pills .nav-link.active {
+  background: var(--teal); border-color: var(--teal); color: #fff;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, .3);
+}
+
+@media (max-width: 991.98px) {
+  .tab-nav-wrap { position: static; }
+}
+.nav-pills .fraud-active.active    { background: var(--red); border-color: var(--red); }
+.nav-pills .contractor-active.active { background: var(--green); border-color: var(--green); }
+.nav-pills .anomaly-active.active  { background: var(--indigo); border-color: var(--indigo); }
+.nav-pills .demo-active.active     { background: var(--purple); border-color: var(--purple); }
+
+.subnav .btn { border-radius: 20px; }
+.subnav .btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* ---------- รายการที่เลือกได้ ---------- */
+
+.list-box { max-height: 66vh; overflow: auto; }
+.contractor-list { max-height: 52vh; }
+.item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 9px 11px; margin-bottom: 7px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.item:hover { background: #f8fafc; border-color: var(--slate); }
+.item.active { border-color: var(--green); background: #f0fdf4; }
+.rank-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 21px; height: 21px; border-radius: 50%;
+  background: #1f2937; color: #fff;
+  font-size: .7rem; margin-right: 5px;
+}
+
+/* ---------- ตาราง ---------- */
+
+/* ตารางเลื่อนแนวนอนได้เสมอบนจอแคบ ไม่ดันให้หน้าล้นออกด้านข้าง */
+.table-wrap { max-height: 340px; overflow: auto; -webkit-overflow-scrolling: touch; }
+.mini-table { font-size: .84rem; }
+.mini-table th {
+  position: sticky; top: 0; z-index: 2;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600; white-space: nowrap;
+  font-size: .76rem;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: #475569;
+}
+/* แถวสลับสีอ่อนมาก ช่วยกวาดสายตาตามแถวยาวได้โดยไม่รบกวน */
+.mini-table tbody tr:nth-child(even) { background: #fbfcfd; }
+.mini-table tbody tr:hover { background: #f1f5f9; }
+.mini-table td { vertical-align: top; }
+.row-peak { background: #fffbeb; }
+
+/* หัวคอลัมน์ที่เรียงลำดับได้ — เว้นที่ทางขวาไว้ให้ลูกศรเสมอ
+   หัวตารางจึงไม่ขยับตอนสลับคอลัมน์ที่เรียง */
+.mini-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  padding-right: 18px;
+  position: sticky;
+}
+.mini-table th.sortable::after {
+  content: '↕';
+  position: absolute;
+  right: 5px;
+  color: var(--slate);
+  opacity: .45;
+  font-size: .78rem;
+}
+.mini-table th.sortable:hover { color: var(--teal); }
+.mini-table th.sortable:hover::after { opacity: .9; }
+.mini-table th.sortable:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.mini-table th.sort-asc,
+.mini-table th.sort-desc { color: var(--teal); }
+.mini-table th.sort-asc::after { content: '▲'; color: var(--teal); opacity: 1; font-size: .62rem; }
+.mini-table th.sort-desc::after { content: '▼'; color: var(--teal); opacity: 1; font-size: .62rem; }
+
+/* ---------- แผนที่ ---------- */
+
+.map-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.map-toolbar .form-label { font-size: .74rem; color: var(--muted); margin-bottom: 2px; }
+.map-tool-check { display: flex; align-items: flex-end; padding-bottom: 4px; }
+
+/* กรอบแผนที่เป็น containing block ให้ชั้นซ้อนทับวางตำแหน่งได้ */
+.map-shell { position: relative; }
+
+#map {
+  height: 54vh; min-height: 380px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #eef2f7;
+}
+.leaflet-container { font-family: inherit; border-radius: 14px; }
+.leaflet-control-zoom a { border-radius: 8px !important; }
+
+/* ชั้นซ้อนทับต้องอยู่เหนือ tile pane ของ Leaflet ซึ่งใช้ z-index ถึง 800 */
+.map-overlay-stats,
+.map-legend {
+  position: absolute;
+  z-index: 900;
+  background: rgba(255, 255, 255, .93);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+  font-size: .78rem;
+}
+.map-overlay-stats { top: 10px; left: 10px; padding: 7px 11px; max-width: 62%; }
+.map-legend { bottom: 22px; right: 10px; padding: 8px 10px; max-width: 230px; }
+
+.legend-title { font-weight: 600; font-size: .74rem; margin-bottom: 5px; color: var(--muted); }
+.legend-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,.15); }
+.legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; }
+.legend-count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .72rem; }
+.legend-more { color: var(--muted); font-size: .72rem; font-style: italic; }
+.legend-gradient {
+  height: 9px; border-radius: 5px;
+  background: linear-gradient(90deg, #0f766e, #ca8a04, #ea580c, #b91c1c);
+}
+.legend-scale { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); }
+
+/* พื้นหลังมืด ชั้นซ้อนทับต้องกลับสีตาม ไม่งั้นอ่านไม่ออก */
+.map-dark .map-overlay-stats,
+.map-dark .map-legend {
+  background: rgba(17, 24, 39, .88);
+  border-color: rgba(255, 255, 255, .18);
+  color: #e5e7eb;
+}
+.map-dark .legend-title,
+.map-dark .legend-count,
+.map-dark .legend-more { color: #9ca3af; }
+.map-dark .map-overlay-stats .small-muted { color: #9ca3af; }
+
+/* กลุ่มหมุดเป็นวงแหวนสัดส่วน แสดงองค์ประกอบของกลุ่มตามมิติที่เลือก */
+.cluster-icon { background: transparent; border: none; }
+.cluster-donut {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .28);
+  transition: transform .15s;
+}
+/* วงในสีขาวทำให้วงแหวนอ่านง่ายและมีที่วางตัวเลข */
+.cluster-core {
+  width: 64%; height: 64%;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #1f2937; font-weight: 700; font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+.map-dark .cluster-core { background: #1f2937; color: #f3f4f6; }
+.cluster-icon:hover .cluster-donut { transform: scale(1.1); }
+
+/* กระจุกที่มีสัญญาระดับวิกฤตอยู่ข้างใน เต้นเบาๆ เพื่อดึงสายตา */
+.cluster-donut.is-critical { animation: cluster-pulse 2.4s ease-in-out infinite; }
+@keyframes cluster-pulse {
+  0%, 100% { box-shadow: 0 3px 12px rgba(0,0,0,.28), 0 0 0 0 rgba(185,28,28,.42); }
+  50%      { box-shadow: 0 3px 12px rgba(0,0,0,.28), 0 0 0 9px rgba(185,28,28,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cluster-donut.is-critical { animation: none; }
+}
+
+/* คำอธิบายสัญลักษณ์แบบกดสลับได้ */
+.legend-hint { font-weight: 400; font-size: .66rem; opacity: .75; margin-left: 4px; }
+.legend-toggle {
+  cursor: pointer; border-radius: 6px;
+  padding: 1px 3px; margin: 0 -3px;
+  transition: background .12s, opacity .12s;
+}
+.legend-toggle:hover { background: rgba(15, 118, 110, .1); }
+.legend-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.legend-toggle.is-off { opacity: .4; }
+.legend-toggle.is-off .legend-label { text-decoration: line-through; }
+.legend-reset { font-size: .7rem; margin-top: 4px; }
+
+/* หน้าต่างข้อมูลบนหมุด */
+.map-popup-wrap .leaflet-popup-content-wrapper { border-radius: 13px; }
+.map-popup-wrap .leaflet-popup-content { margin: 11px 13px; font-family: inherit; }
+.map-popup { font-size: .8rem; }
+.map-popup .pop-title { font-weight: 600; margin-bottom: 3px; line-height: 1.35; }
+.map-popup .pop-meta { color: var(--muted); font-size: .75rem; }
+.map-popup .pop-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin: 6px 0;
+}
+.map-popup .pop-chips { margin-top: 5px; }
+.map-popup .pop-swatch {
+  display: inline-block; width: 9px; height: 9px;
+  border-radius: 50%; margin-right: 4px;
+}
+
+/* โหมดเต็มจอ */
+.map-fullscreen {
+  background: var(--card);
+  padding: 14px !important;
+  display: flex; flex-direction: column;
+}
+.map-fullscreen .map-shell { flex: 1; }
+.map-fullscreen #map { height: 100%; border-radius: 10px; }
+.map-fullscreen .info-note { display: none; }
+
+.chip-bounds {
+  cursor: pointer;
+  background: #fff7ed; color: #9a3412; border-color: #fed7aa;
+}
+.chip-bounds:hover { background: #ffedd5; }
+
+/* ---------- กฎ ---------- */
+
+.rule-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px; margin-bottom: 9px;
+  background: #fcfcfb;
+}
+.rule-config .v { font-size: 1.35rem; font-weight: 700; }
+.codebox {
+  background: #111827; color: #e5e7eb;
+  border-radius: 9px; padding: 9px 11px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: .78rem; overflow-x: auto; white-space: pre-wrap;
+  word-break: break-word;
+}
+.rule-chip {
+  display: inline-block;
+  background: #f1f5f9; color: #334155;
+  border-radius: 999px; padding: 1px 7px;
+  font-size: .74rem; margin: 1px;
+}
+.rule-chip.chip-synthetic { background: #ede9fe; color: #5b21b6; }
+
+/* ---------- ตารางอ้างอิงกฎ ---------- */
+
+.rule-table-wrap { max-height: 72vh; }
+.rule-table td { vertical-align: top; padding-top: 10px; padding-bottom: 10px; }
+.rule-table .codebox {
+  font-size: .72rem;
+  padding: 7px 9px;
+  margin: 0;
+}
+/* ชื่อคอลัมน์ในชุดข้อมูล แยกให้เห็นว่าเป็นชื่อฟิลด์ ไม่ใช่คำอธิบาย */
+.field-chip {
+  display: inline-block;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 5px;
+  margin: 1px 0;
+  font-size: .7rem;
+  color: #334155;
+}
+.rule-table tr.rule-off { opacity: .5; }
+.rule-table tr.rule-off .codebox { filter: grayscale(1); }
+
+/* ---------- การ์ดมิติ ---------- */
+
+.dim-card {
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+  height: 100%;
+}
+.dim-card:hover { border-color: var(--red); box-shadow: 0 6px 18px rgba(185, 28, 28, .12); }
+.dim-card.active { border-color: var(--red); background: #fef2f2; }
+.dim-card:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.dim-icon { font-size: 1.5rem; line-height: 1; }
+.dim-card .v { font-size: 1.3rem; font-weight: 700; }
+
+/* ---------- แถบคะแนน 5 มิติ ---------- */
+
+.riskbar-wrap {
+  display: flex; height: 7px; margin-top: 6px;
+  border-radius: 4px; overflow: hidden; background: #f1f5f9;
+}
+.riskbar-seg { height: 100%; }
+
+.profile-metric {
+  border: 1px solid var(--border);
+  border-radius: 11px; padding: 8px 10px; height: 100%;
+}
+.profile-metric .label { font-size: .74rem; color: var(--muted); }
+.profile-metric .value { font-size: 1.02rem; font-weight: 600; }
+
+/* ---------- หมายเหตุ ---------- */
+
+.info-note {
+  background: #fef9c3; border: 1px solid #fde68a;
+  border-radius: 10px; padding: 8px 11px; font-size: .82rem;
+}
+.warn-note {
+  background: #fee2e2; border: 1px solid #fecaca; color: #7f1d1d;
+  border-radius: 10px; padding: 9px 12px; font-size: .83rem;
+}
+
+/* ---------- กระดานงาน ---------- */
+
+.kanban-col {
+  border: 1px dashed var(--border);
+  border-radius: 12px; min-height: 200px; background: #fafafa;
+}
+.case-card {
+  background: #fff; border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px; margin-bottom: 7px;
+}
+
+/* ---------- หน้าต่างรายละเอียด ---------- */
+
+.detail-clickable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.detail-clickable:hover { color: var(--teal); }
+.detail-clickable:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+button.detail-clickable { text-decoration: none; }
+
+.modal-content { border-radius: 15px; }
+.detail-section { margin-bottom: 18px; }
+.detail-section h6 {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 5px; margin-bottom: 9px;
+}
+.detail-kv {
+  display: flex; gap: 10px;
+  padding: 3px 0; font-size: .86rem;
+  border-bottom: 1px solid #f4f4f5;
+}
+.detail-kv .k { color: var(--muted); min-width: 140px; flex-shrink: 0; }
+.detail-kv .v { font-weight: 500; word-break: break-word; }
+
+/* ---------- ตอบสนองขนาดหน้าจอ ---------- */
+
+@media (max-width: 992px) {
+  .list-box, .contractor-list { max-height: 44vh; }
+  #map { height: 38vh; }
+  .kpi .v { font-size: 1.2rem; }
+}
+
+@media (max-width: 576px) {
+  .filter-bar { padding: 10px; }
+  .hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo { padding: 14px; }
+  .detail-kv { flex-direction: column; gap: 0; }
+  .detail-kv .k { min-width: 0; }
+}
+
+@media print {
+  .topbar, .filter-bar, .nav-pills, #bootScreen { display: none !important; }
+  .cardx { box-shadow: none; break-inside: avoid; }
+}
+
+/* ---------- Enterprise light theme overrides ----------
+   ส่วนนี้ต่อท้ายไฟล์ทั้งหมด ไม่แก้ไขหรือลบ selector ใดในเนื้อหาด้านบน
+   ใช้หลักการ cascade: selector เดิมชื่อเดียวกันที่ปรากฏซ้ำด้านล่างนี้จะชนะเพราะมาทีหลัง
+   (specificity เท่ากัน ลำดับในไฟล์เป็นตัวตัดสิน) จึงไม่จำเป็นต้องแก้ไขของเดิมโดยตรง
+   ยกเว้น 2 จุดที่ระบุเหตุผลไว้เป็น comment กำกับว่าจำเป็นต้องใช้ !important
+   เพราะ Bootstrap ผูก !important ไว้กับ spacing utility (p-*, m-*, g-*) ทุกตัวโดยดีไซน์
+   ทำให้ CSS ปกติสั่งชนะไม่ได้ */
+
+/* ---------- 1) ระยะห่างโดยรวม (Apple-style whitespace) ---------- */
+
+/* เพิ่มช่องไฟระหว่างการ์ดทั้งหน้าแบบเบา ๆ — ตัวแปร gutter ของ Bootstrap 5
+   ไม่ได้ผูก !important เหมือน padding/margin utility จึงปรับผ่าน custom property ได้ตรง ๆ */
+.row.g-3 { --bs-gutter-x: 1.25rem; --bs-gutter-y: 1.25rem; }
+.row.g-2 { --bs-gutter-x: .9rem; --bs-gutter-y: .9rem; }
+
+.filter-bar { padding: 18px 20px; }
+
+/* Bootstrap ผูก !important กับ .mb-3/.mt-3 ไว้ในตัว (เป็นพฤติกรรมมาตรฐานของ utility API)
+   จึงต้องใช้ !important ที่นี่เพื่อขยายช่องไฟใต้ hero ให้เห็นผลจริง มิเช่นนั้นค่าจะถูกเมิน */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo {
+  margin-bottom: var(--gap-section) !important;
+}
+
+/* ---------- 2) การ์ดพื้นฐาน ---------- */
+
+.cardx {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+/* ไม่ให้การ์ดยกตัวแรงเมื่อ hover ตามที่กำหนด — เปลี่ยนเป็นเน้นเส้นขอบแทนเงา */
+.cardx:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+.card-title-row { margin-bottom: 10px; }
+
+/* ---------- 3) แถบบนสุด ---------- */
+
+/* เส้นสีบนหัวเว็บ ผูกกับสีแบรนด์สองสีหลักที่ใช้จริงในระบบ (teal = อัตลักษณ์, primary = การกระทำ) */
+.topbar::before {
+  background: linear-gradient(90deg, var(--brand-teal) 0%, var(--primary) 100%);
+}
+.topbar { box-shadow: var(--shadow-sm); }
+
+/* ปุ่มส่งออก = การกระทำหลักของระบบ ใช้ primary blue ตามที่กำหนด (เดิมเป็นเขียวหัวเป็ด) */
+.btn-primary-action.btn-outline-secondary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-primary-action.btn-outline-secondary:hover,
+.btn-primary-action.btn-outline-secondary:focus {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
+}
+.btn-neutral.btn-outline-secondary {
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+}
+.btn-neutral.btn-outline-secondary:hover {
+  background: var(--surface-hover);
+  border-color: var(--muted-light);
+  color: var(--text);
+}
+
+/* ---------- 4) ตัวชี้วัด (KPI) ---------- */
+
+/* เปลี่ยนจากเส้นขอบทึบเป็นแถบ accent แบบ pseudo-element เพื่อคุมสีตามตำแหน่งได้อิสระ
+   overflow:hidden ทำให้แถบสีโค้งตามมุมการ์ดพอดี ไม่ยื่นออกมาเป็นเหลี่ยม */
+.kpi {
+  position: relative;
+  overflow: hidden;
+  border-left: none;
+  padding-left: 20px;
+}
+.kpi::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--primary);
+}
+/* ไล่สีตามตำแหน่งการ์ด ใช้ได้กับทั้ง 3 กลุ่ม (#kpis, #fraudKpis, #contractorKpis)
+   เพราะทั้งสามผูก class .analytics-kpi-grid ไว้เหมือนกัน และแต่ละกลุ่มมี 4 การ์ดเท่ากันเสมอ */
+.analytics-kpi-grid > [class*="col-"]:nth-child(1) .kpi::before { background: var(--primary); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(2) .kpi::before { background: var(--secondary); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(3) .kpi::before { background: var(--warning); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(4) .kpi::before { background: var(--danger); }
+
+/* ---------- 5) ตัวกรองและฟอร์ม ---------- */
+
+.filter-bar { background: var(--surface); border-color: var(--border); }
+
+.form-control,
+.form-select {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: none;
+}
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+.form-range::-webkit-slider-thumb { background: var(--primary); }
+.form-range::-moz-range-thumb { background: var(--primary); }
+.form-check-input:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ---------- 6) ปุ่ม: ระบบสีตามความหมาย ---------- */
+
+.btn-primary {
+  --bs-btn-bg: var(--primary);
+  --bs-btn-border-color: var(--primary);
+  --bs-btn-hover-bg: var(--primary-dark);
+  --bs-btn-hover-border-color: var(--primary-dark);
+  --bs-btn-active-bg: var(--primary-dark);
+  --bs-btn-active-border-color: var(--primary-dark);
+}
+.btn-success {
+  --bs-btn-bg: var(--success);
+  --bs-btn-border-color: var(--success);
+}
+.btn-warning {
+  --bs-btn-bg: var(--warning);
+  --bs-btn-border-color: var(--warning);
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
+}
+.btn-danger {
+  --bs-btn-bg: var(--danger);
+  --bs-btn-border-color: var(--danger);
+}
+
+/* ปุ่ม outline ธรรมดา (ไม่มี class เสริม primary-action/neutral) เช่น ล้างตัวกรอง คืนมุมมองแผนที่ */
+.btn-outline-secondary {
+  color: var(--muted);
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.btn-outline-secondary:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--muted-light);
+}
+.btn:disabled,
+.btn.disabled { opacity: .55; cursor: not-allowed; }
+
+/* focus-visible รวมเป็นระบบเดียวทั้งแอป ใช้ห่วงโฟกัสสีฟ้าแทน outline หลายแบบที่กระจัดกระจาย */
+.btn:focus-visible,
+.nav-link:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.mini-table th.sortable:focus-visible,
+.item:focus-visible,
+.dim-card:focus-visible,
+.legend-toggle:focus-visible,
+.detail-clickable:focus-visible,
+.skip-link:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* ปุ่มควบคุมแผนที่ 3 ปุ่มใช้พื้นที่ร่วมกันเท่า ๆ กันบนจอแคบ ไม่ให้ข้อความดันจนล้น */
+@media (max-width: 575.98px) {
+  #mapFilterToView, #mapResetView, #mapFitData {
+    flex: 1 1 auto; min-width: 0;
+    font-size: .78rem; padding-left: 8px; padding-right: 8px;
+  }
+  .btn-group-sm > .btn { font-size: .76rem; padding-left: 8px; padding-right: 8px; }
+}
+
+/* ---------- 7) แท็บ: สีเฉพาะของแต่ละมุมมอง ---------- */
+
+/* กำหนดสีประจำแต่ละแท็บผ่าน custom property บน id ปุ่มโดยตรง
+   ไม่แตะ id/class เดิม เพิ่มเฉพาะการประกาศตัวแปรสีเท่านั้น */
+#pill-overview   { --tab-color: #1677FF; }
+#pill-explain    { --tab-color: #0F766E; }
+#pill-fraud      { --tab-color: #DC3545; }
+#pill-anomaly    { --tab-color: #D97706; }
+#pill-network    { --tab-color: #7C3AED; }
+#pill-contractor { --tab-color: #0891B2; }
+#pill-time       { --tab-color: #2563EB; }
+#pill-rules      { --tab-color: #64748B; }
+#pill-demo       { --tab-color: #9333EA; }
+
+.nav-pills .nav-link {
+  color: var(--tab-color, var(--text-soft));
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+  /* color-mix() รองรับเบราว์เซอร์หลักตั้งแต่ปี 2023 (Chrome 111+, Firefox 113+, Safari 16.4+)
+     ประกาศค่า fallback แบบสีทึบไว้ก่อนเสมอ บราวเซอร์รุ่นเก่าที่ไม่รู้จัก color-mix()
+     จะทิ้งเฉพาะบรรทัด color-mix() แล้วใช้ค่า fallback ที่ประกาศไว้ก่อนหน้าแทนโดยอัตโนมัติ */
+  border-color: color-mix(in srgb, var(--tab-color, var(--muted-light)) 24%, white);
+  transition: background-color .16s ease, border-color .16s ease,
+              color .16s ease, box-shadow .16s ease;
+}
+.nav-pills .nav-link:hover {
+  color: var(--tab-color, var(--text));
+  background: var(--surface-hover);
+  background: color-mix(in srgb, var(--tab-color, var(--muted-light)) 9%, white);
+  border-color: var(--border-strong);
+  border-color: color-mix(in srgb, var(--tab-color, var(--muted-light)) 45%, white);
+}
+.nav-pills .nav-link.active {
+  color: #fff;
+  background: var(--tab-color, var(--brand-teal));
+  border-color: var(--tab-color, var(--brand-teal));
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .16);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--tab-color, var(--muted-light)) 30%, transparent);
+}
+.nav-pills .nav-link:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---------- 8) ส่วนหัวแต่ละแท็บ (hero) ---------- */
+
+/* คงดีไซน์พื้นสว่าง + แถบสีด้านซ้ายจากเวอร์ชันก่อนหน้าไว้โดยตั้งใจ แทนที่จะย้อนกลับไปใช้
+   พื้นไล่สีเข้มตัวอักษรขาวตามตัวอย่างในสเปก เพราะสเปกเองระบุชัดว่า "ไม่ใช้ hero เป็นพื้นที่
+   ที่เด่นกว่าข้อมูล KPI" และ "ลดความฉูดฉาดของ gradient" — พื้นสว่างสอดคล้องกับทั้งสองข้อนี้
+   มากกว่าพาเนลสีเข้มเต็มพื้นที่ ในที่นี้จึงปรับเฉพาะสีแถบซ้ายให้ตรงกับสีของแต่ละแท็บแทน */
+.hero            { border-left-color: var(--primary); }
+.hero-fraud      { border-left-color: var(--danger); }
+.hero-contractor { border-left-color: var(--cyan); }
+.hero-anomaly    { border-left-color: var(--warning); }
+.hero-demo       { border-left-color: #9333EA; }
+
+/* ---------- 9) ป้ายกำกับ (badge) ---------- */
+
+.badge-real      { background: var(--brand-teal); color: #fff; }
+.badge-derived   { background: var(--primary); color: #fff; }
+.badge-synthetic { background: var(--violet); color: #fff; }
+.badge-critical  { background: var(--danger); color: #fff; }
+.badge-high      { background: var(--warning); color: #fff; }
+.badge-medium    { background: #ca8a04; color: #111827; }
+.badge-low       { background: var(--success-soft); color: #065f46; }
+.badge-none      { background: var(--surface-hover); color: var(--text-soft); }
+
+/* ---------- 10) รายการที่เลือกได้ ---------- */
+
+.item:hover {
+  background: #EFF6FF;
+  border-color: var(--primary);
+}
+.item.active {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+/* ---------- 11) ตาราง ---------- */
+
+.mini-table th {
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  border-bottom: 1px solid var(--border-strong);
+}
+.mini-table tbody tr:nth-child(even) { background: var(--surface-soft); }
+.mini-table tbody tr:hover { background: var(--surface-hover); }
+
+/* ---------- 12) แผนที่ ---------- */
+
+#map {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.map-toolbar {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+.map-overlay-stats,
+.map-legend {
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 575.98px) {
+  /* ลดพื้นที่ overlay บนจอแคบ ไม่ให้บังแผนที่มากเกินไป แต่ยังอ่านได้ครบ */
+  .map-overlay-stats { max-width: 68%; font-size: .72rem; padding: 6px 9px; }
+  .map-legend { max-width: 150px; font-size: .7rem; padding: 6px 8px; }
+  .map-legend .legend-hint { display: none; }
+  #map { min-height: 320px; }
+}
+
+/* ---------- 13) ตอบสนองขนาดหน้าจอเพิ่มเติม ---------- */
+
+@media (max-width: 991.98px) {
+  .cardx { box-shadow: var(--shadow-sm); }
+}
+
+@media (max-width: 575.98px) {
+  .cardx, .hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo,
+  .boot-panel, .map-toolbar { border-radius: var(--radius-md); }
+
+  /* ตัวกรองแต่ละช่องเต็มความกว้างบนโทรศัพท์ แตะง่ายขึ้น ไม่ต้องเล็งช่องแคบ */
+  .filter-bar .row > [class*="col-"] { flex: 0 0 100%; max-width: 100%; }
+
+  .topbar-inner { row-gap: 6px; }
+}
+
+/* ---------- 14) การเข้าถึง: ลดการเคลื่อนไหวเมื่อผู้ใช้ตั้งค่าไว้ ---------- */
+
+/* ครอบคลุมทุก transition/animation ในไฟล์นี้เป็นการทั่วไป เพิ่มเติมจากกฎเฉพาะจุด
+   (เช่น .cluster-donut.is-critical) ที่มีอยู่แล้วด้านบน ไม่ได้ทดแทนกัน แต่เสริมกัน */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

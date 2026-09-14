@@ -1,0 +1,3410 @@
+/* style.css — Procurement Analytics
+   ระบบภาพเน้นความเป็นทางการ พื้นสว่าง ตัวอักษรอ่านง่าย และมีพื้นที่ว่างพอให้สายตาพัก
+   โครงกริดอิงระบบ 12 คอลัมน์ของ Bootstrap สีหลักคือเขียวหัวเป็ดตามอัตลักษณ์เดิมของระบบ */
+
+:root {
+  /* ---------- ระบบขนาดตัวอักษร ----------
+     เดิมมี 30 ค่ากระจัดกระจาย หลายค่าต่างกันไม่ถึงครึ่งพิกเซลซึ่งสายตาแยกไม่ออก
+     แต่ทำให้ลำดับชั้นไม่ชัด จึงยุบเหลือ 8 ขั้นที่ต่างกันพอให้อ่านออกว่าคนละระดับ
+     ภาษาไทยไม่มีตัวพิมพ์ใหญ่เล็กช่วยแยกระดับ ขนาดกับน้ำหนักจึงต้องทำงานหนักกว่า */
+  --text-xs: .6875rem;    /* 11px  — ป้ายกำกับเล็ก ตัวห้อย */
+  --text-sm: .78rem;      /* 12.5px — คำอธิบายประกอบ */
+  --text-md: .875rem;     /* 14px  — ตารางและเนื้อความรอง */
+  --text-base: .9375rem;  /* 15px  — เนื้อความหลัก */
+  --text-lg: 1.0625rem;   /* 17px  — หัวการ์ด */
+  --text-xl: 1.375rem;    /* 22px  — หัวเรื่องแท็บ */
+  --text-2xl: 2rem;       /* 32px  — หัวเรื่องหลัก */
+  --text-kpi: 2.5rem;     /* 40px  — ตัวเลขบนการ์ด KPI */
+
+  /* ---------- ระบบโทเค็นสี ----------
+     ชุดสีอ้างจากต้นแบบที่ผู้ใช้กำหนด: โครงหน้าเป็นเขียวเข้มแบบหน่วยงานตรวจสอบ
+     พื้นหลังอมเขียวอ่อน และ "บันไดความรุนแรง 4 ระดับ" เป็นภาษาภาพหลัก
+     ชื่อโทเค็นทั้งหมดยังเป็นชื่อเดิม กฎ CSS กว่า 600 ข้อจึงเปลี่ยนสีตามไปพร้อมกัน */
+
+  /* พื้นผิวและเส้นขอบ */
+  --bg: #F2F6F4;
+  --surface: #FFFFFF;
+  --surface-soft: #F7FAF9;
+  --surface-hover: #EEF4F2;
+  --border: #E1EAE7;
+  --border-strong: #C9D8D3;
+  /* สีฐานของ color-mix ทั่วไฟล์ ต้องสลับตามธีมด้วย ไม่งั้นโหมดมืดจะได้พื้นสว่าง */
+  --mix-base: #FFFFFF;
+
+  /* ตัวอักษร */
+  --text: #132420;
+  --text-soft: #3C4F4A;
+  --muted: #5F7570;        /* 5.0:1 บนพื้นขาว ใช้กับตัวอักษรได้ */
+  --muted-light: #93A7A1;  /* ใช้กับเส้นขอบ ไอคอน และเส้นกราฟเท่านั้น */
+
+  /* โครงหน้าสีเข้ม: แถบข้าง แถบบน และแผงพาดหัว */
+  --chrome: #0B4F45;
+  --chrome-2: #0E5F52;
+  --chrome-line: #1B7566;
+  --chrome-ink: #EAF5F1;
+  --chrome-ink-dim: #9CC7BC;
+
+  /* สีหลักของแบรนด์และการกระทำ — เขียวหัวเป็ดเข้ม ผ่าน AA คู่ตัวอักษรขาว
+     --primary 5.14:1 · --primary-dark 7.84:1 */
+  --primary: #0E7C66;
+  --primary-dark: #0A5C4B;
+  --primary-soft: #E3F3EE;
+  --secondary: #2FA98D;
+  --brand-teal: #0B4F45;
+
+  /* บันไดความรุนแรง: หนึ่งชุดสี = หนึ่งความหมาย ใช้กับ "ระดับความเสี่ยง" เท่านั้น */
+  --sev-4: #B42318; --sev-4-bg: #FDF0EE; --sev-4-ink: #8C1A12;
+  --sev-3: #C2680B; --sev-3-bg: #FDF4E7; --sev-3-ink: #8A4A07;
+  --sev-2: #0E7490; --sev-2-bg: #E8F5F9; --sev-2-ink: #0A566B;
+  --sev-1: #5A716B; --sev-1-bg: #EFF3F1; --sev-1-ink: #41534E;
+
+  /* สีตามความหมาย (semantic) ผูกเข้ากับบันไดความรุนแรงข้างบน */
+  --success: #12795B;
+  --success-soft: #E4F4EE;
+  --warning: var(--sev-3);
+  --warning-soft: var(--sev-3-bg);
+  --danger: var(--sev-4);
+  --danger-soft: var(--sev-4-bg);
+  /* เฉดเข้มสำหรับวางคู่ตัวอักษรสีขาวให้ผ่าน WCAG AA (สีปกติด้านบนไว้ใช้กับพื้นและกราฟ) */
+  --danger-ink: var(--sev-4-ink);
+  --warning-ink: var(--sev-3-ink);
+  --violet: #5B4BB8;
+  --violet-soft: #EEEBFA;
+  --cyan: var(--sev-2);
+  --cyan-soft: var(--sev-2-bg);
+
+  /* เงาและมุมโค้งมาตรฐาน */
+  --shadow-sm: 0 1px 2px rgba(11, 79, 69, .05);
+  --shadow-md: 0 1px 2px rgba(11, 79, 69, .05), 0 8px 22px rgba(11, 79, 69, .05);
+  --shadow-focus: 0 0 0 3px rgba(14, 124, 102, .22);
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 13px;
+  --sidebar-w: 238px;
+
+  /* ---------- ชื่อตัวแปรเดิม: คงไว้เป็น alias ----------
+     selector เดิมทุกจุดที่อ้าง var(--teal), var(--blue) ฯลฯ ยังทำงานเหมือนเดิม
+     ค่าที่ตรงกับของเดิมเป๊ะ (--card, --teal, --purple, --slate) จึงไม่กระทบภาพเดิมเลย
+     ค่าที่ขยับเล็กน้อย (--blue, --orange, --red, --green) คือการรวมโทนสีเข้าระบบใหม่ตามที่ระบุ
+
+     หมายเหตุ --slate: ชุดโทเค็นใหม่ที่กำหนดมาให้ค่า --slate ตรงกับ --muted (#64748B) พอดี
+     แต่ --slate เดิมของไฟล์นี้คือ #94a3b8 ซึ่งตรงกับ --muted-light เป๊ะ และถูกใช้เป็นสีเทาอ่อน
+     ในหลายจุด (ลูกศรเรียงตาราง, เส้นขอบ hover, badge-none) การ alias ไปยัง --muted-light
+     จึงรักษาโทนภาพเดิมไว้ได้ตรงกว่า สอดคล้องกับคำสั่ง "เปลี่ยน reference เดิมอย่างปลอดภัย" */
+  --card: var(--surface);
+  --teal: var(--brand-teal);
+  --teal-dark: #08423A;
+  --orange: var(--warning);
+  --red: var(--danger);
+  --yellow: #A9740A;
+  --purple: var(--violet);
+  --indigo: var(--violet);
+  --blue: var(--primary);
+  --green: var(--success);
+  --slate: var(--muted-light);
+
+  /* ระยะห่างและมุมโค้งที่ตั้งไว้ในเวอร์ชันก่อนหน้า ผูกเข้ากับระบบโทเค็นใหม่ */
+  --gap-section: 22px;
+  --radius-card: var(--radius-lg);
+
+  /* เฉดสว่างสำหรับ "ตัวอักษรสีแบรนด์บนพื้นการ์ด"
+     แยกจาก --primary ที่ใช้เป็นพื้นทึบรองรับตัวอักษรขาว เพราะสองบทบาทนี้
+     ต้องการความสว่างตรงข้ามกัน และในโหมดมืดยิ่งต้องแยกกันชัด */
+  --accent-bright: var(--primary-dark);
+  --danger-text: var(--danger-ink);
+  --warning-text: var(--warning-ink);
+}
+
+/* ---------- โหมดมืด ----------
+   สลับเฉพาะค่าโทเค็น ไม่แก้ selector ใด ๆ
+   ข้อควรระวังที่ตรวจแล้ว: --primary / --primary-dark / --danger-ink / --warning-ink / --violet
+   ถูกใช้เป็น "พื้นทึบรองรับตัวอักษรขาว" หลายจุด จึงต้องคงความเข้มไว้แม้ในโหมดมืด
+   ส่วนบทบาท "ตัวอักษรสีแบรนด์" ใช้ --accent-bright ที่สว่างขึ้นแทน */
+[data-theme="dark"] {
+  --bg: #08110F;
+  --surface: #101B18;
+  --surface-soft: #16221F;
+  --surface-hover: #1B2926;
+  --border: #22322E;
+  --border-strong: #31453F;
+  --mix-base: #101B18;
+
+  --text: #E6EFEC;
+  --text-soft: #B4C6C1;
+  --muted: #96ACA6;
+  --muted-light: #6E847E;
+
+  --chrome: #07231F;
+  --chrome-2: #0A2E28;
+  --chrome-line: #144F44;
+  --chrome-ink: #DCEDE8;
+  --chrome-ink-dim: #7FA79D;
+
+  --primary: #12866E;
+  --primary-dark: #0E7C66;
+  --primary-soft: #13302A;
+  --secondary: #2FB394;
+  --accent-bright: #5FD3B4;
+
+  --sev-4: #F0776B; --sev-4-bg: #2B1512; --sev-4-ink: #F5A79E;
+  --sev-3: #E7A24C; --sev-3-bg: #2A1E0D; --sev-3-ink: #F0C182;
+  --sev-2: #45B8D6; --sev-2-bg: #0E2730; --sev-2-ink: #8FD6E8;
+  --sev-1: #93A7A1; --sev-1-bg: #1A2523; --sev-1-ink: #B6C6C1;
+
+  /* พื้นทึบของป้ายระดับความเสี่ยง ยังต้องรองรับตัวอักษรขาว */
+  --danger-ink: #9B2C20;
+  --warning-ink: #8A4A07;
+  --danger-text: var(--sev-4-ink);
+  --warning-text: var(--sev-3-ink);
+
+  --success: #12795B;
+  --success-soft: #12302A;
+  --violet: #6C5CD0;
+  --violet-soft: #1E1A33;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px rgba(0, 0, 0, .22);
+  --shadow-focus: 0 0 0 3px rgba(95, 211, 180, .3);
+}
+
+body {
+  font-family: 'IBM Plex Sans Thai', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -.005em; }
+
+/* ตัวเลขทั้งหน้าใช้ความกว้างเท่ากัน คอลัมน์ตัวเลขจึงเรียงตรงกัน */
+.metric, .kpi .v, .legend-count, td.text-end, th.text-end {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ลิงก์ข้ามไปเนื้อหาหลัก สำหรับผู้ใช้คีย์บอร์ด */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 2000;
+  background: var(--teal); color: #fff;
+  padding: 10px 16px; border-radius: 0 0 10px 0;
+  text-decoration: none; font-size: var(--text-base);
+}
+.skip-link:focus { left: 0; }
+
+/* ---------- โครงหน้า ---------- */
+
+.main-content { padding-top: 4px; }
+.section-block { scroll-margin-top: 76px; }
+
+/* ป้ายกำกับกลุ่มเครื่องมือ ช่วยให้สายตาแยกโซนได้โดยไม่ต้องใช้เส้นหนา */
+.section-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--slate);
+  margin-bottom: 8px;
+}
+
+/* ---------- หน้าจอตอนโหลด ---------- */
+
+.boot-screen {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+  background: var(--bg);
+}
+.boot-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 38px 44px;
+  box-shadow: 0 10px 34px rgba(15, 23, 42, .06);
+  max-width: 480px;
+}
+.boot-brand {
+  font-weight: 600; color: var(--teal);
+  letter-spacing: .2px; font-size: var(--text-lg);
+}
+.boot-message { font-size: var(--text-base); }
+.text-teal { color: var(--teal); }
+
+.loading-box { padding: 36px; text-align: center; color: var(--muted); }
+
+/* ข้อความ "ไม่มีข้อมูล" ที่มีกรอบ เพื่อให้แยกออกจาก widget ที่พัง */
+.empty-state {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-md);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+/* ---------- แถบบนสุด ---------- */
+
+.topbar {
+  position: sticky; top: 0; z-index: 1020;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, .04);
+}
+/* เส้นสีบางด้านบนเป็นตัวยึดอัตลักษณ์องค์กร */
+.topbar::before {
+  content: '';
+  display: block; height: 3px;
+  background: linear-gradient(90deg, var(--teal) 0%, var(--teal-dark) 55%, var(--indigo) 100%);
+}
+.topbar-inner { min-height: 46px; }
+
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand strong { color: var(--teal); letter-spacing: .2px; }
+
+/* ตราสัญลักษณ์ตัวย่อ ใช้แทนโลโก้ภาพเพื่อให้ไฟล์ยังเป็น static ล้วน */
+.brand-mark {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  color: #fff; font-weight: 700; font-size: var(--text-sm); letter-spacing: .5px;
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.brand-sub {
+  font-size: var(--text-xs); color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.meta-line {
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.topbar-actions .btn { font-weight: 500; }
+
+/* ปุ่มการกระทำหลัก ใช้สีทึบเพื่อให้ลำดับความสำคัญชัด */
+.btn-primary-action.btn-outline-secondary {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.btn-primary-action.btn-outline-secondary:hover,
+.btn-primary-action.btn-outline-secondary:focus {
+  background: var(--teal-dark);
+  border-color: var(--teal-dark);
+  color: #fff;
+}
+.btn-neutral.btn-outline-secondary {
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+}
+.btn-neutral.btn-outline-secondary:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+@media (max-width: 575.98px) {
+  .brand-sub { display: none; }
+  .topbar-actions { width: 100%; }
+  .topbar-actions .btn { flex: 1; }
+}
+
+/* ---------- ตัวกรองส่วนกลาง ---------- */
+
+.filter-bar { padding: 14px 16px; }
+.filter-bar .form-label { font-size: var(--text-sm); color: var(--muted); margin-bottom: 2px; }
+.filter-summary { font-size: var(--text-md); color: var(--muted); }
+.chip {
+  display: inline-block;
+  background: var(--primary-soft); color: var(--accent-bright);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--mix-base));
+  border-radius: 999px;
+  padding: 1px 9px; margin-right: 4px;
+  font-size: var(--text-sm);
+}
+
+/* ---------- ส่วนหัวแต่ละแท็บ ---------- */
+
+/* ส่วนหัวแต่ละแท็บใช้พื้นสว่างและแถบสีด้านซ้ายแทนการไล่สีเข้ม
+   อ่านง่ายกว่าในการใช้งานต่อเนื่องนาน และเข้ากับงานเอกสารราชการมากกว่า */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo {
+  border-radius: var(--radius-card);
+  padding: 18px 22px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.hero h1, .hero-fraud h1, .hero-contractor h1,
+.hero-anomaly h1, .hero-demo h1 { color: var(--text); }
+.hero .small, .hero-fraud .small, .hero-contractor .small,
+.hero-anomaly .small, .hero-demo .small { color: var(--muted); }
+
+.hero            { border-left-color: var(--teal);   background: linear-gradient(90deg, #f0fdfa 0%, #fff 42%); }
+.hero-fraud      { border-left-color: var(--red);    background: linear-gradient(90deg, #fef2f2 0%, #fff 42%); }
+.hero-contractor { border-left-color: var(--green);  background: linear-gradient(90deg, #f0fdf4 0%, #fff 42%); }
+.hero-anomaly    { border-left-color: var(--indigo); background: linear-gradient(90deg, #eef2ff 0%, #fff 42%); }
+.hero-demo       { border-left-color: var(--purple); background: linear-gradient(90deg, #f5f3ff 0%, #fff 42%); }
+
+/* แท็บสาธิตมีพื้นหลังลายทางจาง เพื่อไม่ให้เข้าใจผิดว่าเป็นข้อมูลจริง */
+.demo-pane {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(124, 58, 237, .035) 0 12px, transparent 12px 24px);
+  border-radius: var(--radius-card);
+  padding: 12px;
+  margin: -12px;
+}
+
+/* ---------- การ์ด ---------- */
+
+/* การ์ดใช้เงาบางและขอบคม เน้นความสะอาดแบบระบบงานองค์กร
+   ไม่ใช้เงาฟุ้งเพราะทำให้หน้าที่มีการ์ดจำนวนมากดูรก */
+.cardx {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+  transition: box-shadow .15s, border-color .15s;
+}
+.cardx:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .06); }
+
+.card-title-row {
+  display: flex; justify-content: space-between;
+  align-items: center; gap: 8px; margin-bottom: 6px;
+}
+/* หัวการ์ดมีเส้นคั่นบาง ช่วยแยกหัวเรื่องออกจากเนื้อหาโดยไม่เพิ่มความหนัก */
+.cardx .card-title-row {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.cardx .card-title-row h2 { letter-spacing: -.01em; }
+
+/* การ์ดตัวชี้วัด เน้นให้อ่านจากบนลงล่าง: ป้าย ▸ ตัวเลข ▸ คำอธิบาย */
+.kpi {
+  padding: 16px 18px;
+  border-left: 3px solid var(--teal);
+  height: 100%;
+}
+.kpi .v {
+  font-size: var(--text-2xl); font-weight: 700; line-height: 1.2;
+  letter-spacing: -.02em; margin: 2px 0;
+}
+.kpi .small-muted:first-child {
+  font-size: var(--text-sm); font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase;
+  /* เดิมใช้ var(--slate) ซึ่ง alias ไปที่ #94A3B8 ได้ contrast เพียง 2.56:1
+     ทั้งที่เป็นข้อความบอกว่าตัวเลขใหญ่ที่สุดบนหน้าคืออะไร */
+  color: var(--muted);
+}
+.analytics-kpi-grid > [class*="col-"] { display: flex; }
+.analytics-kpi-grid .cardx { width: 100%; }
+
+.small-muted { color: var(--muted); font-size: var(--text-md); }
+.metric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- ป้ายกำกับ ---------- */
+
+.badge { font-weight: 500; }
+.badge-critical { background: var(--red); color: #fff; }
+.badge-high     { background: var(--orange); color: #fff; }
+.badge-medium   { background: var(--yellow); color: #111827; }
+.badge-low      { background: #d1fae5; color: #065f46; }
+.badge-none     { background: #f1f5f9; color: #475569; }
+.badge-real     { background: var(--teal); color: #fff; }
+.badge-derived  { background: var(--blue); color: #fff; }
+.badge-synthetic { background: var(--purple); color: #fff; }
+
+/* ---------- แท็บ ---------- */
+
+/* แถบมุมมองใช้ทรงเหลี่ยมมนเล็กน้อยและตัวอักษรกระชับ ให้อ่านเป็นระบบเมนูงาน */
+.tab-nav-wrap { position: sticky; top: 49px; z-index: 1010; background: var(--bg); padding: 6px 0 0; }
+
+.nav-pills .nav-link {
+  color: #334155; background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: var(--text-md); font-weight: 500;
+  padding: 6px 14px;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.nav-pills .nav-link:hover { border-color: var(--teal); color: var(--teal); }
+.nav-pills .nav-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.nav-pills .nav-link.active {
+  background: var(--teal); border-color: var(--teal); color: #fff;
+  box-shadow: 0 1px 3px rgba(15, 118, 110, .3);
+}
+
+@media (max-width: 991.98px) {
+  .tab-nav-wrap { position: static; }
+}
+.nav-pills .fraud-active.active    { background: var(--red); border-color: var(--red); }
+.nav-pills .contractor-active.active { background: var(--green); border-color: var(--green); }
+.nav-pills .anomaly-active.active  { background: var(--indigo); border-color: var(--indigo); }
+.nav-pills .demo-active.active     { background: var(--purple); border-color: var(--purple); }
+
+.subnav .btn { border-radius: 20px; }
+.subnav .btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+
+/* ---------- รายการที่เลือกได้ ---------- */
+
+.list-box { max-height: 66vh; overflow: auto; }
+.contractor-list { max-height: 52vh; }
+.item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 9px 11px; margin-bottom: 7px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.item:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.item.active { border-color: var(--green); background: var(--success-soft); }
+.rank-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 21px; height: 21px; border-radius: 50%;
+  background: #1f2937; color: #fff;
+  font-size: var(--text-xs); margin-right: 5px;
+}
+
+/* ---------- ตาราง ---------- */
+
+/* ตารางเลื่อนแนวนอนได้เสมอบนจอแคบ ไม่ดันให้หน้าล้นออกด้านข้าง */
+.table-wrap { max-height: 340px; overflow: auto; -webkit-overflow-scrolling: touch; }
+.mini-table { font-size: var(--text-md); }
+.mini-table th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600; white-space: nowrap;
+  font-size: var(--text-sm);
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* แถวสลับสีอ่อนมาก ช่วยกวาดสายตาตามแถวยาวได้โดยไม่รบกวน */
+.mini-table tbody tr:nth-child(even) { background: var(--surface-soft); }
+.mini-table tbody tr:hover { background: var(--surface-hover); }
+.mini-table td { vertical-align: top; }
+.row-peak { background: var(--sev-3-bg); }
+
+/* หัวคอลัมน์ที่เรียงลำดับได้ — เว้นที่ทางขวาไว้ให้ลูกศรเสมอ
+   หัวตารางจึงไม่ขยับตอนสลับคอลัมน์ที่เรียง */
+.mini-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  padding-right: 18px;
+  position: sticky;
+}
+.mini-table th.sortable::after {
+  content: '↕';
+  position: absolute;
+  right: 5px;
+  color: var(--slate);
+  opacity: .45;
+  font-size: var(--text-sm);
+}
+.mini-table th.sortable:hover { color: var(--teal); }
+.mini-table th.sortable:hover::after { opacity: .9; }
+.mini-table th.sortable:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.mini-table th.sort-asc,
+.mini-table th.sort-desc { color: var(--teal); }
+.mini-table th.sort-asc::after { content: '▲'; color: var(--teal); opacity: 1; font-size: var(--text-xs); }
+.mini-table th.sort-desc::after { content: '▼'; color: var(--teal); opacity: 1; font-size: var(--text-xs); }
+
+/* ---------- แผนที่ ---------- */
+
+.map-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.map-toolbar .form-label { font-size: var(--text-sm); color: var(--muted); margin-bottom: 2px; }
+.map-tool-check { display: flex; align-items: flex-end; padding-bottom: 4px; }
+
+/* กรอบแผนที่เป็น containing block ให้ชั้นซ้อนทับวางตำแหน่งได้ */
+.map-shell { position: relative; }
+
+#map {
+  height: 54vh; min-height: 380px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+}
+.leaflet-container { font-family: inherit; border-radius: 14px; }
+.leaflet-control-zoom a { border-radius: 8px !important; }
+
+/* ชั้นซ้อนทับต้องอยู่เหนือ tile pane ของ Leaflet ซึ่งใช้ z-index ถึง 800 */
+.map-overlay-stats,
+.map-legend {
+  position: absolute;
+  z-index: 900;
+  background: rgba(255, 255, 255, .93);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+  font-size: var(--text-sm);
+}
+.map-overlay-stats { top: 10px; left: 10px; padding: 7px 11px; max-width: 62%; }
+.map-legend { bottom: 22px; right: 10px; padding: 8px 10px; max-width: 230px; }
+
+.legend-title { font-weight: 600; font-size: var(--text-sm); margin-bottom: 5px; color: var(--muted); }
+.legend-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,.15); }
+.legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.legend-count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: var(--text-sm); }
+.legend-more { color: var(--muted); font-size: var(--text-sm); font-style: italic; }
+.legend-gradient {
+  height: 9px; border-radius: 5px;
+  background: linear-gradient(90deg, #0f766e, #ca8a04, #ea580c, #b91c1c);
+}
+.legend-scale { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--muted); }
+
+/* พื้นหลังมืด ชั้นซ้อนทับต้องกลับสีตาม ไม่งั้นอ่านไม่ออก */
+.map-dark .map-overlay-stats,
+.map-dark .map-legend {
+  background: rgba(17, 24, 39, .88);
+  border-color: rgba(255, 255, 255, .18);
+  color: #e5e7eb;
+}
+.map-dark .legend-title,
+.map-dark .legend-count,
+.map-dark .legend-more { color: #9ca3af; }
+.map-dark .map-overlay-stats .small-muted { color: #9ca3af; }
+
+/* กลุ่มหมุดเป็นวงแหวนสัดส่วน แสดงองค์ประกอบของกลุ่มตามมิติที่เลือก */
+.cluster-icon { background: transparent; border: none; }
+.cluster-donut {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .28);
+  transition: transform .15s;
+}
+/* วงในสีขาวทำให้วงแหวนอ่านง่ายและมีที่วางตัวเลข */
+.cluster-core {
+  width: 64%; height: 64%;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #1f2937; font-weight: 700; font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.map-dark .cluster-core { background: #1f2937; color: #f3f4f6; }
+.cluster-icon:hover .cluster-donut { transform: scale(1.1); }
+
+/* กระจุกที่มีสัญญาระดับวิกฤตอยู่ข้างใน เต้นเบาๆ เพื่อดึงสายตา */
+.cluster-donut.is-critical { animation: cluster-pulse 2.4s ease-in-out infinite; }
+@keyframes cluster-pulse {
+  0%, 100% { box-shadow: 0 3px 12px rgba(0,0,0,.28), 0 0 0 0 rgba(185,28,28,.42); }
+  50%      { box-shadow: 0 3px 12px rgba(0,0,0,.28), 0 0 0 9px rgba(185,28,28,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cluster-donut.is-critical { animation: none; }
+}
+
+/* คำอธิบายสัญลักษณ์แบบกดสลับได้ */
+.legend-hint { font-weight: 400; font-size: var(--text-xs); opacity: .75; margin-left: 4px; }
+.legend-toggle {
+  cursor: pointer; border-radius: 6px;
+  padding: 1px 3px; margin: 0 -3px;
+  transition: background .12s, opacity .12s;
+}
+.legend-toggle:hover { background: rgba(15, 118, 110, .1); }
+.legend-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.legend-toggle.is-off { opacity: .4; }
+.legend-toggle.is-off .legend-label { text-decoration: line-through; }
+.legend-reset { font-size: var(--text-xs); margin-top: 4px; }
+
+/* หน้าต่างข้อมูลบนหมุด */
+.map-popup-wrap .leaflet-popup-content-wrapper { border-radius: 13px; }
+.map-popup-wrap .leaflet-popup-content { margin: 11px 13px; font-family: inherit; }
+.map-popup { font-size: var(--text-sm); }
+.map-popup .pop-title { font-weight: 600; margin-bottom: 3px; line-height: 1.35; }
+.map-popup .pop-meta { color: var(--muted); font-size: var(--text-sm); }
+.map-popup .pop-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin: 6px 0;
+}
+.map-popup .pop-chips { margin-top: 5px; }
+.map-popup .pop-swatch {
+  display: inline-block; width: 9px; height: 9px;
+  border-radius: 50%; margin-right: 4px;
+}
+
+/* โหมดเต็มจอ */
+.map-fullscreen {
+  background: var(--card);
+  padding: 14px !important;
+  display: flex; flex-direction: column;
+}
+.map-fullscreen .map-shell { flex: 1; }
+.map-fullscreen #map { height: 100%; border-radius: 10px; }
+.map-fullscreen .info-note { display: none; }
+
+.chip-bounds {
+  cursor: pointer;
+  background: #fff7ed; color: #9a3412; border-color: #fed7aa;
+}
+.chip-bounds:hover { background: #ffedd5; }
+
+/* ---------- กฎ ---------- */
+
+.rule-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px; margin-bottom: 9px;
+  background: var(--surface-soft);
+}
+.rule-config .v { font-size: var(--text-xl); font-weight: 700; }
+.codebox {
+  background: #111827; color: #e5e7eb;
+  border-radius: 9px; padding: 9px 11px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: var(--text-sm); overflow-x: auto; white-space: pre-wrap;
+  word-break: break-word;
+}
+.rule-chip {
+  display: inline-block;
+  background: var(--surface-hover); color: var(--text-soft);
+  border-radius: 999px; padding: 1px 7px;
+  font-size: var(--text-sm); margin: 1px;
+}
+.rule-chip.chip-synthetic { background: #ede9fe; color: #5b21b6; }
+
+/* ---------- ตารางอ้างอิงกฎ ---------- */
+
+.rule-table-wrap { max-height: 72vh; }
+.rule-table td { vertical-align: top; padding-top: 10px; padding-bottom: 10px; }
+.rule-table .codebox {
+  font-size: var(--text-sm);
+  padding: 7px 9px;
+  margin: 0;
+}
+/* ชื่อคอลัมน์ในชุดข้อมูล แยกให้เห็นว่าเป็นชื่อฟิลด์ ไม่ใช่คำอธิบาย */
+.field-chip {
+  display: inline-block;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 5px;
+  margin: 1px 0;
+  font-size: var(--text-xs);
+  color: var(--text-soft);
+}
+.rule-table tr.rule-off { opacity: .5; }
+.rule-table tr.rule-off .codebox { filter: grayscale(1); }
+
+/* ---------- การ์ดมิติ ---------- */
+
+.dim-card {
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+  height: 100%;
+}
+.dim-card:hover { border-color: var(--red); box-shadow: 0 6px 18px rgba(185, 28, 28, .12); }
+.dim-card.active { border-color: var(--red); background: var(--sev-4-bg); }
+.dim-card:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.dim-icon { font-size: var(--text-2xl); line-height: 1; }
+.dim-card .v { font-size: var(--text-xl); font-weight: 700; }
+
+/* ---------- แถบคะแนน 5 มิติ ---------- */
+
+.riskbar-wrap {
+  display: flex; height: 7px; margin-top: 6px;
+  border-radius: 4px; overflow: hidden; background: var(--surface-hover);
+}
+.riskbar-seg { height: 100%; }
+
+.profile-metric {
+  border: 1px solid var(--border);
+  border-radius: 11px; padding: 8px 10px; height: 100%;
+}
+.profile-metric .label { font-size: var(--text-sm); color: var(--muted); }
+.profile-metric .value { font-size: var(--text-lg); font-weight: 600; }
+
+/* ---------- หมายเหตุ ---------- */
+
+.info-note {
+  background: var(--sev-3-bg); border: 1px solid color-mix(in srgb, var(--sev-3) 40%, var(--mix-base));
+  border-radius: 10px; padding: 8px 11px; font-size: var(--text-md);
+}
+.warn-note {
+  background: var(--sev-4-bg); border: 1px solid color-mix(in srgb, var(--sev-4) 40%, var(--mix-base)); color: var(--danger-text);
+  border-radius: 10px; padding: 9px 12px; font-size: var(--text-md);
+}
+
+/* ---------- กระดานงาน ---------- */
+
+.kanban-col {
+  border: 1px dashed var(--border);
+  border-radius: 12px; min-height: 200px; background: var(--surface-soft);
+}
+.case-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px; margin-bottom: 7px;
+}
+
+/* ---------- หน้าต่างรายละเอียด ---------- */
+
+.detail-clickable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.detail-clickable:hover { color: var(--teal); }
+.detail-clickable:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+button.detail-clickable { text-decoration: none; }
+
+.modal-content { border-radius: 15px; }
+.detail-section { margin-bottom: 18px; }
+.detail-section h6 {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 5px; margin-bottom: 9px;
+}
+.detail-kv {
+  display: flex; gap: 10px;
+  padding: 3px 0; font-size: var(--text-md);
+  border-bottom: 1px solid #f4f4f5;
+}
+.detail-kv .k { color: var(--muted); min-width: 140px; flex-shrink: 0; }
+.detail-kv .v { font-weight: 500; word-break: break-word; }
+
+/* ---------- ตอบสนองขนาดหน้าจอ ---------- */
+
+@media (max-width: 992px) {
+  .list-box, .contractor-list { max-height: 44vh; }
+  #map { height: 38vh; }
+  .kpi .v { font-size: var(--text-xl); }
+}
+
+@media (max-width: 576px) {
+  .filter-bar { padding: 10px; }
+  .hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo { padding: 14px; }
+  .detail-kv { flex-direction: column; gap: 0; }
+  .detail-kv .k { min-width: 0; }
+}
+
+@media print {
+  .topbar, .filter-bar, .nav-pills, #bootScreen { display: none !important; }
+  .cardx { box-shadow: none; break-inside: avoid; }
+}
+
+/* ---------- Enterprise light theme overrides ----------
+   ส่วนนี้ต่อท้ายไฟล์ทั้งหมด ไม่แก้ไขหรือลบ selector ใดในเนื้อหาด้านบน
+   ใช้หลักการ cascade: selector เดิมชื่อเดียวกันที่ปรากฏซ้ำด้านล่างนี้จะชนะเพราะมาทีหลัง
+   (specificity เท่ากัน ลำดับในไฟล์เป็นตัวตัดสิน) จึงไม่จำเป็นต้องแก้ไขของเดิมโดยตรง
+   ยกเว้น 2 จุดที่ระบุเหตุผลไว้เป็น comment กำกับว่าจำเป็นต้องใช้ !important
+   เพราะ Bootstrap ผูก !important ไว้กับ spacing utility (p-*, m-*, g-*) ทุกตัวโดยดีไซน์
+   ทำให้ CSS ปกติสั่งชนะไม่ได้ */
+
+/* ---------- 1) ระยะห่างโดยรวม (Apple-style whitespace) ---------- */
+
+/* เพิ่มช่องไฟระหว่างการ์ดทั้งหน้าแบบเบา ๆ — ตัวแปร gutter ของ Bootstrap 5
+   ไม่ได้ผูก !important เหมือน padding/margin utility จึงปรับผ่าน custom property ได้ตรง ๆ */
+.row.g-3 { --bs-gutter-x: 1.25rem; --bs-gutter-y: 1.25rem; }
+.row.g-2 { --bs-gutter-x: .9rem; --bs-gutter-y: .9rem; }
+
+.filter-bar { padding: 18px 20px; }
+
+/* Bootstrap ผูก !important กับ .mb-3/.mt-3 ไว้ในตัว (เป็นพฤติกรรมมาตรฐานของ utility API)
+   จึงต้องใช้ !important ที่นี่เพื่อขยายช่องไฟใต้ hero ให้เห็นผลจริง มิเช่นนั้นค่าจะถูกเมิน */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo {
+  margin-bottom: var(--gap-section) !important;
+}
+
+/* ---------- 2) การ์ดพื้นฐาน ---------- */
+
+.cardx {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+/* ไม่ให้การ์ดยกตัวแรงเมื่อ hover ตามที่กำหนด — เปลี่ยนเป็นเน้นเส้นขอบแทนเงา */
+.cardx:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+.card-title-row { margin-bottom: 10px; }
+
+/* ---------- 3) แถบบนสุด ---------- */
+
+/* เส้นสีบนหัวเว็บ ผูกกับสีแบรนด์สองสีหลักที่ใช้จริงในระบบ (teal = อัตลักษณ์, primary = การกระทำ) */
+.topbar::before {
+  background: linear-gradient(90deg, var(--brand-teal) 0%, var(--primary) 100%);
+}
+.topbar { box-shadow: var(--shadow-sm); }
+
+/* ปุ่มส่งออก = การกระทำหลักของระบบ ใช้ primary blue ตามที่กำหนด (เดิมเป็นเขียวหัวเป็ด) */
+.btn-primary-action.btn-outline-secondary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-primary-action.btn-outline-secondary:hover,
+.btn-primary-action.btn-outline-secondary:focus {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
+}
+.btn-neutral.btn-outline-secondary {
+  border-color: var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+}
+.btn-neutral.btn-outline-secondary:hover {
+  background: var(--surface-hover);
+  border-color: var(--muted-light);
+  color: var(--text);
+}
+
+/* ---------- 4) ตัวชี้วัด (KPI) ---------- */
+
+/* เปลี่ยนจากเส้นขอบทึบเป็นแถบ accent แบบ pseudo-element เพื่อคุมสีตามตำแหน่งได้อิสระ
+   overflow:hidden ทำให้แถบสีโค้งตามมุมการ์ดพอดี ไม่ยื่นออกมาเป็นเหลี่ยม */
+.kpi {
+  position: relative;
+  overflow: hidden;
+  border-left: none;
+  padding-left: 20px;
+}
+.kpi::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--primary);
+}
+/* ไล่สีตามตำแหน่งการ์ด ใช้ได้กับทั้ง 3 กลุ่ม (#kpis, #fraudKpis, #contractorKpis)
+   เพราะทั้งสามผูก class .analytics-kpi-grid ไว้เหมือนกัน และแต่ละกลุ่มมี 4 การ์ดเท่ากันเสมอ */
+.analytics-kpi-grid > [class*="col-"]:nth-child(1) .kpi::before { background: var(--primary); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(2) .kpi::before { background: var(--secondary); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(3) .kpi::before { background: var(--warning); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(4) .kpi::before { background: var(--danger); }
+
+/* ---------- 5) ตัวกรองและฟอร์ม ---------- */
+
+.filter-bar { background: var(--surface); border-color: var(--border); }
+
+.form-control,
+.form-select {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  /* ใช้ background-color ไม่ใช่ background แบบย่อ เพราะแบบย่อจะล้าง background-image
+     ของ Bootstrap ทิ้ง แล้วลูกศรของ <select> จะหายไปทั้งหน้า */
+  background-color: var(--surface);
+  box-shadow: none;
+}
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-focus);
+}
+.form-range::-webkit-slider-thumb { background: var(--primary); }
+.form-range::-moz-range-thumb { background: var(--primary); }
+.form-check-input:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ---------- 6) ปุ่ม: ระบบสีตามความหมาย ---------- */
+
+.btn-primary {
+  --bs-btn-bg: var(--primary);
+  --bs-btn-border-color: var(--primary);
+  --bs-btn-hover-bg: var(--primary-dark);
+  --bs-btn-hover-border-color: var(--primary-dark);
+  --bs-btn-active-bg: var(--primary-dark);
+  --bs-btn-active-border-color: var(--primary-dark);
+}
+.btn-success {
+  --bs-btn-bg: var(--success);
+  --bs-btn-border-color: var(--success);
+}
+.btn-warning {
+  --bs-btn-bg: var(--warning);
+  --bs-btn-border-color: var(--warning);
+  --bs-btn-color: #fff;
+  --bs-btn-hover-color: #fff;
+}
+.btn-danger {
+  --bs-btn-bg: var(--danger);
+  --bs-btn-border-color: var(--danger);
+}
+
+/* ปุ่ม outline ธรรมดา (ไม่มี class เสริม primary-action/neutral) เช่น ล้างตัวกรอง คืนมุมมองแผนที่ */
+.btn-outline-secondary {
+  color: var(--muted);
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.btn-outline-secondary:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--muted-light);
+}
+.btn:disabled,
+.btn.disabled { opacity: .55; cursor: not-allowed; }
+
+/* focus-visible รวมเป็นระบบเดียวทั้งแอป ใช้ห่วงโฟกัสสีฟ้าแทน outline หลายแบบที่กระจัดกระจาย */
+.btn:focus-visible,
+.nav-link:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.mini-table th.sortable:focus-visible,
+.item:focus-visible,
+.dim-card:focus-visible,
+.legend-toggle:focus-visible,
+.detail-clickable:focus-visible,
+.skip-link:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* ปุ่มควบคุมแผนที่ 3 ปุ่มใช้พื้นที่ร่วมกันเท่า ๆ กันบนจอแคบ ไม่ให้ข้อความดันจนล้น */
+@media (max-width: 575.98px) {
+  #mapFilterToView, #mapResetView, #mapFitData {
+    flex: 1 1 auto; min-width: 0;
+    font-size: var(--text-sm); padding-left: 8px; padding-right: 8px;
+  }
+  .btn-group-sm > .btn { font-size: var(--text-sm); padding-left: 8px; padding-right: 8px; }
+}
+
+/* ---------- 7) แท็บ: สีเฉพาะของแต่ละมุมมอง ---------- */
+
+/* สีตามบทบาท: การนำทางใช้สีเดียวทั้งระบบ
+   เดิมแท็บใช้ 9 สี ทำให้แดง/ส้มมีสองความหมายพร้อมกัน (เป็นทั้งสีแท็บและระดับความเสี่ยง)
+   ตอนนี้แดง-ส้ม-เหลืองสงวนไว้ให้ "ระดับความเสี่ยง" อย่างเดียว
+   ส่วนเอกลักษณ์ของแต่ละแท็บย้ายไปอยู่ที่ไอคอนแทน ซึ่งแยกออกจากกันได้โดยไม่ใช้สี
+   คงกลไก --tab-color ไว้เหมือนเดิม เปลี่ยนเฉพาะค่า จึงย้อนกลับได้ง่ายถ้าต้องการ */
+#pill-overview, #pill-explain, #pill-fraud, #pill-anomaly, #pill-network,
+#pill-contractor, #pill-time, #pill-rules, #pill-demo { --tab-color: var(--primary); }
+
+.nav-pills .nav-link {
+  color: var(--tab-color, var(--text-soft));
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+  /* color-mix() รองรับเบราว์เซอร์หลักตั้งแต่ปี 2023 (Chrome 111+, Firefox 113+, Safari 16.4+)
+     ประกาศค่า fallback แบบสีทึบไว้ก่อนเสมอ บราวเซอร์รุ่นเก่าที่ไม่รู้จัก color-mix()
+     จะทิ้งเฉพาะบรรทัด color-mix() แล้วใช้ค่า fallback ที่ประกาศไว้ก่อนหน้าแทนโดยอัตโนมัติ */
+  border-color: color-mix(in srgb, var(--tab-color, var(--muted-light)) 24%, var(--mix-base));
+  transition: background-color .16s ease, border-color .16s ease,
+              color .16s ease, box-shadow .16s ease, transform .16s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.nav-pills .nav-link:hover { transform: translateY(-1px); }
+.nav-pills .nav-icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: var(--text-base);
+  line-height: 1;
+  background: color-mix(in srgb, var(--tab-color, var(--muted-light)) 16%, var(--mix-base));
+  transition: background-color .16s ease;
+}
+.nav-pills .nav-link.active .nav-icon {
+  background: rgba(255, 255, 255, .22);
+}
+.nav-pills .nav-link:hover {
+  color: var(--tab-color, var(--text));
+  background: var(--surface-hover);
+  background: color-mix(in srgb, var(--tab-color, var(--muted-light)) 9%, var(--mix-base));
+  border-color: var(--border-strong);
+  border-color: color-mix(in srgb, var(--tab-color, var(--muted-light)) 45%, var(--mix-base));
+}
+.nav-pills .nav-link.active {
+  color: #fff;
+  background: var(--tab-color, var(--brand-teal));
+  border-color: var(--tab-color, var(--brand-teal));
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .16);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--tab-color, var(--muted-light)) 30%, transparent);
+}
+.nav-pills .nav-link:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---------- 8) ส่วนหัวแต่ละแท็บ (hero) ---------- */
+
+/* คงดีไซน์พื้นสว่าง + แถบสีด้านซ้ายจากเวอร์ชันก่อนหน้าไว้โดยตั้งใจ แทนที่จะย้อนกลับไปใช้
+   พื้นไล่สีเข้มตัวอักษรขาวตามตัวอย่างในสเปก เพราะสเปกเองระบุชัดว่า "ไม่ใช้ hero เป็นพื้นที่
+   ที่เด่นกว่าข้อมูล KPI" และ "ลดความฉูดฉาดของ gradient" — พื้นสว่างสอดคล้องกับทั้งสองข้อนี้
+   มากกว่าพาเนลสีเข้มเต็มพื้นที่ ในที่นี้จึงปรับเฉพาะสีแถบซ้ายให้ตรงกับสีของแต่ละแท็บแทน */
+.hero            { border-left-color: var(--primary); }
+.hero-fraud      { border-left-color: var(--danger); }
+.hero-contractor { border-left-color: var(--cyan); }
+.hero-anomaly    { border-left-color: var(--warning); }
+.hero-demo       { border-left-color: #9333EA; }
+
+/* ---------- 9) ป้ายกำกับ (badge) ---------- */
+
+/* ป้ายเป็นตัวอักษรขาวบนพื้นสีขนาดเล็ก ต้องได้ contrast อย่างน้อย 4.5:1 ตาม WCAG AA
+   เฉดเดิมไม่ผ่าน: ขาวบน #DC3545 = 4.0:1, ขาวบน #D97706 = 3.0:1, ขาวบน #1677FF = 3.6:1
+   จึงใช้เฉดเข้มเฉพาะตอนวางคู่ตัวอักษร ส่วนสีเดิมยังใช้กับกราฟและหมุดแผนที่ตามปกติ */
+.badge-real      { background: var(--brand-teal); color: #fff; }      /* 5.1:1 */
+.badge-derived   { background: var(--primary-dark); color: #fff; }    /* 5.2:1 */
+.badge-synthetic { background: var(--violet); color: #fff; }          /* 5.6:1 */
+.badge-critical  { background: var(--danger-ink); color: #fff; }      /* 6.2:1 */
+.badge-high      { background: var(--warning-ink); color: #fff; }     /* 5.3:1 */
+.badge-medium    { background: var(--sev-2); color: #fff; }             /* 7.4:1 */
+.badge-low       { background: var(--success-soft); color: var(--success); }
+.badge-none      { background: var(--surface-hover); color: var(--text-soft); }
+
+/* ---------- 10) รายการที่เลือกได้ ---------- */
+
+.item:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+.item.active {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+/* ---------- 11) ตาราง ---------- */
+
+.mini-table th {
+  background: var(--surface-soft);
+  color: var(--text-soft);
+  border-bottom: 1px solid var(--border-strong);
+}
+.mini-table tbody tr:nth-child(even) { background: var(--surface-soft); }
+.mini-table tbody tr:hover { background: var(--surface-hover); }
+
+/* ---------- 12) แผนที่ ---------- */
+
+#map {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.map-toolbar {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+.map-overlay-stats,
+.map-legend {
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 575.98px) {
+  /* ลดพื้นที่ overlay บนจอแคบ ไม่ให้บังแผนที่มากเกินไป แต่ยังอ่านได้ครบ */
+  .map-overlay-stats { max-width: 68%; font-size: var(--text-sm); padding: 6px 9px; }
+  .map-legend { max-width: 150px; font-size: var(--text-xs); padding: 6px 8px; }
+  .map-legend .legend-hint { display: none; }
+  #map { min-height: 320px; }
+}
+
+/* ---------- 13) ตอบสนองขนาดหน้าจอเพิ่มเติม ---------- */
+
+@media (max-width: 991.98px) {
+  .cardx { box-shadow: var(--shadow-sm); }
+}
+
+@media (max-width: 575.98px) {
+  .cardx, .hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo,
+  .boot-panel, .map-toolbar { border-radius: var(--radius-md); }
+
+  /* ตัวกรองแต่ละช่องเต็มความกว้างบนโทรศัพท์ แตะง่ายขึ้น ไม่ต้องเล็งช่องแคบ */
+  .filter-bar .row > [class*="col-"] { flex: 0 0 100%; max-width: 100%; }
+
+  .topbar-inner { row-gap: 6px; }
+}
+
+/* ---------- 14) การเข้าถึง: ลดการเคลื่อนไหวเมื่อผู้ใช้ตั้งค่าไว้ ---------- */
+
+/* ครอบคลุมทุก transition/animation ในไฟล์นี้เป็นการทั่วไป เพิ่มเติมจากกฎเฉพาะจุด
+   (เช่น .cluster-donut.is-critical) ที่มีอยู่แล้วด้านบน ไม่ได้ทดแทนกัน แต่เสริมกัน */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- 15) ตัวกรองข้อมูล: สีสันและไอคอน ---------- */
+
+/* การ์ดตัวกรองเป็นจุดแรกที่ผู้ใช้สัมผัส จึงให้มีแถบไล่สีบางบนขอบบน
+   ผูกกับสีแบรนด์เดียวกับ topbar เพื่อให้รู้สึกว่าเป็น "ศูนย์ควบคุม" ของหน้า
+   ไม่ใช้สีเข้มเต็มพื้นที่ ตามหลัก "เรียบหรู มีแสง" ที่วางไว้ทั้งระบบ */
+.filter-bar {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+.filter-bar::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-teal) 0%, var(--primary) 55%, var(--violet) 100%);
+}
+
+/* ป้ายหัวข้อมีไอคอนวงกลมไล่สี ชุดเดียวกับตราแบรนด์ในแถบบนสุด สร้างความต่อเนื่องของภาพ */
+.filter-bar .section-label {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--text-sm);
+}
+.filter-bar .section-label::before {
+  content: '';
+  display: inline-block;
+  width: 18px; height: 18px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--brand-teal), var(--primary));
+  box-shadow: 0 1px 3px rgba(15, 118, 110, .35);
+}
+
+/* ไอคอนสีนำหน้าป้ายชื่อแต่ละช่อง ช่วยให้กวาดสายตาแยกประเภทตัวกรองได้เร็วขึ้น
+   ใช้ emoji แทนไอคอนไฟล์ภาพ เพื่อไม่ต้องพึ่ง asset หรือไลบรารีเพิ่ม */
+.filter-bar label[for="gfSearch"]::before   { content: '🔍 '; }
+.filter-bar label[for="gfProvince"]::before { content: '📍 '; }
+.filter-bar label[for="gfMethod"]::before   { content: '📋 '; }
+.filter-bar label[for="gfType"]::before     { content: '🏷️ '; }
+.filter-bar label[for="gfBand"]::before     { content: '⚠️ '; }
+.filter-bar label[for="gfRule"]::before     { content: '⚖️ '; }
+.filter-bar label[for="gfMinValue"]::before { content: '💰 '; }
+
+/* ช่องกรอกและตัวเลือก: เส้นขอบตอบสนองเมื่อเอาเมาส์ชี้ ไม่ต้องรอถึงตอน focus */
+.filter-bar .form-control,
+.filter-bar .form-select {
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.filter-bar .form-control:hover,
+.filter-bar .form-select:hover {
+  border-color: var(--secondary);
+}
+
+/* ปุ่มล้างตัวกรอง: เพิ่มไอคอนหมุนกลับเพื่อสื่อความหมาย "คืนค่าเดิม" โดยไม่ต้องแก้ HTML/JS */
+#gfReset::before {
+  content: '↺';
+  display: inline-block;
+  margin-right: 4px;
+  font-weight: 700;
+}
+#gfReset:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+#gfReset:hover::before { color: var(--danger); }
+
+/* แถบสรุปผลตัวกรอง: ตัวเลขจำนวนสัญญาเป็นสีเด่น ส่วน chip แต่ละใบไล่สีต่างกัน
+   ให้เห็นภาพรวมทันทีว่ากำลังใช้ตัวกรองกี่มิติ โดยไม่ต้องอ่านข้อความทีละคำ */
+.filter-summary strong { color: var(--primary); font-weight: 700; }
+
+.filter-summary .chip {
+  background: var(--cyan-soft); color: var(--sev-2-ink);
+  border-color: color-mix(in srgb, var(--cyan) 35%, var(--mix-base));
+  font-weight: 500;
+}
+.filter-summary .chip:nth-of-type(6n+2) {
+  background: var(--violet-soft); color: var(--violet);
+  border-color: color-mix(in srgb, var(--violet) 30%, var(--mix-base));
+}
+.filter-summary .chip:nth-of-type(6n+3) {
+  background: var(--warning-soft); color: var(--warning-text);
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--mix-base));
+}
+.filter-summary .chip:nth-of-type(6n+4) {
+  background: var(--primary-soft); color: var(--accent-bright);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--mix-base));
+}
+.filter-summary .chip:nth-of-type(6n+5) {
+  background: var(--success-soft); color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 30%, var(--mix-base));
+}
+.filter-summary .chip:nth-of-type(6n+6) {
+  background: var(--violet-soft); color: var(--violet);
+  border-color: color-mix(in srgb, var(--violet) 35%, var(--mix-base));
+}
+/* ป้าย "เฉพาะพื้นที่บนแผนที่" ยังคงเป็นสีส้มเดิมเสมอ ไม่ให้ไปโดนไล่สีข้างต้นทับ
+   เพราะมีความหมายเฉพาะ (คลิกเพื่อยกเลิก) ต้องแยกจาก chip แสดงผลอย่างเดียว */
+.filter-summary .chip.chip-bounds {
+  background: var(--sev-3-bg) !important; color: var(--warning-text) !important;
+  border-color: color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)) !important;
+}
+
+/* ---------- 16) แผนที่เล่นย้อนเวลา ---------- */
+
+.map-timelapse {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+.btn-timelapse-play {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background-color .15s, transform .1s;
+}
+.btn-timelapse-play:hover { background: var(--primary-dark); }
+.btn-timelapse-play:active { transform: scale(.94); }
+.btn-timelapse-play:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.btn-timelapse-play:disabled { opacity: .4; cursor: not-allowed; }
+/* ขณะเล่นอยู่ ปุ่มเปลี่ยนเป็นสีแดงอ่อนและเต้นจังหวะเบาๆ ให้รู้ว่ากำลังทำงาน */
+.btn-timelapse-play.is-playing {
+  background: var(--danger);
+  animation: timelapse-pulse 1.8s ease-in-out infinite;
+}
+.btn-timelapse-play.is-playing:hover { background: #c22e3d; }
+@keyframes timelapse-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, .35); }
+  50%      { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-timelapse-play.is-playing { animation: none; }
+}
+.map-timelapse-label {
+  flex-shrink: 0;
+  font-size: var(--text-sm); font-weight: 600;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  min-width: 118px; text-align: right;
+}
+#mapTimelapseSlider::-webkit-slider-thumb { background: var(--primary); }
+#mapTimelapseSlider::-moz-range-thumb { background: var(--primary); }
+
+/* ---------- 17) ไดอะแกรมอธิบายรูปแบบของกฎ ---------- */
+
+.rule-diagram {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+.rule-diagram svg { width: 100%; height: auto; display: block; }
+.rule-diagram-caption {
+  font-size: var(--text-md); color: var(--text-soft);
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  background: var(--cyan-soft);
+  border-left: 3px solid var(--cyan);
+  border-radius: 0 8px 8px 0;
+}
+
+/* ---------- 18) เปรียบเทียบสองรายการแบบเคียงข้าง ---------- */
+
+.btn-compare-trigger {
+  color: var(--violet);
+  border-color: color-mix(in srgb, var(--violet) 35%, var(--mix-base));
+  background: var(--violet-soft);
+  font-weight: 600;
+}
+.btn-compare-trigger:hover {
+  background: var(--violet); color: #fff; border-color: var(--violet);
+}
+
+.compare-picker { align-items: end; }
+
+.compare-head {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.compare-name {
+  flex: 1; font-size: var(--text-lg); font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.compare-name:last-child { text-align: right; }
+.compare-vs {
+  flex-shrink: 0;
+  font-size: var(--text-sm); font-weight: 600; color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px; padding: 3px 10px;
+}
+
+.compare-metric-row {
+  display: grid;
+  grid-template-columns: 1fr minmax(140px, auto) 1fr;
+  align-items: center; gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--surface-soft);
+  font-size: var(--text-md);
+}
+.compare-metric-row .compare-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  /* หดให้พอดีเนื้อหาแทนที่จะยืดเต็มคอลัมน์ตามพฤติกรรมปกติของ grid item
+     ไม่งั้นพื้นหลังไฮไลต์ตอน "แย่กว่า" จะกลายเป็นแถบยาวเต็มคอลัมน์แทนป้ายกระชับรอบตัวเลข */
+  justify-self: end;
+}
+.compare-metric-row .compare-val:last-child { justify-self: start; }
+.compare-metric-row .compare-label {
+  text-align: center; color: var(--muted);
+  font-size: var(--text-sm); font-weight: 500;
+}
+/* ฝั่งที่ "แย่กว่า" ไฮไลต์พื้นแดงอ่อนรอบตัวเลข ไม่ใช้แค่สีตัวหนังสือ เพื่อให้อ่านได้แม้ตาบอดสี */
+.compare-val.compare-worse {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: 6px; padding: 2px 8px;
+}
+.compare-val.compare-better {
+  color: var(--success);
+}
+
+@media (max-width: 575.98px) {
+  .compare-metric-row { grid-template-columns: 1fr; text-align: center; gap: 2px; }
+  .compare-metric-row .compare-val,
+  .compare-metric-row .compare-val:last-child { justify-self: center; }
+  .compare-name:last-child { text-align: left; }
+  .compare-head { flex-direction: column; align-items: stretch; text-align: center; }
+}
+
+/* ---------- 19) แท็บเครือข่าย: ส่วนอธิบายและการจัดกลุ่มตัวกรอง ---------- */
+
+/* ส่วนหัวของแท็บเครือข่าย ใช้สีม่วงเดียวกับปุ่มแท็บ (--tab-color ของ #pill-network) */
+.hero-network {
+  border-radius: var(--radius-card);
+  padding: 18px 22px;
+  color: var(--text);
+  background: linear-gradient(90deg, #f5f3ff 0%, #fff 42%);
+  border: 1px solid var(--border);
+  border-left: 4px solid #7C3AED;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.hero-network h1 { color: var(--text); }
+.hero-network .small { color: var(--muted); }
+
+/* แถบ "อ่านอย่างไร" สามช่อง วางเรียงกันบนจอกว้าง และซ้อนกันบนจอแคบ */
+.net-howto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px 16px;
+}
+.net-howto-item {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: var(--text-md); color: var(--text-soft);
+  /* เดิมเป็น rgba(255,255,255,.7) ซึ่งกลายเป็นกล่องสว่างบนการ์ดมืด แล้วตัวอักษรสีอ่อนจมหาย
+     ใช้โทเค็นพื้นผิวแทน กล่องจึงสลับตามธีมเหมือนส่วนอื่น */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.net-howto-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 5px;
+}
+.net-howto-item strong { color: var(--text); }
+
+/* กล่องคำอธิบายวิธีอ่านแผนภาพ อัปเดตตามรูปแบบและมิติสีที่เลือก */
+.net-view-hint {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface-soft, #f8fafc);
+  border: 1px solid var(--border);
+  border-left: 3px solid #7C3AED;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: var(--text-md); color: var(--text-soft);
+}
+.net-hint-row { display: flex; align-items: baseline; gap: 8px; }
+.net-hint-tag {
+  flex-shrink: 0;
+  font-size: var(--text-xs); font-weight: 600; letter-spacing: .04em;
+  color: var(--violet); background: var(--violet-soft);
+  border: 1px solid color-mix(in srgb, var(--violet) 30%, var(--mix-base));
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* จัดตัวกรองเป็นขั้นตอน แทนการวางเรียงกันเป็นแถวเดียวยาว */
+.net-filter-group { margin-bottom: 12px; }
+.net-filter-group:last-of-type { margin-bottom: 0; }
+.net-filter-group .section-label { margin-bottom: 6px; }
+
+/* คำอธิบายใต้ช่องกรอกแต่ละช่อง */
+.field-hint {
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+/* คีย์สีของเกณฑ์ HHI ในคำอธิบายการ์ด */
+.hhi-key {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.hhi-key-low  { background: var(--success-soft); color: var(--success);
+                border: 1px solid color-mix(in srgb, var(--success) 30%, var(--mix-base)); }
+.hhi-key-mid  { background: var(--sev-3-bg); color: var(--warning-text);
+                border: 1px solid color-mix(in srgb, var(--sev-3) 30%, var(--mix-base)); }
+.hhi-key-high { background: var(--sev-4-bg); color: var(--danger-text);
+                border: 1px solid color-mix(in srgb, var(--sev-4) 30%, var(--mix-base)); }
+
+/* อภิธานศัพท์แบบพับเก็บได้ ไม่กินพื้นที่จนกว่าผู้ใช้จะกดเปิด */
+.net-glossary {
+  background: var(--card, #fff);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 12px 16px;
+}
+.net-glossary > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-md);
+  color: #6D28D9;
+  list-style: none;
+}
+.net-glossary > summary::-webkit-details-marker { display: none; }
+.net-glossary > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform .15s ease;
+}
+.net-glossary[open] > summary::before { transform: rotate(90deg); }
+.net-glossary > summary:focus-visible { outline: 2px solid #7C3AED; outline-offset: 3px; border-radius: 6px; }
+.net-glossary-body { margin-top: 10px; }
+.net-glossary dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 4px 24px;
+  margin: 0;
+}
+.net-glossary dt {
+  font-size: var(--text-md); font-weight: 600; color: var(--text);
+  margin-top: 8px;
+}
+.net-glossary dd {
+  font-size: var(--text-sm); color: var(--muted);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .net-glossary > summary::before { transition: none; }
+}
+
+/* ---------- 20) นำทางสองระดับ: กลุ่มงานตรวจสอบ -> แท็บย่อย ---------- */
+
+/* แถวกลุ่ม เป็นปุ่มกด (ไม่ใช่ tablist ซ้อน tablist) แต่ละปุ่มบอกว่ากลุ่มนั้นตอบคำถามอะไร
+   ช่วยให้ผู้ตรวจสอบที่เพิ่งใช้ระบบรู้ลำดับงานโดยไม่ต้องเปิดคู่มือ */
+.tab-groupnav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.group-btn {
+  display: flex; align-items: center; gap: 10px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  min-height: 52px;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease,
+              color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.group-btn:hover {
+  border-color: var(--primary);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+.group-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.group-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(22, 119, 255, .25);
+}
+
+/* ตัวเลขบอกลำดับที่แนะนำ ไม่ได้บังคับว่าต้องทำตามลำดับ */
+.group-step {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  font-size: var(--text-sm); font-weight: 700;
+  background: var(--surface-hover);
+  color: var(--muted);
+  transition: background-color .16s ease, color .16s ease;
+}
+.group-btn.active .group-step { background: rgba(255, 255, 255, .22); color: #fff; }
+
+.group-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.group-name { font-size: var(--text-md); font-weight: 600; }
+.group-sub {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.group-btn.active .group-sub { color: rgba(255, 255, 255, .85); }
+
+/* แถวแท็บย่อย: ซ่อนรายการที่ไม่ได้อยู่ในกลุ่มปัจจุบันด้วย attribute hidden
+   ประกาศ display:none ตรงๆ กันไว้ เผื่อกฎอื่นไปตั้ง display ทับ UA stylesheet */
+.tab-subnav { margin-bottom: 12px; }
+.tab-subnav li[hidden] { display: none !important; }
+
+@media (max-width: 575.98px) {
+  .tab-groupnav { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .group-btn { padding: 8px 10px; min-height: 48px; }
+  .group-sub { display: none; }
+}
+
+/* ---------- 21) การ์ด KPI ที่กดได้ · ทางลัด · ป้ายเงื่อนไขที่ยกเลิกได้ ---------- */
+
+/* KPI ที่กดได้เป็น <button> จริง จึงเข้าถึงด้วยคีย์บอร์ดได้เอง
+   ต้องรีเซ็ต appearance ของปุ่มก่อน ไม่งั้นจะได้ขอบและ font ของ UA มาด้วย */
+.kpi-clickable {
+  display: block; width: 100%;
+  text-align: left;
+  font: inherit; color: inherit;
+  cursor: pointer;
+  position: relative;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.kpi-clickable:hover { border-color: var(--primary); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.kpi-clickable:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.kpi-clickable.is-on { border-color: var(--primary); box-shadow: inset 3px 0 0 var(--primary); }
+
+/* บอกว่ากดได้ โดยไม่แย่งสายตาไปจากตัวเลข */
+.kpi-hint {
+  position: absolute; right: 12px; top: 10px;
+  font-size: var(--text-xs); color: var(--muted-light);
+  opacity: 0; transition: opacity .16s ease;
+}
+.kpi-clickable:hover .kpi-hint,
+.kpi-clickable:focus-visible .kpi-hint { opacity: 1; }
+.kpi-clickable.is-on .kpi-hint { opacity: 1; color: var(--primary); }
+
+/* แถบทางลัด */
+.quick-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 10px;
+}
+.quick-filters-label {
+  font-size: var(--text-xs); font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+  margin-right: 2px;
+}
+.quick-chip {
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: var(--text-sm); font-weight: 500;
+  cursor: pointer;
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease;
+}
+.quick-chip:hover { background: var(--surface-hover); border-color: var(--muted); }
+.quick-chip:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+/* ทางลัดที่อ้างถึงระดับความเสี่ยงใช้สีของระดับนั้นตอนถูกเลือก เพื่อไม่ให้ความหมายของสีเพี้ยน */
+.quick-chip.is-on { color: #fff; }
+.qc-critical.is-on { background: var(--danger-ink); border-color: var(--danger-ink); }
+.qc-high.is-on     { background: var(--warning-ink); border-color: var(--warning-ink); }
+.qc-priority.is-on { background: var(--danger-ink); border-color: var(--danger-ink); }
+.qc-flagged.is-on  { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+/* ป้ายเงื่อนไขที่กดกากบาทยกเลิกได้ทีละอัน */
+.chip-removable { display: inline-flex; align-items: center; gap: 2px; padding-right: 3px; }
+.chip-x {
+  border: 0; background: transparent;
+  color: inherit; opacity: .65;
+  cursor: pointer; line-height: 1;
+  font-size: var(--text-sm);
+  padding: 2px 5px;
+  border-radius: 999px;
+  min-width: 22px; min-height: 22px;
+}
+.chip-x:hover { opacity: 1; background: rgba(0, 0, 0, .08); }
+.chip-x:focus-visible { outline: none; box-shadow: var(--shadow-focus); opacity: 1; }
+.chip-clear-all {
+  border: 1px dashed var(--border-strong);
+  background: transparent; color: var(--muted);
+  cursor: pointer; min-height: 26px;
+}
+.chip-clear-all:hover { color: var(--danger-text); border-color: var(--danger-text); }
+
+/* พื้นที่กดขั้นต่ำ 40px สำหรับปุ่มหลักและแท็บ ให้กดพลาดยากขึ้นทั้งบนเมาส์และนิ้ว */
+.nav-pills .nav-link,
+.subnav .btn,
+.topbar-actions .btn { min-height: 40px; }
+
+/* ปุ่ม "ตัวกรองเพิ่มเติม" หมุนลูกศรเมื่อเปิด */
+#gfMoreToggle::after {
+  content: ' ▾';
+  display: inline-block;
+  transition: transform .15s ease;
+}
+#gfMoreToggle.is-open::after { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-clickable, .kpi-hint, .quick-chip, #gfMoreToggle::after { transition: none; }
+  .kpi-clickable:hover { transform: none; }
+}
+
+/* ปุ่มท้ายแถวตัวกรองต้องอยู่ระดับเดียวกับช่องกรอก ซึ่งมี label อยู่ด้านบน */
+.filter-actions { align-items: flex-end; }
+@media (min-width: 992px) { .filter-actions { padding-top: 20px; } }
+
+/* ---------- 22) โหมดเรียนรู้: กรณีศึกษา อภิธานศัพท์ และทัวร์แนะนำ ---------- */
+
+/* กรณีศึกษา: การ์ดกดได้ เรียงเป็นกริดที่ยืดตามความกว้างจอ */
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+.case-card {
+  display: flex; flex-direction: column; gap: 4px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 11px 13px;
+  cursor: pointer;
+  min-height: 96px;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.case-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.case-card:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.case-badge {
+  align-self: flex-start;
+  font-size: var(--text-xs); font-weight: 700;
+  background: var(--primary); color: #fff;
+  border-radius: 999px; padding: 1px 9px;
+}
+.case-title { font-size: var(--text-md); font-weight: 600; color: var(--text); line-height: 1.3; }
+.case-teaser { font-size: var(--text-sm); color: var(--muted); line-height: 1.4; }
+
+/* แถบอธิบายกรณีศึกษา ลอยล่างจอ ไม่บังเนื้อหาหลัก */
+.case-note {
+  position: fixed;
+  left: 50%; bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 1055;
+  width: min(760px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .18);
+  padding: 11px 14px;
+  font-size: var(--text-md);
+}
+.case-note-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.case-note-head strong { flex: 1; min-width: 0; }
+.case-note-close {
+  border: 0; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: var(--text-base);
+  min-width: 32px; min-height: 32px; border-radius: 8px;
+}
+.case-note-close:hover { background: var(--surface-hover); color: var(--text); }
+.case-note-body { color: var(--text-soft); line-height: 1.5; }
+
+/* อภิธานศัพท์ */
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px 20px;
+}
+.glossary-item { border-left: 2px solid var(--border); padding-left: 10px; }
+.glossary-term {
+  border: 0; background: transparent; padding: 0;
+  color: var(--primary-dark); font-weight: 600; font-size: var(--text-md);
+  cursor: pointer; text-align: left;
+}
+.glossary-term:hover { text-decoration: underline; }
+.glossary-short { font-size: var(--text-sm); color: var(--muted); line-height: 1.45; }
+.glossary-body { font-size: var(--text-md); color: var(--text-soft); line-height: 1.6; }
+
+/* คำศัพท์ที่ฝังอยู่ในหน้า กดเพื่อดูความหมายได้ทันที */
+.term {
+  border-bottom: 1px dashed var(--muted-light);
+  cursor: pointer;
+}
+.term:hover { border-bottom-color: var(--primary); color: var(--primary-dark); }
+.term-link {
+  border: 1px solid var(--border);
+  background: var(--surface-soft);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: var(--text-sm);
+  color: var(--primary-dark);
+  cursor: pointer;
+  min-height: 28px;
+}
+.term-link:hover { border-color: var(--primary); background: var(--surface); }
+.term-links { display: flex; flex-wrap: wrap; gap: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .case-card { transition: none; }
+  .case-card:hover { transform: none; }
+}
+
+/* ---------- 23) ขั้นตอนถัดไปของผู้ตรวจสอบ ---------- */
+
+.audit-next { font-size: var(--text-sm); line-height: 1.45; }
+.audit-next-label {
+  font-size: var(--text-xs); font-weight: 700; letter-spacing: .05em;
+  color: var(--primary-dark);
+  margin-top: 6px;
+}
+.audit-next-label:first-child { margin-top: 0; }
+.audit-list { margin: 2px 0 0; padding-left: 16px; color: var(--text-soft); }
+.audit-list li { margin-bottom: 2px; }
+
+/* กฎที่ใช้ข้อมูลสาธิต ต้องดูออกทันทีว่าห้ามนำไปใช้อ้างอิงจริง */
+.audit-next-demo {
+  background: var(--violet-soft);
+  border-left: 3px solid var(--violet);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.audit-next-demo .audit-next-label { color: #6D28D9; }
+
+/* ---------- 24) กรอบ 3E: ป้ายมิติ และตารางความครอบคลุม ---------- */
+
+/* ป้ายมิติการตรวจสอบ ใช้สีคนละชุดกับ "ระดับความเสี่ยง" โดยตั้งใจ
+   เพื่อไม่ให้ผู้ใช้เข้าใจผิดว่าเป็นระดับความรุนแรง */
+.fw-tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.dim-tag {
+  display: inline-block;
+  font-size: var(--text-xs); font-weight: 600;
+  border-radius: 999px; padding: 1px 8px;
+  white-space: nowrap;
+}
+.dim-economy       { background: #ECFEFF; color: #0E7490; border: 1px solid #A5F3FC; }
+.dim-efficiency    { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
+.dim-effectiveness { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
+.dim-integrity     { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
+.dim-performance   { background: #FFF7ED; color: #B54708; border: 1px solid #FED7AA; }
+
+.stage-tag {
+  display: inline-block;
+  font-size: var(--text-xs);
+  border-radius: 6px; padding: 1px 7px;
+  background: var(--surface-hover); color: var(--muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.fw-standard {
+  font-size: var(--text-xs); color: var(--muted-light);
+  line-height: 1.35; margin-top: 3px;
+}
+
+/* ตารางความครอบคลุม */
+.cov-table { table-layout: fixed; min-width: 900px; }
+.cov-table th, .cov-table td { vertical-align: top; }
+.cov-corner {
+  width: 190px;
+  font-size: var(--text-sm); font-weight: 600; color: var(--muted);
+}
+.cov-stage {
+  font-size: var(--text-sm); font-weight: 600;
+  color: var(--text-soft);
+  background: var(--surface-soft);
+  text-align: center;
+}
+.cov-dim { width: 190px; }
+.cov-dim-desc { font-size: var(--text-xs); color: var(--muted); line-height: 1.35; margin-top: 3px; }
+.cov-cell { text-align: center; padding: 8px 6px !important; }
+.cov-has { background: var(--surface-soft); }
+.cov-rules { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.cov-rule {
+  font-size: var(--text-xs); font-weight: 700;
+  background: var(--primary); color: #fff;
+  border-radius: 5px; padding: 1px 6px;
+}
+/* กฎที่ใช้ข้อมูลสาธิต ต้องแยกออกจากกฎที่ใช้ข้อมูลจริงด้วยสายตา */
+.cov-rule-demo { background: var(--violet); }
+.cov-hits { font-size: var(--text-xs); color: var(--muted); margin-top: 4px; }
+
+/* ช่องว่างคือสาระสำคัญของตารางนี้ จึงทำให้เห็นชัด ไม่ใช่ปล่อยว่างเปล่า */
+.cov-empty { background: repeating-linear-gradient(45deg, var(--surface-soft) 0 6px, var(--surface-hover) 6px 12px); }
+.cov-gap {
+  font-size: var(--text-xs); color: var(--warning-text); font-weight: 600;
+  border-bottom: 1px dashed var(--warning-text); cursor: help;
+}
+.cov-dash { color: var(--muted-light); }
+
+/* ---------- 25) โหมดการแสดงผล กระชับ / อธิบาย ---------- */
+
+.density-switch {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+.density-btn {
+  border: 0; background: transparent;
+  padding: 4px 12px; min-height: 34px;
+  font-size: var(--text-sm); font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color .14s ease, color .14s ease;
+}
+.density-btn:hover { background: var(--surface-hover); color: var(--text); }
+.density-btn.active { background: var(--primary); color: #fff; }
+.density-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); position: relative; z-index: 1; }
+
+/* ---- โหมดกระชับ: ซ่อนชั้นคำอธิบาย เหลือตัวเลขและกราฟ ----
+   ซ่อนเฉพาะข้อความประกอบ ไม่ซ่อนตัวควบคุม ตาราง กราฟ หรือค่าใดๆ
+   ผู้ใช้จึงยังทำงานได้ครบเหมือนเดิม ต่างแค่ไม่มีคำอธิบายกำกับ */
+
+/* คำบรรยายใต้หัวการ์ด (32 จุดทั้งแอป) */
+.density-compact .cardx > p.small-muted { display: none; }
+
+/* คำอธิบายใต้ช่องกรอกในแท็บเครือข่าย (10 จุด) */
+.density-compact .field-hint { display: none; }
+
+/* ส่วนหัวแต่ละแท็บ เหลือเฉพาะชื่อเรื่อง */
+.density-compact .hero > .small,
+.density-compact .hero-fraud > .small,
+.density-compact .hero-contractor > .small,
+.density-compact .hero-anomaly > .small,
+.density-compact .hero-demo > .small,
+.density-compact .hero-network > .small,
+.density-compact .hero-network .net-howto,
+.density-compact .hero-network > .small-muted { display: none; }
+.density-compact .hero,
+.density-compact .hero-fraud,
+.density-compact .hero-contractor,
+.density-compact .hero-anomaly,
+.density-compact .hero-demo,
+.density-compact .hero-network { padding: 10px 16px; }
+.density-compact .hero h1,
+.density-compact .hero-fraud h1,
+.density-compact .hero-contractor h1,
+.density-compact .hero-anomaly h1,
+.density-compact .hero-demo h1,
+.density-compact .hero-network h1 { margin-bottom: 0 !important; font-size: var(--text-lg); }
+
+/* กล่องอธิบายวิธีอ่านแผนภาพ และหมายเหตุประกอบ */
+.density-compact .net-view-hint,
+.density-compact .info-note,
+.density-compact .fw-standard,
+.density-compact .cov-dim-desc { display: none; }
+
+/* การ์ด KPI: ลดระยะขอบอย่างเดียว ไม่ซ่อนบรรทัดขยาย
+   เพราะบรรทัดนั้นเป็นตัวเลขจริง (จำนวนวิกฤต/สูง, สัดส่วน) ไม่ใช่คำอธิบาย
+   และการซ่อนด้วย :last-child จะไม่โดนการ์ดที่กดได้ ซึ่งมีป้าย "คลิกเพื่อกรอง" ปิดท้าย
+   ทำให้การ์ด 4 ใบแสดงไม่เหมือนกัน */
+.density-compact .kpi { padding: 10px 14px; }
+.density-compact .analytics-kpi-grid { --bs-gutter-y: .5rem; }
+
+/* เมนูกลุ่ม: ตัดคำบรรยายใต้ชื่อกลุ่ม */
+.density-compact .group-sub { display: none; }
+.density-compact .group-btn { min-height: 42px; padding: 6px 12px; }
+
+/* ---- รายละเอียดที่พับเก็บได้ ---- */
+
+/* ขั้นตอนถัดไปในตารางกฎ 18 แถว รวมกันสูงเกือบ 3,900px ถ้ากางค้างทั้งหมด */
+.audit-details > summary {
+  cursor: pointer;
+  font-size: var(--text-sm); font-weight: 600;
+  color: var(--primary-dark);
+  list-style: none;
+  padding: 3px 0;
+}
+.audit-details > summary::-webkit-details-marker { display: none; }
+.audit-details > summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform .15s ease;
+}
+.audit-details[open] > summary::before { content: '▾ '; }
+.audit-details > summary:hover { text-decoration: underline; }
+.audit-details > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.audit-details .audit-next { margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .density-btn, .audit-details > summary::before { transition: none; }
+}
+
+/* ---------- 26) ย่อแถบตัวกรอง และ KPI แบบแถบเดียว ---------- */
+
+.filter-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 8px;
+}
+.filter-collapse {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 2px 12px; min-height: 30px;
+  font-size: var(--text-sm); font-weight: 500;
+  cursor: pointer;
+  transition: background-color .14s ease, color .14s ease, border-color .14s ease;
+}
+.filter-collapse:hover { background: var(--surface-hover); color: var(--text); border-color: var(--muted); }
+.filter-collapse:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+/* ตอนย่อแล้วแถบเตี้ยลงมาก จึงลดระยะขอบในตัวการ์ดด้วย */
+.filter-bar:has(#gfBody[hidden]) { padding-top: 10px; padding-bottom: 10px; }
+.filter-bar:has(#gfBody[hidden]) .filter-head { margin-bottom: 4px; }
+
+/* โหมดกระชับ: KPI เป็นแถบเดียว ไม่ตกบรรทัด
+   ที่ความกว้างจริง การ์ด 4 ใบแบบ col-6 จะตกเป็น 2 แถว สูงถึง 192px
+   บังคับให้อยู่แถวเดียวจึงลดความสูงได้มากกว่าการซ่อนข้อความ */
+.density-compact .analytics-kpi-grid {
+  display: flex; flex-wrap: nowrap; gap: 8px;
+  --bs-gutter-x: 0; --bs-gutter-y: 0;
+}
+.density-compact .analytics-kpi-grid > [class*="col-"] {
+  flex: 1 1 0; width: auto; max-width: none; padding: 0;
+}
+.density-compact .kpi { padding: 8px 12px; min-height: 0; }
+.density-compact .kpi .v { font-size: var(--text-lg); line-height: 1.25; }
+.density-compact .kpi .small-muted { font-size: var(--text-xs); }
+
+/* จอแคบยังต้องตกบรรทัดได้ ไม่งั้นตัวเลขจะบีบจนอ่านไม่ออก */
+@media (max-width: 767.98px) {
+  .density-compact .analytics-kpi-grid { flex-wrap: wrap; }
+  .density-compact .analytics-kpi-grid > [class*="col-"] { flex: 1 1 45%; }
+}
+
+/* ---------- 27) การแสดงผลบนมือถือ ---------- */
+
+/* ป้ายปุ่มแบบสั้น ใช้เฉพาะจอแคบ ข้อความเต็มยังอยู่ใน DOM เพื่อโปรแกรมอ่านหน้าจอ */
+.lbl-short { display: none; }
+@media (max-width: 767.98px) {
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+}
+
+@media (max-width: 767.98px) {
+  /* ปุ่มบนแถบหัวเรื่องเดิมตัดคำเป็น 3 บรรทัดและดัน "ส่งออก CSV" ลงไปเต็มแถว
+     ย่อป้ายแล้วบังคับไม่ให้ตัดคำ ทั้งแถวจึงอยู่บรรทัดเดียว */
+  .topbar-actions { gap: 6px !important; }
+  .topbar-actions .btn { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
+  .topbar .container-fluid { padding-top: 6px !important; padding-bottom: 6px !important; }
+  .brand-sub { display: none; }          /* คำบรรยายใต้ชื่อระบบ ไม่จำเป็นบนจอแคบ */
+
+  /* พื้นที่กดขั้นต่ำ 44px ตามแนวทางการใช้งานด้วยนิ้ว
+     ของเดิมหลายจุดอยู่ที่ 30-38px ซึ่งกดพลาดง่าย */
+  .form-select-sm,
+  .form-control-sm,
+  .top-btn,
+  .icon-btn,
+  .density-btn,
+  .filter-collapse,
+  .quick-chip,
+  .side-nav .nav-link,
+  .subnav .btn,
+  .btn-sm { min-height: 44px; }
+  .form-select-sm, .form-control-sm { font-size: var(--text-base); }
+
+  /* ระยะห่างระหว่างเป้ากดในตาราง ให้นิ้วแตะไม่พลาดแถวข้างเคียง */
+  .mini-table td, .mini-table th { padding-top: 9px; padding-bottom: 9px; }
+
+  /* แถบเครื่องมือแผนที่เดิมสูง 236px ใกล้เคียงกับตัวแผนที่เอง (320px)
+     จัดเป็น 2 ช่องต่อแถวเพื่อคืนพื้นที่ให้แผนที่ */
+  .map-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .map-tool-check { grid-column: 1 / -1; }
+  .map-shell { min-height: 360px; }
+
+  /* คำอธิบายสัญลักษณ์บนแผนที่ ไม่ให้บังพื้นที่แผนที่มากเกินไป */
+  .map-legend { max-width: 52%; font-size: var(--text-xs); }
+  .map-overlay-stats { max-width: 62%; font-size: var(--text-xs); }
+
+  /* แถบอธิบายกรณีศึกษาลอยอยู่ล่างจอ บนมือถือให้เต็มความกว้างและเตี้ยลง */
+  .case-note { left: 8px; right: 8px; bottom: 8px; transform: none; width: auto; }
+
+  /* แถบเครื่องมือของ Plotly มีปุ่มเล็กมาก และแตะโดนโดยไม่ตั้งใจบ่อยบนจอสัมผัส */
+  .modebar-container { display: none !important; }
+
+  /* การ์ด KPI วางเป็น 2x2 บนจอแคบ ซึ่งถูกต้องแล้ว แต่บรรทัดขยายตัดคำเป็น 3 บรรทัด
+     ทำให้การ์ดสูงถึง 120px รวมกัน 300px · บีบระยะขอบและขนาดอักษรลงโดยยังอ่านออก
+     ไม่ซ่อนบรรทัดขยาย เพราะเป็นตัวเลขจริงไม่ใช่คำอธิบาย */
+  .kpi { padding: 10px 12px !important; }
+  .kpi .small-muted { font-size: var(--text-xs); line-height: 1.3; }
+  .kpi .v { font-size: var(--text-xl); line-height: 1.25; }
+  .analytics-kpi-grid { --bs-gutter-y: .5rem; --bs-gutter-x: .5rem; }
+
+  /* ปุ่มซูมของ Leaflet ค่าเริ่มต้นคือ 30px ซึ่งเล็กเกินไปสำหรับการแตะด้วยนิ้ว */
+  .leaflet-touch .leaflet-bar a,
+  .leaflet-control-zoom a {
+    width: 44px !important; height: 44px !important;
+    line-height: 44px !important; font-size: var(--text-xl) !important;
+  }
+}
+
+/* จอแคบมาก: ลดขนาดตัวเลข KPI ไม่ให้ตัดคำกลางตัวเลข */
+@media (max-width: 400px) {
+  .kpi .v { font-size: var(--text-xl); }
+  .topbar-actions .btn { font-size: var(--text-sm); padding-left: 8px; padding-right: 8px; }
+  .density-btn { padding-left: 9px; padding-right: 9px; }
+}
+
+/* ---------- 28) การ์ดที่พับเก็บได้ ---------- */
+
+/* พับแล้วเหลือเฉพาะหัวการ์ด ผู้ใช้ยังเห็นว่ามีข้อมูลอะไรให้กดดูต่อ */
+.cardx.is-collapsed > *:not(.card-head-el) { display: none !important; }
+.cardx.is-collapsed { padding-bottom: 10px !important; }
+.cardx.is-collapsed .card-head-el {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+/* การ์ดที่พับแล้วไม่ต้องยืดเต็มความสูงคอลัมน์ ไม่งั้นจะเหลือช่องว่างก้อนใหญ่ */
+.cardx.is-collapsed.h-100 { height: auto !important; }
+
+.card-collapse-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 2px 11px;
+  min-height: 30px;
+  font-size: var(--text-sm); font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .14s ease, color .14s ease, border-color .14s ease;
+}
+.card-collapse-btn:hover { background: var(--surface-hover); color: var(--primary-dark); border-color: var(--primary); }
+.card-collapse-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+/* หัวการ์ดบางใบเป็น <h2> ลอยๆ ไม่ใช่แถว flex ต้องจัดให้ปุ่มไปอยู่ขวา */
+h2.card-head-el {
+  display: flex; align-items: center; gap: 8px;
+  justify-content: space-between;
+}
+
+@media (max-width: 767.98px) {
+  .card-collapse-btn { min-height: 44px; padding-left: 14px; padding-right: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-collapse-btn { transition: none; }
+}
+
+/* ---------- 29) ปรับระบบภาพ: contrast · ลำดับชั้น · ความกว้าง · บุคลิก ---------- */
+
+/* --- ① แก้ contrast ที่วัดแล้วไม่ผ่าน WCAG AA ---
+   ป้ายกำกับบนการ์ด KPI เดิมใช้ --muted-light (#94A3B8) บนพื้นขาว = 2.56:1
+   ทั้งที่เป็นข้อความบอกว่าตัวเลขใหญ่ที่สุดบนหน้าคืออะไร */
+.kpi .small-muted { color: var(--muted); font-size: var(--text-sm); }   /* 4.76:1 */
+/* คำบรรยายใต้ชื่อกลุ่มตอน active เดิมขาว 85% บนน้ำเงิน = 4.1:1 */
+.group-btn.active .group-sub { color: rgba(255, 255, 255, .95); }
+
+/* --- ③ ตัวเลขคือสินค้าหลักของแดชบอร์ด ต้องเด่นกว่านี้ ---
+   เดิม 25.9px เทียบเนื้อความ 15px = ต่างกันเพียง 1.7 เท่า */
+.kpi .v {
+  font-size: var(--text-kpi);
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  margin: 2px 0 4px;
+}
+/* หน่วยแยกออกจากตัวเลข ตัวเลขจึงเด่นขึ้นโดยไม่ต้องขยายอะไรเพิ่ม */
+.kpi .unit {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 3px;
+  letter-spacing: 0;
+}
+.kpi .spark { display: block; margin-top: 6px; height: 26px; }
+.kpi { border-left-width: 4px; }
+
+/* --- ④ ลำดับชั้นของการ์ด: เดิมทุกใบใช้เงาและขอบชุดเดียวกันหมด ---
+   เงาเดิมฟุ้ง 24px ทำให้ทุกอย่างดูลอย ลดให้คมขึ้นและดูเป็นเครื่องมือทำงาน */
+.cardx {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+  border-radius: 12px;
+}
+/* การ์ดรอง: การ์ดที่พับเก็บได้คือข้อมูลประกอบตามนิยาม จึงเบากว่าการ์ดหลัก */
+.cardx[data-collapse-id] { box-shadow: none; }
+.cardx[data-collapse-id]:hover { box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+/* พื้นหลัง: แผงตัวควบคุมไม่ใช่เนื้อหา ไม่ต้องมีน้ำหนักเท่าการ์ดข้อมูล */
+.filter-bar { box-shadow: none; background: var(--surface-soft); }
+
+/* --- ⑤ จำกัดความกว้างเนื้อหา ---
+   เดิม max-width: none ทำให้บนจอ 2560px ตารางกว้างจนสายตาไล่บรรทัดหลง */
+.main-content > .section-block,
+.main-content > .tab-nav-wrap,
+.main-content > .tab-content {
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* แผนที่กับเครือข่ายได้ประโยชน์จากพื้นที่กว้าง จึงยกเว้นให้ */
+#tab-explain .map-shell, #tab-network #networkChart { max-width: none; }
+
+/* --- ⑥ คืนบุคลิกด้วยสีแบรนด์ โดยไม่ไปปนกับสีที่มีความหมาย ---
+   น้ำเงิน = สถานะที่เลือกอยู่ · เขียวหัวเป็ด = อัตลักษณ์ระบบ · แดง-ส้ม = ระดับความเสี่ยง */
+.topbar { border-top: 3px solid var(--brand-teal); }
+.brand-mark { background: var(--brand-teal); }
+.mini-table thead th {
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--border-strong);
+}
+.mini-table tbody tr:nth-child(even) { background: var(--surface-soft); }
+
+/* --- ⑧ รายละเอียดที่ทำให้ดูเป็นเครื่องมือทำงานจริง --- */
+
+/* บอกว่าตารางยังเลื่อนได้ต่อ ด้วยเงาไล่ที่ขอบขวา */
+.table-wrap {
+  background:
+    linear-gradient(to right, var(--surface) 30%, rgba(255,255,255,0)) left / 24px 100% no-repeat,
+    linear-gradient(to left, var(--surface) 30%, rgba(255,255,255,0)) right / 24px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgba(15,23,42,.10), transparent) left / 10px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(15,23,42,.10), transparent) right / 10px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* โครงร่างตอนกำลังโหลด ดีกว่าปล่อยหน้าว่างระหว่างดาวน์โหลดข้อมูล 22.7MB */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-hover) 25%, var(--surface-soft) 37%, var(--surface-hover) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shift 1.4s ease infinite;
+  border-radius: 8px;
+}
+@keyframes skeleton-shift { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* โหมดพิมพ์: ผู้ตรวจสอบต้องแนบผลในรายงาน
+   ตัดส่วนควบคุมออก และกางการ์ดที่พับไว้ให้เห็นเนื้อหาครบ */
+@media print {
+  .topbar, .filter-bar, .quick-filters, .tab-groupnav, .tab-subnav,
+  .card-collapse-btn, .density-switch, .case-note { display: none !important; }
+  .cardx.is-collapsed > *:not(.card-head-el) { display: revert !important; }
+  .cardx { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  .tab-pane { display: block !important; opacity: 1 !important; }
+  .table-wrap { overflow: visible !important; background: none; }
+  a[href]::after { content: ''; }
+}
+
+/* ป้าย "ข้อมูลจริง" กับ "คำนวณ" ปรากฏรวมกัน 82 จุด กลายเป็นสัญญาณรบกวนมากกว่าข้อมูล
+   ในโหมดกระชับจึงซ่อนสองแบบนี้ แต่คง "ข้อมูลสาธิต" ไว้เสมอ เพราะเป็นคำเตือนที่ห้ามพลาด */
+.density-compact .cardx > .card-title-row > .badge-real,
+.density-compact .cardx > .card-title-row > .badge-derived { display: none; }
+
+/* --- แก้ contrast เชิงระบบ: สองสาเหตุหลักที่ตรวจพบ ---
+
+   สาเหตุที่ 1: ตัวอักษรขาวบนพื้น --primary (#1677FF) ได้เพียง 4.1:1
+   ซึ่งไม่ผ่านเกณฑ์ 4.5:1 สำหรับตัวอักษรต่ำกว่า 18.66px
+   จึงใช้ --primary-dark (#0F5FCC = 5.95:1) กับทุกจุดที่เป็นพื้นทึบรองรับตัวอักษรขาว
+   ส่วน --primary ยังใช้กับเส้นขอบ พื้นอ่อน และสีเน้นได้ตามเดิม
+
+   สาเหตุที่ 2: --slate และ --muted-light (#94A3B8 = 2.56:1) ถูกใช้กับข้อความจริง
+   ทั้งสองค่าเหมาะกับเส้นขอบและไอคอนเท่านั้น ไม่ใช่ตัวอักษร */
+
+.group-btn.active,
+.density-btn.active,
+.nav-pills .nav-link.active,
+.case-badge,
+.cov-rule,
+.rank-badge,
+.btn-primary-action,
+.btn.btn-primary {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+.group-btn.active { box-shadow: 0 4px 10px rgba(15, 95, 204, .25); }
+#pill-overview, #pill-explain, #pill-fraud, #pill-anomaly, #pill-network,
+#pill-contractor, #pill-time, #pill-rules, #pill-demo { --tab-color: var(--primary-dark); }
+
+/* ข้อความที่เคยใช้สีเทาอ่อนเกินไป */
+.section-label { color: var(--muted); }
+.kpi-hint { color: var(--muted); }
+.filter-summary { color: var(--text-soft); }
+.fw-standard { color: var(--muted); }
+.cov-dash { color: var(--muted); }
+
+/* จุดที่เหลือจากการตรวจ contrast รอบสอง */
+.btn.btn-primary-action,
+.btn-sm.btn-primary-action {
+  background: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+  color: #fff !important;
+}
+.filter-summary strong { color: var(--primary-dark); }
+.quick-filters-label { color: var(--text-soft); }
+.group-step { color: var(--text-soft); }
+.btn-timelapse-play { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+/* SVG ที่ไม่กำหนดความกว้างจะใช้ค่าปริยาย ทำให้เส้นแนวโน้มไม่ยืดเต็มการ์ด */
+.kpi .spark {
+  width: 100%;
+  height: 26px;
+  color: var(--muted-light);   /* ใช้เป็นเส้นกราฟ ไม่ใช่ตัวอักษร จึงใช้เทาอ่อนได้ */
+  overflow: visible;
+}
+.kpi-clickable.is-on .spark { color: var(--primary-dark); }
+
+/* ตัวเลข KPI 40px เหมาะกับจอกว้าง แต่บนการ์ดกว้าง ~162px ของจอมือถือจะล้นและตัดคำ
+   กฎมือถือที่เขียนไว้ก่อนหน้าอยู่ต้นไฟล์จึงถูกกฎในหัวข้อ 29 ทับ ต้องประกาศซ้ำหลังสุด */
+@media (max-width: 767.98px) {
+  .kpi .v { font-size: 1.75rem; }          /* 28px */
+  .kpi .unit { font-size: var(--text-sm); white-space: nowrap; }
+  .kpi .spark { height: 20px; }
+}
+@media (max-width: 400px) {
+  .kpi .v { font-size: 1.5rem; }           /* 24px */
+}
+
+/* ---------- 30) โครงหน้าแบบแถบข้าง + โครมเขียวเข้ม ----------
+
+   ปรับตามต้นแบบที่ผู้ใช้กำหนด สาระของการเปลี่ยนคือสามอย่าง
+   ① เมนูย้ายจากสองแถวแนวนอนไปเป็นคอลัมน์ซ้าย เห็นทั้ง 9 มุมมองพร้อมหัวข้อกลุ่มในครั้งเดียว
+   ② โครงหน้า (แถบข้าง แถบบน แผงพาดหัว) เป็นเขียวเข้ม เนื้อหาอยู่บนพื้นอมเขียวอ่อน
+   ③ บันไดความรุนแรง 4 ระดับเป็นภาษาภาพหลัก โทเค็น --sev-* ถูกใช้ร่วมทั้งไฟล์ */
+
+.shell { display: flex; min-height: 100vh; }
+.main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ---- แถบข้าง ---- */
+
+.side {
+  width: var(--sidebar-w); flex: 0 0 var(--sidebar-w);
+  background: var(--chrome); color: var(--chrome-ink);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  z-index: 1030;
+}
+.side-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 15px 14px;
+  border-bottom: 1px solid var(--chrome-line);
+}
+.side-brand .brand-mark {
+  background: rgba(255, 255, 255, .14);
+  color: var(--chrome-ink);
+  width: 32px; height: 32px;
+}
+.side-brand .brand-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.side-brand strong { color: var(--chrome-ink); font-size: var(--text-md); font-weight: 600; }
+.side-brand .brand-sub {
+  color: var(--chrome-ink-dim); font-size: var(--text-xs);
+  white-space: normal; overflow: visible;
+}
+
+.side-nav { padding: 10px 9px 18px; flex: 1; }
+.side-nav .tab-subnav {
+  display: flex; flex-direction: column;
+  gap: 0; margin: 0; padding: 0; list-style: none;
+}
+
+/* แต่ละหมวดมีสีประจำ: หัวหมวดและแถบซ้ายของรายการที่เลือกใช้สีเดียวกัน
+   --g  = เฉดสว่าง วางบนพื้นเขียวเข้มของแถบข้าง
+   --gi = เฉดเข้ม  วางบนพื้นการ์ดสีขาวตอนรายการถูกเลือก */
+.side-nav [data-cat] { --g: var(--chrome-ink-dim); --gi: var(--text-soft); }
+.side-nav [data-cat="overview"]  { --g: #6ED3AE; --gi: #0A5C4B; }
+.side-nav [data-cat="screening"] { --g: #E8B15C; --gi: #8A4A07; }
+.side-nav [data-cat="deepdive"]  { --g: #5FBEDA; --gi: #0A566B; }
+.side-nav [data-cat="context"]   { --g: #B3A5EE; --gi: #453A8A; }
+.side-nav [data-cat="about"]     { --g: #9FB5AE; --gi: #41534E; }
+
+.nav-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--text-xs); font-weight: 500;
+  color: var(--g); opacity: .92;
+  padding: 14px 8px 5px;
+}
+.nav-head:first-child { padding-top: 4px; }
+.nav-step {
+  flex: 0 0 16px;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: inline-grid; place-items: center;
+  background: rgba(255, 255, 255, .12); color: var(--g);
+  font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+
+.side-nav .nav-item { display: block; }
+.side-nav .nav-link {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: none; border: 0;
+  border-inline-start: 3px solid transparent;
+  color: var(--chrome-ink);
+  text-align: start; padding: 7px 11px; margin-bottom: 2px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-md); font-weight: 400;
+  min-height: 40px;
+  transition: background .14s, color .14s;
+}
+.side-nav .nav-link:hover { background: rgba(255, 255, 255, .09); color: var(--chrome-ink); }
+.side-nav .nav-link.active {
+  background: var(--surface); color: var(--gi);
+  border-inline-start-color: var(--g);
+  font-weight: 600;
+  box-shadow: none;
+}
+[data-theme="dark"] .side-nav .nav-link.active { color: var(--g); }
+.side-nav .nav-link:focus-visible { outline: 2px solid var(--chrome-ink); outline-offset: 1px; box-shadow: none; }
+
+.side-nav .nav-icon {
+  flex: 0 0 20px;
+  width: 20px; height: 20px;
+  display: inline-grid; place-items: center;
+  font-size: var(--text-md); line-height: 1;
+  background: none; border-radius: 0;
+  filter: grayscale(.3);
+}
+.side-nav .nav-link.active .nav-icon,
+.side-nav .nav-link:hover .nav-icon { filter: none; }
+.nav-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.nav-text em {
+  font-style: normal; font-size: var(--text-xs);
+  color: var(--chrome-ink-dim); font-weight: 400;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.side-nav .nav-link.active .nav-text em { color: var(--muted); }
+.nav-count {
+  margin-inline-start: auto;
+  font-size: var(--text-xs); color: var(--g); opacity: .9;
+  font-variant-numeric: tabular-nums;
+}
+.side-nav .nav-link.active .nav-count { color: var(--gi); opacity: 1; }
+
+.side-foot {
+  padding: 11px 15px; border-top: 1px solid var(--chrome-line);
+  border-left: 0;
+  font-size: var(--text-xs); color: var(--chrome-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- แถบบน ---- */
+
+.topbar {
+  position: sticky; top: 0; z-index: 1020;
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 9px 16px;
+  background: var(--chrome); color: var(--chrome-ink);
+  border-bottom: 1px solid var(--chrome-line);
+  border-top: 0;
+  box-shadow: none;
+}
+.topbar::before { display: none; }
+
+.top-search {
+  flex: 1 1 240px; max-width: 460px;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--radius-md);
+  padding: 5px 11px;
+  min-height: 36px;
+}
+.top-search-icon { color: var(--chrome-ink-dim); font-size: var(--text-lg); line-height: 1; }
+.top-search input {
+  flex: 1; min-width: 0;
+  background: none; border: 0; color: var(--chrome-ink);
+  font-size: var(--text-md); font-family: inherit;
+}
+.top-search input::placeholder { color: var(--chrome-ink-dim); }
+.top-search input:focus { outline: none; }
+.top-search:focus-within { border-color: var(--chrome-ink-dim); background: rgba(255, 255, 255, .16); }
+.top-search input::-webkit-search-cancel-button { filter: invert(1) opacity(.6); }
+.kbd {
+  font-size: var(--text-xs);
+  border: 1px solid var(--chrome-line); border-radius: 5px;
+  padding: 1px 5px; color: var(--chrome-ink-dim); white-space: nowrap;
+}
+.top-spacer { flex: 1 1 0; }
+
+.top-btn, .icon-btn {
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid var(--chrome-line);
+  color: var(--chrome-ink);
+  border-radius: var(--radius-md);
+  padding: 6px 11px; cursor: pointer;
+  font-size: var(--text-md); font-family: inherit; font-weight: 500;
+  min-height: 36px;
+}
+.top-btn:hover, .icon-btn:hover { background: rgba(255, 255, 255, .2); }
+.top-btn:focus-visible, .icon-btn:focus-visible { outline: 2px solid var(--chrome-ink); outline-offset: 1px; }
+.icon-btn { padding: 6px 10px; line-height: 1; min-width: 36px; }
+.top-btn-go { background: var(--primary); border-color: var(--primary); color: #fff; }
+.top-btn-go:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+/* สวิตช์โหมดการแสดงผลบนพื้นเข้ม */
+.topbar .density-switch {
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid var(--chrome-line);
+  border-radius: var(--radius-md);
+  overflow: hidden; padding: 0;
+}
+.topbar .density-btn {
+  background: none; border: 0; color: var(--chrome-ink-dim);
+  padding: 6px 12px; min-height: 36px; border-radius: 0;
+  font-size: var(--text-md);
+}
+.topbar .density-btn:hover { background: rgba(255, 255, 255, .12); color: var(--chrome-ink); }
+.topbar .density-btn.active {
+  background: var(--surface); color: var(--primary-dark); font-weight: 600;
+}
+[data-theme="dark"] .topbar .density-btn.active { color: var(--accent-bright); }
+
+/* ปุ่มเปิดแถบข้าง โชว์เฉพาะจอแคบ */
+.side-toggle { display: none; }
+.side-scrim {
+  position: fixed; inset: 0; z-index: 1025;
+  background: rgba(8, 17, 15, .5);
+  border: 0; padding: 0;
+}
+.side-scrim[hidden] { display: none; }
+
+/* ---- แผงพาดหัวของแต่ละแท็บ: จากพื้นสว่างไล่สี เป็นแผงเขียวเข้ม ----
+   ต้นแบบใช้แผงเข้มเป็นจุดยึดสายตาบนสุดของเนื้อหา และการไล่สีอ่อนเดิม
+   ฝังสีสว่างไว้ตายตัวจนใช้กับโหมดมืดไม่ได้ */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo, .hero-network {
+  background: var(--chrome);
+  color: var(--chrome-ink);
+  border: 1px solid var(--chrome-line);
+  border-left: 4px solid var(--hero-accent, var(--chrome-ink-dim));
+  border-radius: var(--radius-lg);
+  padding: 15px 18px;
+  box-shadow: none;
+}
+.hero h1, .hero-fraud h1, .hero-contractor h1, .hero-anomaly h1,
+.hero-demo h1, .hero-network h1 { color: var(--chrome-ink); }
+.hero .small, .hero-fraud .small, .hero-contractor .small, .hero-anomaly .small,
+.hero-demo .small, .hero-network .small { color: var(--chrome-ink-dim); }
+.hero            { --hero-accent: #6ED3AE; }
+.hero-fraud      { --hero-accent: #E0A24C; }
+.hero-anomaly    { --hero-accent: #E8B15C; }
+.hero-contractor { --hero-accent: #5FBEDA; }
+.hero-network    { --hero-accent: #B3A5EE; }
+.hero-demo       { --hero-accent: #B3A5EE; }
+/* ตัวเลขและคำที่เน้นในแผงเข้ม ต้องสว่างกว่าคำอธิบายรอบข้าง */
+.hero strong, .hero-fraud strong, .hero-contractor strong,
+.hero-anomaly strong, .hero-demo strong, .hero-network strong { color: #fff; }
+.hero .badge, .hero-fraud .badge, .hero-contractor .badge,
+.hero-anomaly .badge, .hero-demo .badge, .hero-network .badge { color: #fff; }
+
+/* ---- รายละเอียดที่ปรับให้ตรงกับต้นแบบ ---- */
+
+/* มุมโค้งชุดใหม่เล็กลงจากเดิม ให้ดูเป็นเครื่องมือทำงานมากกว่าการ์ดโปรโมชัน */
+.cardx { border-radius: var(--radius-lg); }
+.cardx[data-collapse-id] { border-radius: var(--radius-md); }
+
+/* หัวการ์ดมีเส้นคั่นชัดเจนเหมือนต้นแบบ */
+.cardx > .card-title-row {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px; margin-bottom: 10px;
+}
+
+/* หัวตาราง: ไม่บังคับตัวพิมพ์ใหญ่ เพราะชื่อคอลัมน์เป็นภาษาไทยซึ่งไม่มีตัวพิมพ์ใหญ่
+   การ letter-spacing กว้างจึงทำให้อ่านยากขึ้นเปล่า ๆ */
+.mini-table th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+
+/* แถวที่เสี่ยงสูงย้อมพื้นอ่อนตามบันไดความรุนแรง */
+.mini-table tbody tr.row-sev-4 { background: var(--sev-4-bg); }
+.mini-table tbody tr.row-sev-3 { background: var(--sev-3-bg); }
+
+/* แถบตัวกรองเบาลง เพราะช่องค้นหาย้ายขึ้นแถบบนแล้ว */
+.filter-bar { border-radius: var(--radius-lg); }
+.filter-bar::before { display: none; }
+
+/* ---- โหมดมืด: จุดที่ยังฝังสีสว่างไว้เฉพาะทาง ---- */
+
+[data-theme="dark"] .codebox { background: #050D0B; color: #C8DCD6; }
+[data-theme="dark"] .rule-chip.chip-synthetic { background: var(--violet-soft); color: #C3B8F2; }
+[data-theme="dark"] .badge-medium { background: var(--sev-2); color: #04221C; }
+[data-theme="dark"] .cluster-core { background: #E9F1EF; color: #132420; }
+/* แผ่นแผนที่ของ OSM เป็นภาพสว่างเสมอ ลดความจ้าลงให้เข้ากับพื้นมืด */
+[data-theme="dark"] .leaflet-tile-pane { filter: brightness(.82) saturate(.9); }
+[data-theme="dark"] .modal-content { background: var(--surface); color: var(--text); }
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+  background-color: var(--surface-soft); border-color: var(--border-strong); color: var(--text);
+}
+[data-theme="dark"] .form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2396ACA6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+[data-theme="dark"] .btn-close { filter: invert(1) grayscale(1) brightness(1.8); }
+[data-theme="dark"] .table > :not(caption) > * > * { color: var(--text); }
+[data-theme="dark"] .btn-outline-secondary {
+  color: var(--text-soft); border-color: var(--border-strong);
+}
+[data-theme="dark"] .btn-outline-secondary:hover {
+  background: var(--surface-hover); color: var(--text);
+}
+
+/* ตัวอักษรสีแบรนด์บนพื้นการ์ด ใช้เฉดสว่างที่แยกไว้ ไม่ใช่สีพื้นทึบ */
+.boot-brand, .text-teal,
+.mini-table th.sortable:hover, .mini-table th.sort-asc, .mini-table th.sort-desc,
+.detail-clickable:hover, .term:hover { color: var(--accent-bright); }
+.mini-table th.sort-asc::after, .mini-table th.sort-desc::after { color: var(--accent-bright); }
+
+/* ---- ตอบสนองขนาดหน้าจอ ---- */
+
+/* แคบกว่า 1024px: แถบข้างกลายเป็นแผงเลื่อนออกมาทับ ไม่เบียดเนื้อหา */
+@media (max-width: 1023.98px) {
+  .side {
+    position: fixed; inset-inline-start: 0; top: 0;
+    z-index: 1040; width: 272px; flex-basis: 272px;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 0 0 40px rgba(0, 0, 0, .3);
+  }
+  .side.is-open { transform: none; }
+  .side-toggle { display: inline-grid; place-items: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side { transition: none; }
+}
+@media (min-width: 1024px) {
+  .side-scrim { display: none !important; }
+}
+
+/* แถบข้างกินความกว้างไป 238px การ์ด KPI จึงแคบลงราว 60px ต่อใบ
+   ตัวเลข 40px ทำให้ "8.13 พันล้าน" ตกบรรทัดที่สอง ลดขนาดลงในช่วงความกว้างนี้ */
+/* จำกัดช่วงบนไว้ที่ 768px ด้วย ไม่งั้นกฎนี้ (อยู่ท้ายไฟล์) จะไปทับกฎมือถือ
+   ที่ประกาศไว้ก่อนหน้าซึ่งใช้ 28px และ 24px */
+@media (min-width: 768px) and (max-width: 1499.98px) {
+  .kpi .v { font-size: 1.75rem; }
+}
+
+@media (max-width: 767.98px) {
+  .topbar { padding: 8px 12px; gap: 7px; }
+  .top-search { flex: 1 1 100%; max-width: none; order: -1; }
+  .top-search .kbd { display: none; }
+  .topbar .density-btn { padding: 6px 9px; }
+  .hero, .hero-fraud, .hero-contractor, .hero-anomaly,
+  .hero-demo, .hero-network { padding: 13px 14px; }
+}
+
+@media print {
+  .side, .side-scrim, .top-search, .side-toggle { display: none !important; }
+  .shell { display: block; }
+  .hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo, .hero-network {
+    background: none; color: #000; border: 1px solid #ccc;
+  }
+  .hero h1, .hero-fraud h1, .hero-contractor h1, .hero-anomaly h1,
+  .hero-demo h1, .hero-network h1 { color: #000; }
+  .hero .small, .hero-fraud .small, .hero-contractor .small,
+  .hero-anomaly .small, .hero-demo .small, .hero-network .small { color: #333; }
+}
+
+/* ---------- 31) แก้ contrast หลังเปลี่ยนชุดสีและเพิ่มโหมดมืด ----------
+   วัดด้วยสูตร WCAG จริงทั้ง 9 แท็บ × 2 ธีม เกณฑ์ 4.5:1 สำหรับตัวอักษรต่ำกว่า 18.66px */
+
+/* ① สีประจำหมวดในแถบข้าง สามหมวดเดิมได้ 4.30-4.45 บนพื้น #0B4F45 ยังไม่ถึง 4.5
+      ปรับให้สว่างขึ้นเล็กน้อย โทนยังแยกกันได้เหมือนเดิม */
+.side-nav [data-cat="deepdive"] { --g: #6FC8E0; }   /* 4.97:1 */
+.side-nav [data-cat="context"]  { --g: #BFB3F2; }   /* 4.95:1 */
+.side-nav [data-cat="about"]    { --g: #AEC2BB; }   /* 5.11:1 */
+
+/* ② ในโหมดมืด รายการที่เลือกอยู่ใช้พื้นการ์ดสีเข้ม ตัวอักษรประกอบจึงต้องใช้เฉดสว่าง
+      ไม่ใช่ --gi ที่ออกแบบไว้สำหรับวางบนพื้นขาว */
+[data-theme="dark"] .side-nav .nav-link.active .nav-count { color: var(--g); }
+[data-theme="dark"] .side-nav .nav-link.active .nav-text em { color: var(--chrome-ink-dim); }
+
+/* ③ ข้อความประกอบภายในแผงพาดหัวสีเข้ม
+      คลาสอย่าง .small-muted / .text-body-secondary ถูกออกแบบไว้สำหรับพื้นการ์ดสว่าง
+      เมื่อแผงพาดหัวกลายเป็นพื้นเข้ม ต้องกลับด้านให้ทั้งกลุ่ม ไม่ใช่ไล่แก้ทีละจุด */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo, .hero-network,
+.hero *, .hero-fraud *, .hero-contractor *, .hero-anomaly *, .hero-demo *, .hero-network * {
+  --muted: var(--chrome-ink-dim);
+  --text: var(--chrome-ink);
+  --text-soft: var(--chrome-ink);
+  --muted-light: var(--chrome-ink-dim);
+  --accent-bright: #8FE3C6;
+}
+.hero .small-muted, .hero-fraud .small-muted, .hero-contractor .small-muted,
+.hero-anomaly .small-muted, .hero-demo .small-muted, .hero-network .small-muted {
+  color: var(--chrome-ink-dim);
+}
+
+/* ④ คู่เปรียบเทียบ: ชื่อเป็นตัวอักษรจึงต้องสลับตามธีม ส่วนเส้นในกราฟยังใช้สีคงที่ */
+.compare-name.compare-a { color: var(--accent-bright); }
+.compare-name.compare-b { color: var(--danger-text); }
+.compare-val.compare-better { color: var(--accent-bright); }
+.compare-val.compare-worse { color: var(--danger-text); }
+
+/* ⑤ ตารางของ Bootstrap ตรึงพื้นเป็นขาวผ่านตัวแปรของตัวเอง
+      ถ้าไม่ตั้งค่าให้ ตัวอักษรสว่างในโหมดมืดจะไปอยู่บนพื้นขาว */
+[data-theme="dark"] .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--text);
+  --bs-table-striped-bg: var(--surface-soft);
+  --bs-table-striped-color: var(--text);
+  --bs-table-hover-bg: var(--surface-hover);
+  --bs-table-hover-color: var(--text);
+  --bs-table-border-color: var(--border);
+}
+
+/* ⑥ ลิงก์และข้อความเน้นของ Bootstrap ในโหมดมืด */
+[data-theme="dark"] {
+  --bs-link-color: var(--accent-bright);
+  --bs-link-hover-color: #8FE3C6;
+  --bs-link-color-rgb: 95, 211, 180;
+  --bs-body-color: var(--text);
+  --bs-secondary-color: var(--muted);
+  --bs-emphasis-color: var(--text);
+}
+[data-theme="dark"] a:not(.btn),
+[data-theme="dark"] .btn-link { color: var(--accent-bright); }
+[data-theme="dark"] .text-warning-emphasis { color: var(--sev-3-ink) !important; }
+[data-theme="dark"] .text-danger-emphasis { color: var(--sev-4-ink) !important; }
+[data-theme="dark"] .text-body-secondary, [data-theme="dark"] .text-muted { color: var(--muted) !important; }
+
+/* ⑦ ปุ่มกลุ่มบนแผนที่ตอนถูกเลือก ใช้สีเทาของ Bootstrap ซึ่งจางเกินไปบนพื้นมืด */
+[data-theme="dark"] .btn-check:checked + .btn-outline-secondary,
+[data-theme="dark"] .btn-outline-secondary.active,
+[data-theme="dark"] .btn-outline-secondary:active {
+  background: var(--primary-dark); border-color: var(--primary-dark); color: #fff;
+}
+
+/* ⑧ อภิธานศัพท์และป้ายในแท็บเครือข่าย เดิมฝังสีม่วงเข้มไว้ตายตัว */
+.net-glossary > summary { color: var(--violet); }
+[data-theme="dark"] .net-glossary > summary { color: #C3B8F2; }
+[data-theme="dark"] .net-hint-tag { color: #C3B8F2; }
+
+/* ⑨ ตัวเลขเน้นในคำโปรยของแท็บ ใช้เฉดสว่างเมื่ออยู่บนพื้นการ์ดมืด */
+[data-theme="dark"] .cardx strong, [data-theme="dark"] .small strong { color: inherit; }
+
+/* ⑩ ตัวควบคุมของ Leaflet วาดด้วยสไตล์ของไลบรารีเอง (ตัวอักษร #333 บนพื้นขาว)
+      แผ่นแผนที่เป็นภาพสว่างเสมอ จึงคืนพื้นสว่างให้ตัวควบคุมแทนการเปลี่ยนสีตัวอักษร */
+[data-theme="dark"] .leaflet-control-attribution,
+[data-theme="dark"] .leaflet-control-scale-line {
+  background: rgba(255, 255, 255, .88);
+  color: #333;
+}
+[data-theme="dark"] .leaflet-control-attribution a { color: #0B5A82; }
+
+/* ⑪ ปุ่ม outline ของ Bootstrap ยังใช้สีน้ำเงินปริยาย ทั้งที่ระบบเปลี่ยนสีหลักเป็นเขียวแล้ว
+      ตั้งผ่านตัวแปรของ Bootstrap เอง จึงครอบคลุมทั้ง hover / active / focus ในคราวเดียว */
+.btn-outline-primary, .btn-primary {
+  --bs-btn-color: var(--accent-bright);
+  --bs-btn-border-color: var(--primary);
+  --bs-btn-hover-bg: var(--primary-dark);
+  --bs-btn-hover-border-color: var(--primary-dark);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--primary-dark);
+  --bs-btn-active-border-color: var(--primary-dark);
+  --bs-btn-active-color: #fff;
+  --bs-btn-focus-shadow-rgb: 14, 124, 102;
+}
+.btn-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--primary-dark);
+}
+
+/* ⑫ พื้นที่กดขั้นต่ำ 44px บนจอสัมผัส
+      กฎ min-height ของหัวข้อ 27 อยู่ก่อนหัวข้อ 30 ในไฟล์ จึงถูกค่าของแถบบนชุดใหม่ (36px) ทับ
+      ประกาศซ้ำหลังสุดเพื่อให้มีผลจริง และให้ช่องค้นหายืดเต็มกล่องเพื่อให้กดโดนทั้งกล่อง */
+@media (max-width: 767.98px) {
+  .topbar .top-btn,
+  .topbar .icon-btn,
+  .topbar .density-btn { min-height: 44px; }
+  /* ตัด padding แนวตั้งออก แล้วให้ input ยืดเต็มกล่อง จุดกดจึงเป็น 44px จริงทั้งกล่อง
+     ไม่ใช่กล่อง 44px ที่มี input สูง 32px อยู่ข้างใน */
+  .top-search { min-height: 44px; padding: 0 11px; }
+  .top-search input { align-self: stretch; }
+}
+
+/* ⑬ สามช่อง "อ่านอย่างไร" อยู่ในแผงพาดหัวซึ่งตอนนี้เป็นพื้นเข้ม
+      พื้นขาวโปร่ง 70% เดิมทำให้ตัวอักษรสีอ่อนอ่านไม่ออก เปลี่ยนเป็นพื้นสว่างโปร่งบนพื้นเข้ม
+      หมายเหตุวิธีตรวจ: สคริปต์วัด contrast ข้ามพื้นที่มี alpha ต่ำกว่า .95 จุดนี้จึงไม่ถูกจับ
+      ต้องดูด้วยตาและวัดค่าที่ประกาศไว้จริงประกอบ */
+.hero-network .net-howto-item {
+  background: rgba(255, 255, 255, .1);
+  border-color: var(--chrome-line);
+  color: var(--chrome-ink);
+}
+.hero-network .net-howto-item strong { color: #fff; }
+
+/* ⑭ พื้นโปร่งแสงบนแถบเขียวเข้ม เดิมเป็นสีขาวจาง ทำให้พื้นสว่างขึ้นจนตัวอักษรรอง
+      (--chrome-ink-dim และเลขลำดับหมวด) เหลือ 3.5-3.9:1 ต่ำกว่าเกณฑ์ 4.5:1
+      เปลี่ยนเป็น "จางด้วยสีดำ" พื้นจึงเข้มลงแทนที่จะสว่างขึ้น ค่าที่วัดได้ขยับเป็น 5.9-6.3:1
+      และยังอ่านเป็นช่องกรอกที่ยุบลงไปในแถบ ซึ่งตรงกับความหมายมากกว่า */
+.top-search,
+.top-btn,
+.icon-btn,
+.topbar .density-switch { background: rgba(0, 0, 0, .16); }
+.nav-step { background: rgba(0, 0, 0, .18); }
+.top-search:focus-within { background: rgba(0, 0, 0, .26); }
+
+/* ⑮ แผงข้อมูลบนแผนที่ใช้พื้นขาวโปร่ง ในโหมดมืดตัวอักษรเป็นสีอ่อนจึงจมหายไป
+      ใช้แนวเดียวกับที่มีอยู่แล้วสำหรับแผนที่พื้นมืด (.map-dark) */
+[data-theme="dark"] .map-overlay-stats,
+[data-theme="dark"] .map-legend {
+  background: rgba(16, 27, 24, .9);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* ---------- 32) แท็บสาธิต: อธิบายด้วยภาพ ----------
+
+   สีประจำช่องทางเชื่อมสามแบบถูกใช้ซ้ำใน 4 ที่ (แถบวิธีอ่าน · ไดอะแกรม · ชิปในการ์ดคลัสเตอร์ ·
+   ป้ายในตาราง) จึงประกาศเป็นโทเค็นชุดเดียว ไม่ไล่ใส่สีทีละจุด */
+/* สีของช่องทางเชื่อมมีสองบทบาทที่ต้องการความสว่างตรงข้ามกัน
+   --k-*      ใช้กับเส้นขอบและจุดนำ ต้องสด
+   --k-*-ink  ใช้กับตัวอักษร ต้องเข้มพอผ่าน 4.5:1 บนพื้นการ์ด */
+.demo-pane {
+  --k-director: var(--violet);
+  --k-address: var(--sev-2);
+  --k-subcontractor: var(--sev-3);
+  --k-director-ink: #453A8A;
+  --k-address-ink: var(--sev-2-ink);
+  --k-subcontractor-ink: var(--sev-3-ink);
+}
+[data-theme="dark"] .demo-pane {
+  --k-director-ink: #C3B8F2;
+}
+
+/* คำเตือนเหลือบรรทัดเดียว จัดไอคอนกับข้อความให้อยู่บรรทัดเดียวกันแม้ข้อความยาวจนตัดบรรทัด */
+.demo-warn {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: var(--text-md);
+}
+
+/* ---- ตารางช่องว่างของข้อมูล ---- */
+
+.demo-gap-wrap { max-height: none; }
+.gap-mark {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  margin-inline-end: 6px;
+  font-size: var(--text-xs); font-weight: 700; line-height: 1;
+  vertical-align: -3px;
+}
+.gap-none .gap-mark { background: var(--sev-4-bg); color: var(--danger-text); }
+.gap-proxy .gap-mark { background: var(--sev-3-bg); color: var(--warning-text); }
+/* แถบซ้ายบอกระดับ ใช้พื้นที่น้อยกว่าการย้อมพื้นทั้งแถวซึ่งแย่งสายตากับตัวอักษร */
+.demo-gap-wrap tbody tr > td:first-child { border-inline-start: 3px solid transparent; }
+.gap-none > td:first-child { border-inline-start-color: var(--sev-4); }
+.gap-proxy > td:first-child { border-inline-start-color: var(--sev-3); }
+
+/* ---- จุดสีประจำช่องทางในแถบวิธีอ่าน ---- */
+
+.dot-director { background: var(--k-director); }
+.dot-address { background: var(--k-address); }
+.dot-subcontractor { background: var(--k-subcontractor); }
+
+/* ---- ไดอะแกรม ---- */
+
+/* SVG กว้าง 780 หน่วย ต้องย่อลงมาพอดีการ์ดเสมอ ไม่ดันให้การ์ดล้นแนวนอน */
+.demo-diagram {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  overflow-x: auto;
+}
+.demo-diagram svg { display: block; width: 100%; height: auto; min-width: 560px; }
+
+.chart-sm { min-height: 190px; }
+
+.demo-bid-list { margin: 0; padding-inline-start: 18px; font-size: var(--text-md); }
+.demo-bid-list li { margin-bottom: 4px; }
+
+/* ---- การ์ดคลัสเตอร์ ---- */
+
+.demo-cluster-list { display: grid; gap: 10px; }
+.demo-cluster {
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--sev-1);
+  border-radius: var(--radius-md);
+  padding: 11px 13px;
+  background: var(--surface-soft);
+}
+.demo-cluster.sev-4 { border-inline-start-color: var(--sev-4); background: var(--sev-4-bg); }
+.demo-cluster.sev-3 { border-inline-start-color: var(--sev-3); background: var(--sev-3-bg); }
+
+.demo-cluster-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.demo-cluster-level { font-weight: 600; font-size: var(--text-base); }
+.sev-4 .demo-cluster-level { color: var(--danger-text); }
+.sev-3 .demo-cluster-level { color: var(--warning-text); }
+
+/* แถบสามขีดบอกจำนวนช่องทางที่ซ้อนกัน อ่านได้แม้พิมพ์ขาวดำเพราะขีดที่ติดมีความทึบต่างกันชัด */
+.demo-cluster-bar { display: inline-flex; gap: 3px; }
+.demo-cluster-bar i {
+  display: block; width: 20px; height: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--border-strong);
+}
+.demo-cluster-bar i.on { background: currentColor; }
+.sev-4 .demo-cluster-bar { color: var(--sev-4); }
+.sev-3 .demo-cluster-bar { color: var(--sev-3); }
+.sev-1 .demo-cluster-bar { color: var(--sev-1); }
+
+.demo-cluster-chips, .demo-cluster-cos {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px;
+}
+.demo-chip {
+  display: inline-block;
+  border-radius: var(--radius-pill, 999px);
+  padding: 2px 10px;
+  font-size: var(--text-sm); font-weight: 500;
+  border: 1px solid currentColor;
+  background: var(--surface);
+}
+.demo-chip.chip-director { color: var(--k-director-ink); border-color: var(--k-director); }
+.demo-chip.chip-address { color: var(--k-address-ink); border-color: var(--k-address); }
+.demo-chip.chip-subcontractor { color: var(--k-subcontractor-ink); border-color: var(--k-subcontractor); }
+
+/* --muted ออกแบบมาให้อยู่บนพื้นการ์ดปกติ พอวางบนพื้นย้อมสีของคลัสเตอร์จะเหลือ 4.4:1
+   ใช้ --text-soft ซึ่งเข้มกว่าแทน เฉพาะภายในการ์ดที่ย้อมพื้น */
+.demo-cluster.sev-4 .small-muted,
+.demo-cluster.sev-3 .small-muted { color: var(--text-soft); }
+
+.demo-cluster-action {
+  margin-top: 7px; padding-top: 7px;
+  border-top: 1px dashed var(--border-strong);
+  font-size: var(--text-md);
+}
+
+/* ป้ายระดับท้ายชื่อในตารางรายละเอียด */
+.demo-level-tag {
+  display: inline-block; margin-inline-start: 6px;
+  border-radius: var(--radius-pill, 999px);
+  padding: 1px 8px;
+  font-size: var(--text-xs); font-weight: 600; white-space: nowrap;
+  background: var(--sev-1-bg); color: var(--sev-1-ink);
+}
+.demo-level-tag.sev-4 { background: var(--sev-4-bg); color: var(--danger-text); }
+.demo-level-tag.sev-3 { background: var(--sev-3-bg); color: var(--warning-text); }
+
+/* บนจอสัมผัส ชื่อที่กดได้ในตารางสองใบนี้คือทางเข้าหลักของภาพความเชื่อมโยง
+   ข้อความในเซลล์สูงเพียง 21px จึงขยายพื้นที่กดให้ถึง 44px ตามเกณฑ์เดียวกับปุ่มอื่น
+   จำกัดไว้เฉพาะแท็บสาธิตซึ่งมี 14 แถว ไม่ขยายไปตารางที่มีหลายร้อยแถวในแท็บอื่น */
+@media (max-width: 767.98px) {
+  .demo-pane .mini-table td .detail-clickable {
+    display: inline-block;
+    padding: 12px 0;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .demo-diagram { padding: 8px; }
+  .demo-cluster { padding: 10px; }
+}
+
+/* ---------- 33) โมเดลวิเคราะห์: ขอบเขตข้อมูล · Isolation Forest · คุณภาพชุดกฎ ---------- */
+
+.chart-md { height: 320px; }
+
+/* ขอบเขตของชุดข้อมูล — ต้องเห็นก่อนอ่านตัวเลขใด ๆ จึงไม่ใส่ในการ์ดพับได้ */
+.scope-note {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-inline-start: 4px solid var(--sev-2);
+  border-radius: var(--radius-md);
+  background: var(--sev-2-bg);
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.scope-icon { color: var(--sev-2-ink); font-size: var(--text-lg); line-height: 1.2; }
+[data-theme="dark"] .scope-icon { color: var(--sev-2-ink); }
+
+/* สรุปสามมุมของแผนภาพโมเดลเทียบกฎ */
+.ml-quadrant-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}
+.ml-q {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 8px 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--surface-soft);
+  font-size: var(--text-sm);
+}
+.ml-q strong { font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
+.ml-q-blind { border-inline-start: 4px solid var(--sev-4); background: var(--sev-4-bg); }
+.ml-q-blind strong { color: var(--danger-text); }
+.ml-q-both { border-inline-start: 4px solid var(--violet); }
+.ml-q-rule { border-inline-start: 4px solid var(--sev-1); }
+.ml-q-blind span { color: var(--text-soft); }
+
+.ml-why { margin: 0; padding-inline-start: 16px; }
+.ml-why li { margin-bottom: 2px; }
+
+/* คำอธิบายวิธีคิดที่พับไว้ */
+.method-note {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  background: var(--surface-soft);
+}
+.method-note > summary { cursor: pointer; font-size: var(--text-md); font-weight: 600; color: var(--accent-bright); }
+
+/* ---------- 34) แก้ contrast ในเนื้อหาที่พับไว้ ----------
+   ตรวจพบตอนกางการ์ดทั้งหมดเพื่อวัด contrast ของการ์ดโมเดลใหม่ ทั้งสามจุดมีมาก่อนแล้ว
+   แต่ไม่เคยถูกวัดเพราะอยู่ในการ์ดที่พับไว้โดยค่าเริ่มต้น */
+
+/* ป้ายช่วงกระบวนการ: --muted บนพื้น --surface-hover ได้ 4.42 ต่ำกว่าเกณฑ์เล็กน้อย */
+.stage-tag { color: var(--text-soft); }
+
+/* หัวข้อ "เอกสารที่ควรขอ" ใช้สีพื้นทึบของปุ่ม (--primary-dark) เป็นสีตัวอักษร ในโหมดมืดจึงจม */
+.audit-next-label,
+.audit-details > summary { color: var(--accent-bright); }
+[data-theme="dark"] .audit-next-demo .audit-next-label { color: #C3B8F2; }
+
+/* ป้ายระดับ "ต่ำ": สีเขียวเข้มของ --success บนพื้นเขียวเข้มในโหมดมืดได้ 2.6 */
+[data-theme="dark"] .badge-low { color: #7CD9C2; }
+
+/* ---------- 35) การ์ดขนาดกระชับ ----------
+
+   วัดก่อนแก้ (จอ 1440px สถานะเริ่มต้น): ความสูงรวม 9 แท็บ 14,434px
+   การ์ดที่สูงที่สุด 982px (แผนที่) · 871px (คุณภาพชุดกฎ) · 774px (เรื่องสาธิต) · 773px (เปรียบเทียบผู้รับจ้าง)
+   สาเหตุหลักมี 4 อย่าง
+   ① ช่องไฟรอบการ์ดสะสม: padding 16px + เส้นคั่นหัวการ์ด 18px + ช่องห่างระหว่างการ์ด 20px
+   ② กราฟสูงตายตัวเกินจำเป็น (เครือข่าย 470px · แนวโน้ม 420px) ทั้งที่เส้นกราฟอ่านได้ครบที่ ~340px
+   ③ ย่อหน้าอธิบายยาว 4-5 บรรทัดอยู่บนสุดของการ์ด ดันเนื้อหาจริงลงไป
+   ④ การ์ดที่วางคู่กันด้วย h-100 ยืดตามใบที่สูงที่สุด (รายละเอียดโครงการ 764px ลากแผนที่และรายการสูงตาม)
+
+   ใช้ !important เฉพาะจุดที่ต้องชนะ utility ของ Bootstrap (p-3, mb-3, g-3) และ style ในบรรทัดของกราฟ */
+
+:root {
+  --card-pad-y: 12px;
+  --card-pad-x: 14px;
+  --card-gap: .75rem;
+}
+
+/* ① ช่องไฟ */
+.tab-pane .cardx.p-3,
+.main-content > .section-block .cardx.p-3,
+.cardx.p-3 { padding: var(--card-pad-y) var(--card-pad-x) !important; }
+
+.tab-pane .row.g-3 { --bs-gutter-x: var(--card-gap); --bs-gutter-y: var(--card-gap); }
+.tab-pane .mb-3 { margin-bottom: var(--card-gap) !important; }
+.tab-pane .mt-3 { margin-top: var(--card-gap) !important; }
+
+.cardx .card-title-row {
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  min-height: 30px;
+}
+.cardx .card-title-row h2,
+.cardx > h2.h6 { font-size: var(--text-base); line-height: 1.35; }
+.cardx > h2.h6 { margin-bottom: 8px; }
+.section-label { margin-bottom: 4px; }
+
+/* การ์ดที่พับไว้ เดิมสูง 58px ต่อใบ แท็บที่มีการ์ดพับ 10 ใบจึงเสียพื้นที่ไป 580px */
+/* การ์ดที่พับ: เหลือเพียงแถบหัวเรื่องบาง ๆ ปุ่มกางบนจอเมาส์เล็กลงได้ ส่วนจอสัมผัสยังคง 44px ตามเกณฑ์เดิม */
+/* ต้องเจาะจงกว่ากฎ padding ของ .tab-pane .cardx.p-3 ด้านบน ไม่เช่นนั้นการ์ดพับยังหนา 52px */
+.tab-pane .cardx.p-3.is-collapsed,
+.cardx.is-collapsed { padding-top: 7px !important; padding-bottom: 7px !important; }
+.cardx.is-collapsed .card-title-row { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; min-height: 26px; }
+@media (hover: hover) and (min-width: 768px) {
+  .card-collapse-btn { min-height: 26px; padding: 1px 10px; }
+}
+
+/* แผงพาดหัวของแท็บ */
+.hero, .hero-fraud, .hero-contractor, .hero-anomaly, .hero-demo, .hero-network {
+  padding: 10px 14px;
+  margin-bottom: var(--card-gap) !important;
+}
+.hero h1, .hero-fraud h1, .hero-contractor h1, .hero-anomaly h1,
+.hero-demo h1, .hero-network h1 { font-size: var(--text-lg); margin-bottom: 4px !important; }
+
+/* การ์ด KPI */
+.kpi { padding: 10px 14px 10px 18px; }
+.kpi .spark { margin-top: 2px; }
+.analytics-kpi-grid { --bs-gutter-x: var(--card-gap); --bs-gutter-y: var(--card-gap); }
+
+/* แถบตัวกรอง */
+.filter-bar { padding: 10px 14px; }
+
+/* ② ความสูงของกราฟ — ลดเท่าที่แกนและป้ายยังอ่านได้ครบ */
+.chart-md { height: 260px; }
+#networkChart { height: 400px !important; }
+#timeChart { height: 340px !important; }
+#hhiChart { height: 280px !important; }
+#ovMonthly, #ovMethodDonut, #anCliffChart, #anRatioChart { height: 240px !important; }
+#ovBandDonut, #ovRuleBar, #fraudSeverityDonut, #fraudCategoryBar, #fraudHistogram { height: 220px !important; }
+#anBenfordChart { height: 230px !important; }
+#waterfall { height: 220px !important; }
+#contractorRiskChart { height: 260px !important; }
+[id$="Radar"], [id^="ccRadar"] { height: 260px !important; }
+
+/* ตาราง: เลื่อนภายในการ์ดแทนการยืดการ์ด */
+.table-wrap { max-height: 300px; }
+#tab-fraud .table-wrap[style*="max-height:460px"] { max-height: 380px !important; }
+#mlBody { font-size: var(--text-sm); }
+.ml-why li { margin-bottom: 0; }
+
+/* ภาพไดอะแกรมสาธิตกว้างตามการ์ดโดยไม่มีเพดาน บนจอกว้างจึงสูงเกือบ 440px */
+.demo-diagram svg { max-width: 760px; margin: 0 auto; }
+
+/* ④ การ์ดที่ยืดตามเพื่อนบ้าน: เนื้อหาเลื่อนในตัวแทนการยืดทั้งแถว */
+#tab-explain #detail { max-height: 58vh; overflow: auto; padding-right: 4px; }
+.list-box { max-height: 58vh; }
+.contractor-list { max-height: 420px; }
+
+/* แผนที่ */
+#tab-explain #map { height: 48vh; min-height: 340px; }
+
+/* สรุปสามมุมของโมเดล */
+.ml-quadrant-stats { margin-bottom: 8px; gap: 6px; }
+.ml-q { padding: 6px 10px; }
+.ml-q strong { font-size: var(--text-lg); }
+
+/* ③ ย่อหน้าอธิบายยาว: แสดง 2 บรรทัด คลิกเพื่ออ่านทั้งหมด
+   คลาส is-clampable ใส่โดย app.js เฉพาะย่อหน้าที่ยาวเกิน 2 บรรทัดจริง
+   ย่อหน้าสั้นจึงไม่มีตัวชี้ "อ่านเพิ่ม" ที่ไม่มีอะไรให้อ่าน */
+.note-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.note-clamp.is-clampable { cursor: pointer; position: relative; }
+.note-clamp.is-clampable:not(.is-expanded)::after {
+  content: 'อ่านเพิ่ม';
+  position: absolute; right: 0; bottom: 0;
+  padding-left: 28px;
+  background: linear-gradient(to right, transparent, var(--surface) 26px);
+  color: var(--accent-bright); font-weight: 600;
+}
+.note-clamp.is-expanded { -webkit-line-clamp: unset; line-clamp: unset; display: block; }
+.note-clamp:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+/* พื้นหลังของย่อหน้าบางจุดไม่ใช่สีการ์ด ปรับสีจางของตัวชี้ให้กลืนตาม */
+.info-note.note-clamp.is-clampable:not(.is-expanded)::after { background: linear-gradient(to right, transparent, var(--sev-3-bg) 26px); }
+.scope-note .note-clamp.is-clampable:not(.is-expanded)::after { background: linear-gradient(to right, transparent, var(--sev-2-bg) 26px); }
+
+@media (max-width: 767.98px) {
+  :root { --card-pad-y: 10px; --card-pad-x: 12px; --card-gap: .625rem; }
+  #networkChart { height: 340px !important; }
+  #timeChart { height: 280px !important; }
+  .chart-md { height: 240px; }
+  #tab-explain #detail { max-height: none; }
+}
+
+@media print {
+  .note-clamp { -webkit-line-clamp: unset; line-clamp: unset; display: block; }
+  .note-clamp::after { display: none; }
+}
+
+/* แผงตัวกรองเครือข่าย: สามขั้นเรียงลงแนวตั้งสูงรวม ~380px บนจอกว้างวางเคียงกันได้ */
+@media (min-width: 1200px) {
+  #tab-network .cardx:has(> .net-filter-group) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--card-gap);
+    align-items: start;
+  }
+  #tab-network .cardx:has(> .net-filter-group) > :not(.net-filter-group) { grid-column: 1 / -1; }
+}
+#ccCompareRadar { height: 230px !important; }
+#tab-explain #map { height: 44vh; min-height: 320px; }
+/* กราฟในแท็บสาธิตมีแค่ min-height เมื่อไม่มีความสูงแน่นอน Plotly ใช้ความสูงปริยาย 450px การ์ดจึงสูงถึง 890px */
+.chart-sm { height: 220px; min-height: 0; }
+
+/* ---------- 36) ตะกร้าคัดเลือก · โทนส้มแสด ----------
+
+   ส้มแสดใช้เฉพาะกับตะกร้าเท่านั้น ไม่ไปปนกับบันไดความรุนแรง (แดง-ส้ม-ฟ้า-เทา)
+   เฉดที่รองรับตัวอักษรขาวต้องเข้มพอผ่าน WCAG AA:
+     --cart   #C2410C  ขาวบนพื้นนี้ 5.2:1
+     --cart-2 #9A3412  ขาวบนพื้นนี้ 7.3:1  (ปลายไล่สี)
+   เฉดสดอย่าง #F97316 ใช้ได้เฉพาะเส้น ขอบ และแสงเรือง ไม่ใช้รองรับตัวอักษร */
+:root {
+  --cart: #C2410C;
+  --cart-2: #9A3412;
+  --cart-hi: #FB7A2E;
+  --cart-glow: rgba(234, 88, 12, .32);
+  --cart-soft: #FFF1E6;
+  --cart-line: #FBC49A;
+  --cart-ink: #9A3412;
+}
+[data-theme="dark"] {
+  --cart-soft: #33190B;
+  --cart-line: #7C2D12;
+  --cart-ink: #FDBA8C;
+  --cart-glow: rgba(251, 122, 46, .28);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cart-soft: #33190B;
+    --cart-line: #7C2D12;
+    --cart-ink: #FDBA8C;
+  }
+}
+
+.cart-ico { width: 16px; height: 16px; flex: 0 0 16px; display: block; }
+
+/* ---- ปุ่มตะกร้าบนแถบบน ---- */
+.cart-top-btn {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 36px; padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--cart) 0%, var(--cart-2) 100%);
+  color: #fff; font-weight: 600; font-size: var(--text-md);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .12) inset, 0 4px 14px var(--cart-glow);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.cart-top-btn .cart-ico { width: 18px; height: 18px; flex-basis: 18px; }
+.cart-top-btn:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px rgba(255, 255, 255, .2) inset, 0 6px 18px var(--cart-glow); }
+.cart-top-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.cart-count {
+  position: absolute; top: -7px; right: -7px;
+  min-width: 20px; height: 20px; padding: 0 5px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: #fff; color: var(--cart-2);
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--cart), 0 2px 6px rgba(0, 0, 0, .25);
+}
+.cart-count[hidden] { display: none; }
+.cart-top-btn.is-bumped { animation: cart-bump .45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes cart-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.14) rotate(-4deg); }
+  70% { transform: scale(.96) rotate(2deg); }
+  100% { transform: scale(1); }
+}
+
+/* ---- ปุ่มเพิ่มลงตะกร้าในแถวรายการ ---- */
+.cart-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+  vertical-align: middle;
+  min-width: 34px; height: 26px; padding: 0 6px;
+  margin-right: 6px;
+  border: 1.5px solid var(--cart);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--cart-ink);
+  cursor: pointer;
+  font-size: 12px; font-weight: 700; line-height: 1;
+  transition: background-color .15s, color .15s, box-shadow .15s, transform .12s;
+}
+[data-theme="dark"] .cart-btn { border-color: var(--cart-hi); }
+.cart-btn .cart-ico { width: 14px; height: 14px; flex-basis: 14px; }
+.cart-btn:hover { background: var(--cart-soft); box-shadow: 0 2px 8px var(--cart-glow); }
+.cart-btn:active { transform: scale(.94); }
+.cart-btn:focus-visible { outline: 2px solid var(--cart-hi); outline-offset: 2px; }
+.cart-btn.is-in {
+  background: linear-gradient(135deg, var(--cart) 0%, var(--cart-2) 100%);
+  border-color: var(--cart-2);
+  color: #fff;
+}
+.cart-btn-label { height: 30px; padding: 0 12px 0 9px; gap: 5px; font-size: var(--text-sm); }
+.cart-btn-text { font-weight: 600; }
+.cart-btn-mark { min-width: 8px; text-align: center; }
+
+/* ---- ลิ้นชักตะกร้า ---- */
+.cart-scrim {
+  position: fixed; inset: 0; z-index: 1065;
+  background: rgba(20, 10, 4, .42);
+  backdrop-filter: blur(1.5px);
+}
+.cart-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 1070;
+  width: min(460px, 100vw);
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--cart-line);
+  box-shadow: -16px 0 40px rgba(0, 0, 0, .22);
+  animation: cart-slide .22s ease-out;
+}
+@keyframes cart-slide { from { transform: translateX(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+.cart-scrim[hidden], .cart-drawer[hidden] { display: none; }
+
+.cart-head {
+  position: relative;
+  padding: 14px 16px 12px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(251, 122, 46, .55) 0%, transparent 55%),
+    linear-gradient(135deg, var(--cart) 0%, var(--cart-2) 100%);
+  color: #fff;
+}
+.cart-head::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, #FDBA74, var(--cart-hi), #FDBA74);
+}
+.cart-head-row { display: flex; align-items: center; gap: 10px; }
+.cart-head-icon {
+  width: 38px; height: 38px; flex: 0 0 38px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
+}
+.cart-head-icon .cart-ico { width: 22px; height: 22px; flex-basis: 22px; }
+.cart-head h2 { font-size: var(--text-lg); margin: 0; color: #fff; outline: none; }
+.cart-head p { margin: 2px 0 0; font-size: var(--text-sm); color: rgba(255, 255, 255, .92); }
+.cart-close {
+  margin-left: auto;
+  width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  /* พื้นขาวโปร่งทำให้ ✕ สีขาวเหลือ 4.27:1 จึงใช้พื้นเข้มโปร่งแทน */
+  background: rgba(0, 0, 0, .18);
+  color: #fff; font-size: 18px; line-height: 1; cursor: pointer;
+}
+.cart-close:hover { background: rgba(0, 0, 0, .3); }
+.cart-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.cart-summary {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  padding: 10px 14px;
+  background: var(--cart-soft);
+  border-bottom: 1px solid var(--cart-line);
+}
+.cart-summary:empty { display: none; }
+.cart-stat { text-align: center; line-height: 1.2; }
+.cart-stat strong { display: block; font-size: var(--text-base); color: var(--cart-ink); font-variant-numeric: tabular-nums; }
+.cart-stat span { font-size: var(--text-xs); color: var(--text-soft); }
+
+.cart-body { flex: 1; overflow: auto; padding: 10px 12px; }
+.cart-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cart-item {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--cart-hi);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  background: var(--surface);
+}
+.cart-item.band-critical { border-left-color: var(--sev-4); }
+.cart-item.band-high { border-left-color: var(--sev-3); }
+.cart-item-head { display: flex; gap: 8px; align-items: flex-start; }
+.cart-item-no {
+  flex: 0 0 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--cart-soft); color: var(--cart-ink);
+  font-size: 11px; font-weight: 700;
+}
+.cart-item-title { flex: 1; min-width: 0; font-size: var(--text-md); line-height: 1.35; }
+.cart-remove {
+  flex: 0 0 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); cursor: pointer;
+}
+.cart-remove:hover { border-color: var(--sev-4); color: var(--danger-text); background: var(--sev-4-bg); }
+.cart-item-meta { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 0 6px 30px; font-size: var(--text-sm); }
+.cart-flag {
+  font-size: var(--text-xs); font-weight: 600;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--violet-soft); color: var(--violet);
+}
+[data-theme="dark"] .cart-flag { color: #C3B8F2; }
+.cart-note {
+  width: calc(100% - 30px); margin-left: 30px;
+  min-height: 30px; resize: vertical;
+  border: 1px dashed var(--border-strong); border-radius: 8px;
+  background: var(--surface-soft); color: var(--text);
+  padding: 4px 8px; font: inherit; font-size: var(--text-sm);
+}
+.cart-note:focus { outline: none; border-style: solid; border-color: var(--cart-hi); box-shadow: 0 0 0 3px var(--cart-glow); }
+
+.cart-empty { text-align: center; padding: 34px 16px; color: var(--text-soft); }
+.cart-empty-art {
+  width: 72px; height: 72px; margin: 0 auto 10px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--cart-soft); color: var(--cart);
+  box-shadow: inset 0 0 0 2px var(--cart-line);
+}
+[data-theme="dark"] .cart-empty-art { color: var(--cart-hi); }
+.cart-empty-art .cart-ico { width: 34px; height: 34px; flex-basis: 34px; }
+.cart-empty strong { display: block; color: var(--text); margin-bottom: 4px; }
+
+.cart-foot {
+  display: flex; gap: 8px; padding: 10px 14px;
+  border-top: 1px solid var(--cart-line);
+  background: var(--surface-soft);
+}
+.cart-export {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; border: 0; border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--cart) 0%, var(--cart-2) 100%);
+  color: #fff; font-weight: 700; cursor: pointer;
+  box-shadow: 0 4px 14px var(--cart-glow);
+}
+.cart-export:hover:not(:disabled) { filter: brightness(1.06); }
+.cart-export:disabled, .cart-clear:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.cart-clear {
+  min-height: 40px; padding: 0 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+  background: var(--surface); color: var(--text-soft); cursor: pointer;
+}
+.cart-clear.is-confirm { border-color: var(--sev-4); background: var(--sev-4-bg); color: var(--danger-text); font-weight: 600; }
+
+/* ข้อความยืนยันลอยล่างจอ */
+.cart-toast {
+  position: fixed; left: 50%; bottom: 22px; z-index: 1080;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  max-width: min(92vw, 520px);
+  padding: 9px 16px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--cart) 0%, var(--cart-2) 100%);
+  color: #fff; font-size: var(--text-sm); font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+  animation: cart-toast-in .2s ease-out;
+}
+.cart-toast[hidden] { display: none; }
+@keyframes cart-toast-in { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+
+/* ปุ่มเพิ่มในแผงรายละเอียดของแท็บ GIS และหน้าต่างรายละเอียด */
+.detail-cart-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+.detail-cart-row .cart-btn { margin-right: 0; }
+.cart-add-all {
+  border: 1px dashed var(--cart); background: transparent; color: var(--cart-ink);
+  border-radius: 999px; padding: 3px 12px; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+}
+[data-theme="dark"] .cart-add-all { border-color: var(--cart-hi); }
+.cart-add-all:hover { background: var(--cart-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-top-btn.is-bumped, .cart-drawer, .cart-toast { animation: none; }
+}
+@media (max-width: 767.98px) {
+  .cart-top-btn { min-height: 44px; padding: 6px 10px; }
+  .cart-top-btn .cart-top-label { display: none; }
+  .cart-btn { min-width: 44px; height: 44px; }
+  .cart-btn-label { height: 44px; }
+  .cart-remove, .cart-close { flex-basis: 44px; width: 44px; height: 44px; }
+  .cart-summary { grid-template-columns: repeat(2, 1fr); }
+  .cart-toast { bottom: 14px; border-radius: 14px; }
+}
+@media print {
+  .cart-btn, .cart-top-btn, .cart-drawer, .cart-scrim, .cart-toast { display: none !important; }
+}
+/* ปุ่มตะกร้าทำให้แถวปุ่มบนแถบบนของจอ 375px ล้นเป็นสามแถว (สูง 165px)
+   ตัดตัวดันระยะออก ลดช่องไฟและขอบในสวิตช์โหมด ให้ปุ่มทั้งหมดกลับมาอยู่แถวเดียว */
+@media (max-width: 767.98px) {
+  .topbar { column-gap: 5px; }
+  .topbar .top-spacer { display: none; }
+  .topbar .density-btn { padding: 6px 7px; }
+  .topbar .density-switch { margin-left: auto; }
+  .cart-clear, .cart-export { min-height: 44px; }
+}
