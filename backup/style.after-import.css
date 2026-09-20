@@ -885,12 +885,10 @@ button.detail-clickable { text-decoration: none; }
   width: 4px;
   background: var(--primary);
 }
-/* ไล่สีตามตำแหน่งการ์ด ใช้ได้กับทุกกลุ่ม (#kpis, #fraudKpis, #contractorKpis, #agencyKpis ฯลฯ)
-   เพราะทุกกลุ่มผูก class .analytics-kpi-grid ไว้เหมือนกัน และแต่ละกลุ่มมี 4 การ์ดเท่ากันเสมอ
-   เดิมใบที่ 1-2 ใช้ --primary/--secondary ซึ่งเป็นเขียวอมฟ้าสองเฉดที่ใกล้กันเกินไป แยกด้วยตาไม่ออก
-   จึงเปลี่ยนใบที่ 2 เป็น --cyan (โทนน้ำเงิน) ให้ทั้ง 4 ใบเป็นคนละสีจริง ๆ (เขียว/ฟ้า/ส้ม/แดง) */
+/* ไล่สีตามตำแหน่งการ์ด ใช้ได้กับทั้ง 3 กลุ่ม (#kpis, #fraudKpis, #contractorKpis)
+   เพราะทั้งสามผูก class .analytics-kpi-grid ไว้เหมือนกัน และแต่ละกลุ่มมี 4 การ์ดเท่ากันเสมอ */
 .analytics-kpi-grid > [class*="col-"]:nth-child(1) .kpi::before { background: var(--primary); }
-.analytics-kpi-grid > [class*="col-"]:nth-child(2) .kpi::before { background: var(--cyan); }
+.analytics-kpi-grid > [class*="col-"]:nth-child(2) .kpi::before { background: var(--secondary); }
 .analytics-kpi-grid > [class*="col-"]:nth-child(3) .kpi::before { background: var(--warning); }
 .analytics-kpi-grid > [class*="col-"]:nth-child(4) .kpi::before { background: var(--danger); }
 
@@ -1963,7 +1961,6 @@ button.detail-clickable { text-decoration: none; }
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; margin-bottom: 8px;
 }
-.filter-head-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .filter-collapse {
   border: 1px solid var(--border-strong);
   background: var(--surface);
@@ -1976,31 +1973,9 @@ button.detail-clickable { text-decoration: none; }
 }
 .filter-collapse:hover { background: var(--surface-hover); color: var(--text); border-color: var(--muted); }
 .filter-collapse:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
-/* ปุ่มซ่อนแถบตัวกรองทั้งแถบ (คนละอย่างกับ "ย่อ" ที่ยังเหลือบรรทัดสรุปไว้เสมอ)
-   วงกลมเล็กแยกจากปุ่ม "ย่อ" ชัดเจน กันกดผิดโดยไม่ตั้งใจ */
-.filter-hide {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; padding: 0; line-height: 1;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--muted);
-  border-radius: 999px;
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background-color .14s ease, color .14s ease, border-color .14s ease;
-}
-.filter-hide:hover { background: var(--surface-hover); color: var(--danger-text); border-color: var(--muted); }
-.filter-hide:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
-/* ตอนย่อแล้วแถบเตี้ยลงมาก จึงลดระยะขอบในตัวการ์ดด้วย และย่อปุ่ม/ตัวอักษรลงอีกชั้น
-   ให้แถบสรุปเหลือสูงจริงเพียงบรรทัดเดียวแคบๆ ตามที่ขอ */
-.filter-bar:has(#gfBody[hidden]) { padding-top: 8px; padding-bottom: 8px; }
-.filter-bar:has(#gfBody[hidden]) .filter-head { margin-bottom: 2px; }
-.filter-bar:has(#gfBody[hidden]) .filter-summary { font-size: var(--text-xs); }
-/* ลดขนาดปุ่มเฉพาะจอกว้าง — จอแคบต้องคงพื้นที่กดขั้นต่ำ 44px ไว้เสมอ (ดูหัวข้อ 27) */
-@media (min-width: 768px) {
-  .filter-bar:has(#gfBody[hidden]) .filter-collapse,
-  .filter-bar:has(#gfBody[hidden]) .filter-hide { min-height: 24px; height: 24px; padding-top: 0; padding-bottom: 0; }
-}
+/* ตอนย่อแล้วแถบเตี้ยลงมาก จึงลดระยะขอบในตัวการ์ดด้วย */
+.filter-bar:has(#gfBody[hidden]) { padding-top: 10px; padding-bottom: 10px; }
+.filter-bar:has(#gfBody[hidden]) .filter-head { margin-bottom: 4px; }
 
 /* โหมดกระชับ: KPI เป็นแถบเดียว ไม่ตกบรรทัด
    ที่ความกว้างจริง การ์ด 4 ใบแบบ col-6 จะตกเป็น 2 แถว สูงถึง 192px
@@ -2051,8 +2026,6 @@ button.detail-clickable { text-decoration: none; }
   .side-nav .nav-link,
   .subnav .btn,
   .btn-sm { min-height: 44px; }
-  /* วงกลมไอคอนล้วน ต้องขยายทั้งกว้างและสูงพร้อมกัน ไม่งั้นได้แค่ high แต่แคบเหมือนเดิม */
-  .filter-hide { width: 44px; height: 44px; min-height: 44px; }
   .form-select-sm, .form-control-sm { font-size: var(--text-base); }
 
   /* ระยะห่างระหว่างเป้ากดในตาราง ให้นิ้วแตะไม่พลาดแถวข้างเคียง */
@@ -2165,6 +2138,7 @@ h2.card-head-el {
   margin-left: 3px;
   letter-spacing: 0;
 }
+.kpi .spark { display: block; margin-top: 6px; height: 26px; }
 .kpi { border-left-width: 4px; }
 
 /* --- ④ ลำดับชั้นของการ์ด: เดิมทุกใบใช้เงาและขอบชุดเดียวกันหมด ---
@@ -2284,11 +2258,21 @@ h2.card-head-el {
 .group-step { color: var(--text-soft); }
 .btn-timelapse-play { background: var(--primary-dark); border-color: var(--primary-dark); }
 
+/* SVG ที่ไม่กำหนดความกว้างจะใช้ค่าปริยาย ทำให้เส้นแนวโน้มไม่ยืดเต็มการ์ด */
+.kpi .spark {
+  width: 100%;
+  height: 26px;
+  color: var(--muted-light);   /* ใช้เป็นเส้นกราฟ ไม่ใช่ตัวอักษร จึงใช้เทาอ่อนได้ */
+  overflow: visible;
+}
+.kpi-clickable.is-on .spark { color: var(--primary-dark); }
+
 /* ตัวเลข KPI 40px เหมาะกับจอกว้าง แต่บนการ์ดกว้าง ~162px ของจอมือถือจะล้นและตัดคำ
    กฎมือถือที่เขียนไว้ก่อนหน้าอยู่ต้นไฟล์จึงถูกกฎในหัวข้อ 29 ทับ ต้องประกาศซ้ำหลังสุด */
 @media (max-width: 767.98px) {
   .kpi .v { font-size: 1.75rem; }          /* 28px */
   .kpi .unit { font-size: var(--text-sm); white-space: nowrap; }
+  .kpi .spark { height: 20px; }
 }
 @media (max-width: 400px) {
   .kpi .v { font-size: 1.5rem; }           /* 24px */
@@ -2467,15 +2451,6 @@ h2.card-head-el {
 .icon-btn { padding: 6px 10px; line-height: 1; min-width: 36px; }
 .top-btn-go { background: var(--primary); border-color: var(--primary); color: #fff; }
 .top-btn-go:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
-
-/* ป้ายจำนวนบนปุ่มแถบบน (เช่น "ตัวกรอง" ตอนซ่อนแถบตัวกรองไว้) — พื้นขาวตัดกับปุ่มพื้นเข้มของแถบบน
-   คนละแบบกับ .cart-count ซึ่งผูกสีไว้กับโทนส้มของตะกร้าโดยเฉพาะ ใช้แทนกันไม่ได้ */
-.top-btn-n {
-  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
-  border-radius: 999px; background: #fff; color: var(--chrome); font-size: .68rem; font-weight: 700;
-  vertical-align: middle; font-variant-numeric: tabular-nums;
-}
-.top-btn-n[hidden] { display: none; }
 
 /* สวิตช์โหมดการแสดงผลบนพื้นเข้ม */
 .topbar .density-switch {
@@ -3062,12 +3037,8 @@ h2.card-head-el {
 
 /* การ์ด KPI */
 .kpi { padding: 10px 14px 10px 18px; }
+.kpi .spark { margin-top: 2px; }
 .analytics-kpi-grid { --bs-gutter-x: var(--card-gap); --bs-gutter-y: var(--card-gap); }
-
-/* การ์ด KPI แถวบนสุด (#kpis) เท่านั้น — ตัดเส้นแนวโน้มจิ๋วออกแล้วเหลือ 3 บรรทัด (ป้าย/ตัวเลข/คำอธิบาย)
-   จึงลดช่องไฟแนวตั้งลงอีกชั้นให้ดูกระชับสมกับเนื้อหาที่สั้นลง ไม่กระทบการ์ด KPI กลุ่มอื่นที่ไม่เคยมีเส้นแนวโน้ม */
-.kpi-compact { padding-top: 12px; padding-bottom: 12px; }
-.kpi-compact .v { margin: 1px 0 2px; }
 
 /* แถบตัวกรอง */
 .filter-bar { padding: 10px 14px; }
@@ -3252,9 +3223,6 @@ h2.card-head-el {
 .cart-btn-label { height: 30px; padding: 0 12px 0 9px; gap: 5px; font-size: var(--text-sm); }
 .cart-btn-text { font-weight: 600; }
 .cart-btn-mark { min-width: 8px; text-align: center; }
-/* ปุ่มเก็บ "ทั้งราย" (โครงการ/ผู้รับจ้าง/หน่วยงาน) ลงตะกร้าย่อย — ใช้โครงเดียวกับปุ่มเก็บสัญญา
-   แค่กว้างขึ้นนิดหน่อยเพราะไอคอนเป็นอิโมจิ ไม่ใช่ SVG เส้นบาง */
-.cart-btn-entity { min-width: 30px; font-size: 13px; }
 
 /* ---- ลิ้นชักตะกร้า ---- */
 .cart-scrim {
@@ -3308,23 +3276,6 @@ h2.card-head-el {
 .cart-close:hover { background: rgba(0, 0, 0, .3); }
 .cart-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-/* ---- แท็บย่อยของตะกร้า: ทั้งหมด/สัญญา/โครงการ/ผู้รับจ้าง/หน่วยงาน ---- */
-.cart-tabs {
-  display: flex; flex-wrap: wrap; gap: 4px;
-  padding: 8px 12px 0;
-  background: var(--cart-soft);
-}
-.cart-tab {
-  border: 1px solid transparent; background: transparent; border-radius: 999px;
-  padding: 5px 10px; min-height: 30px;
-  font-size: var(--text-xs); font-weight: 600; color: var(--text-soft);
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.cart-tab:hover { background: var(--surface); }
-.cart-tab.is-on { background: var(--surface); border-color: var(--cart-hi); color: var(--cart-ink); box-shadow: 0 1px 4px var(--cart-glow); }
-.cart-tab:focus-visible { outline: 2px solid var(--cart-hi); outline-offset: 1px; }
-.cart-tab-n { font-variant-numeric: tabular-nums; opacity: .85; }
-
 .cart-summary {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
   padding: 10px 14px;
@@ -3347,8 +3298,6 @@ h2.card-head-el {
 }
 .cart-item.band-critical { border-left-color: var(--sev-4); }
 .cart-item.band-high { border-left-color: var(--sev-3); }
-/* แถวของ "ทั้งราย" (โครงการ/ผู้รับจ้าง/หน่วยงาน) ไม่มีระดับความเสี่ยงแบบสัญญา ไอคอนหมวดจึงใหญ่ขึ้นแทนตัวเลขลำดับ */
-.cart-item-entity .cart-item-no { font-size: 13px; }
 .cart-item-head { display: flex; gap: 8px; align-items: flex-start; }
 .cart-item-no {
   flex: 0 0 22px; height: 22px; border-radius: 50%;
@@ -3449,7 +3398,6 @@ h2.card-head-el {
   .cart-remove, .cart-close { flex-basis: 44px; width: 44px; height: 44px; }
   .cart-summary { grid-template-columns: repeat(2, 1fr); }
   .cart-toast { bottom: 14px; border-radius: 14px; }
-  .cart-tab { min-height: 40px; }
 }
 @media print {
   .cart-btn, .cart-top-btn, .cart-drawer, .cart-scrim, .cart-toast { display: none !important; }
@@ -4151,7 +4099,6 @@ body.profile-open { overflow: hidden; }
 .map-tool-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
 .map-tool-btn.is-on { background: #7A3FB8; border-color: #7A3FB8; color: #fff; }
 [data-theme="dark"] .map-tool-btn:hover { color: #D9C7F5; }
-.map-fp-kind { flex: 0 0 auto; }
 .map-fp-pick { flex: 1 1 180px; display: flex; align-items: center; gap: 5px; margin: 0; min-width: 0; }
 .map-fp-pick .form-control { min-width: 0; }
 #map.is-drawing, #map.is-drawing .leaflet-interactive { cursor: crosshair !important; }
@@ -4229,120 +4176,11 @@ body.profile-open { overflow: hidden; }
   background: var(--cart); color: #fff; font-size: 14px; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
 }
 
-/* ส่วนผสมหน่วยงานในแผงรอยเท้า */
-.fp-mix { margin: 7px 0; }
-.fp-mix .ma-bandbar { margin-bottom: 4px; }
-.fp-mix-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: .7rem; color: var(--text-soft); }
-.fp-mix-legend span { display: inline-flex; align-items: center; gap: 4px; }
-.fp-mix-legend i { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-.fp-mix-legend b { font-variant-numeric: tabular-nums; }
-
-/* รอยเท้า: แถบเวลา · การเทียบหลายราย · แผงตั้งค่า */
-.fp-time { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
-.fp-time .form-range { flex: 1; min-width: 80px; }
-.fp-time-label { font-size: .72rem; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fp-lock {
-  margin: 6px 0; padding: 5px 8px; border-radius: 8px; font-size: .74rem; line-height: 1.5;
-  background: var(--sev-3-bg); border: 1px solid color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)); color: var(--warning-text);
-}
-.fp-cmp { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 7px 0; }
-.fp-chip {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; font-size: .72rem;
-  background: color-mix(in srgb, var(--fpc) 14%, var(--mix-base)); border: 1px solid var(--fpc); color: var(--text);
-}
-.fp-chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--fpc); }
-.fp-chip button { border: 0; background: none; color: var(--text-soft); line-height: 1; padding: 0 1px; }
-.fp-chip button:hover { color: var(--danger-text); }
-.fp-neigh summary { cursor: pointer; color: var(--accent-bright); }
-.fp-neigh .ma-row i { border-radius: 50%; }
-.fp-neigh .ma-row.is-on { background: var(--surface-hover); font-weight: 600; }
-/* พื้นเข้มขึ้นทำให้สีคำอธิบายเดิมเหลือ 4.42 ต่ำกว่าเกณฑ์ 4.5 จึงเข้มขึ้นเฉพาะแถวที่เลือก */
-.fp-neigh .ma-row.is-on em { color: var(--text-soft); }
-.fp-settings .ma-controls { margin-top: 7px; }
-.fp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.fp-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; font-size: .72rem; color: var(--text-soft); }
-.fp-checks label { display: inline-flex; align-items: center; gap: 5px; margin: 0; }
-
-/* การ์ดจุดเดียวหลายสัญญา (ใต้แผนที่) */
-.stack-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-.stack-head { margin-bottom: 8px; }
-.stack-hide { display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; color: var(--text-soft); margin: 6px 0 0; }
-.stack-list { max-height: 44vh; overflow-y: auto; }
-.stack-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) 92px auto; align-items: center; gap: 8px;
-  padding: 7px 4px; border-bottom: 1px solid var(--border);
-}
-.stack-row:last-child { border-bottom: 0; }
-.stack-title { font-size: var(--text-sm); font-weight: 600; }
-.stack-prov { font-weight: 400; color: var(--muted); font-size: .72rem; margin-left: 4px; }
-.stack-meta { font-size: .7rem; color: var(--muted); margin-top: 1px; }
-.stack-sample { font-size: .7rem; color: var(--text-soft); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stack-val { font-size: .74rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-soft); }
-.stack-act { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-
-@media (max-width: 767.98px) {
-  .stack-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "main main" "act val";
-    row-gap: 6px;
-  }
-  .stack-main { grid-area: main; }
-  .stack-val { grid-area: val; align-self: center; }
-  .stack-act { grid-area: act; justify-content: flex-start; }
-  .stack-act .mp-btn { min-height: 44px; }
-  .stack-list { max-height: none; }
-}
-
-/* การ์ดคู่ผู้รับจ้างที่ครองพื้นที่เดียวกัน (แท็บเครือข่าย) */
-.terr-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 8px; }
-.terr-controls label { display: flex; flex-direction: column; gap: 2px; font-size: .72rem; color: var(--muted); margin: 0; }
-.terr-controls .form-select { width: auto; }
-.terr-list { max-height: 52vh; overflow-y: auto; }
-.terr-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) 118px 96px auto; align-items: center; gap: 8px;
-  padding: 7px 4px; border-bottom: 1px solid var(--border);
-}
-.terr-row:last-of-type { border-bottom: 0; }
-.terr-names { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: var(--text-sm); }
-.terr-names em { font-style: normal; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
-.terr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
-.terr-plus { color: var(--muted); margin: 0 2px; }
-.terr-meta { font-size: .7rem; color: var(--muted); margin-top: 2px; }
-.terr-share { display: flex; flex-direction: column; gap: 2px; font-size: .72rem; }
-.terr-bar { display: block; height: 7px; border-radius: 999px; background: var(--surface-hover); overflow: hidden; }
-.terr-bar i { display: block; height: 100%; background: var(--sev-3); }
-.terr-share b { font-variant-numeric: tabular-nums; color: var(--text); }
-.terr-share em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
-.terr-val { font-size: .74rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-soft); }
-.terr-act { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
-
-@media (max-width: 767.98px) {
-  /* คอลัมน์แคบเกินกว่าจะวางสี่ช่องเรียงกัน ถ้าปล่อยไว้ช่องชื่อจะสูงจนอีกสามช่องลอยอยู่กลางที่ว่าง */
-  .terr-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "main main" "share val" "act act";
-    row-gap: 6px;
-  }
-  .terr-main { grid-area: main; }
-  .terr-share { grid-area: share; flex-direction: row; align-items: center; gap: 6px; }
-  .terr-bar { flex: 1; min-width: 60px; }
-  .terr-val { grid-area: val; text-align: right; align-self: center; }
-  .terr-act { grid-area: act; justify-content: flex-start; }
-}
-
 @media (max-width: 575.98px) {
-  .terr-list { max-height: none; }
-  .terr-act .mp-btn { min-height: 44px; }
   #mapMode .btn, .map-tool-btn, .map-fp-pick .form-control, .ma-close, .ma-row { min-height: 44px; }
   .ma-close { width: 44px; }
   .ma-controls, .ma-cols { grid-template-columns: 1fr; }
   .ma-kpis { grid-template-columns: 1fr 1fr; }
-  .fp-grid { grid-template-columns: 1fr 1fr; }
-  .fp-time-label { white-space: normal; }
-  /* เป้ากดบนมือถือ: แถบเวลา ปุ่มเอาออกจากการเทียบ และป้ายของช่องติ๊ก ต้องกดติดด้วยนิ้ว */
-  .fp-time .form-range { min-height: 44px; }
-  .fp-chip button { min-width: 32px; min-height: 32px; }
-  .fp-checks label { min-height: 44px; }
 }
 
 /* =====================================================================
@@ -5093,476 +4931,3 @@ mark.ai-unverified { background: none; color: inherit; padding: 0; text-decorati
 }
 /* แถวชุดข้อมูลที่กำลังใช้อยู่มีพื้นเขียวอ่อน ตัวอักษร --muted จึงจางเกินไป */
 .imp-ds.is-on .small-muted { color: var(--text-soft); }
-
-/* =====================================================================
-   45. ตัวช่วยค้นหา: รายการแนะนำแยกตามประเภท และการเน้นคำที่ตรงกัน
-   ===================================================================== */
-
-/* ช่องค้นหาอยู่บนแถบบนซึ่งเป็นพื้นเขียวเข้ม ส่วนรายการแนะนำเป็นการ์ดบนพื้นหน้า
-   จึงใช้โทเค็นสีของเนื้อหา ไม่ใช่โทเค็น chrome-* ของแถบบน */
-.top-search { position: relative; }
-.search-pop {
-  position: absolute; z-index: 1300; top: calc(100% + 8px); left: 0; right: 0;
-  max-height: min(70vh, 520px); overflow-y: auto; overscroll-behavior: contain;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
-  box-shadow: 0 14px 38px rgba(0, 0, 0, .28);
-  padding: 4px;
-}
-.search-pop[hidden] { display: none; }
-
-.search-group {
-  padding: 7px 10px 3px; font-size: .68rem; font-weight: 700; letter-spacing: .3px;
-  color: var(--muted); text-transform: none;
-}
-.search-opt {
-  display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: 7px 10px; border-radius: 9px; cursor: pointer; min-height: 40px;
-}
-.search-opt:hover, .search-opt.is-active { background: var(--surface-hover); }
-.search-opt.is-active { box-shadow: inset 0 0 0 2px var(--primary); }
-.search-ico { flex: none; width: 22px; text-align: center; font-size: .95rem; }
-.search-main { flex: 1; min-width: 0; font-size: .82rem; line-height: 1.35; }
-.search-main small { display: block; font-size: .7rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.search-meta { flex: none; font-size: .74rem; color: var(--text-soft); font-variant-numeric: tabular-nums; }
-.search-main mark {
-  background: var(--sev-3-bg); color: var(--warning-text);
-  padding: 0 1px; border-radius: 3px; font-weight: 700;
-}
-.search-opt-text { border-bottom: 1px solid var(--border); border-radius: 9px 9px 0 0; }
-.search-forget {
-  flex: none; width: 26px; height: 26px; border: 0; border-radius: 7px;
-  background: transparent; color: var(--muted); font-size: .8rem;
-}
-.search-forget:hover { background: var(--sev-4-bg); color: var(--danger-text); }
-.search-empty, .search-hint { padding: 10px 12px; font-size: .76rem; color: var(--muted); }
-.search-hint { border-top: 1px solid var(--border); text-align: center; font-size: .7rem; }
-
-/* สีนำสายตาประจำประเภท: ใช้แถบซ้ายของแถว ไม่ใช่สีของไอคอน
-   เพราะไอคอนเป็นอีโมจิซึ่งวาดด้วยสีของตัวเองเสมอ การกำหนด color ให้จึงไม่มีผลอะไร */
-.search-opt-agency, .search-opt-contractor, .search-opt-project { border-left: 3px solid transparent; }
-.search-opt-agency { border-left-color: var(--sev-2); }
-.search-opt-contractor { border-left-color: var(--sev-3); }
-.search-opt-project { border-left-color: var(--primary); }
-/* ขอบด้านเดียวกับมุมโค้งเข้ากันไม่ได้ (ดูหัวข้อ 12) จึงตัดมุมซ้ายออก */
-.search-opt-agency, .search-opt-contractor, .search-opt-project { border-radius: 0 9px 9px 0; }
-
-/* คำที่ตรงกับการค้นหาในหน้าที่กำลังดู — วาดผ่าน CSS Custom Highlight API
-   ไม่มีการแก้ DOM จึงไม่กระทบตาราง กราฟ หรือตัวจับเหตุการณ์เดิม */
-::highlight(pa-search) { background-color: #FDE68A; color: #3F2D06; }
-[data-theme="dark"] ::highlight(pa-search) { background-color: #7C5B12; color: #FFF6DC; }
-
-@media (max-width: 767.98px) {
-  /* บนมือถือช่องค้นหาอยู่แถวของตัวเอง รายการจึงกางเต็มความกว้างของแถบบนได้ */
-  .search-pop { max-height: 60vh; }
-  .search-opt { min-height: 48px; }
-  .search-forget { width: 44px; height: 44px; }
-}
-
-/* =====================================================================
-   46. แท็บ AI · มุมมองชื่อโครงการ: พจนานุกรม ส่วนผสมวัตถุประสงค์ และสิ่งที่พบ
-   ===================================================================== */
-
-.nl-profile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 4px; }
-.nl-profile-label { font-size: .76rem; color: var(--muted); font-weight: 600; }
-.nl-profile .form-select { width: auto; min-width: 200px; max-width: 320px; }
-.nl-profile-note { font-size: .72rem; color: var(--muted); margin-bottom: 6px; }
-/* ปุ่มลบใช้สีแดงมาตรฐานของ Bootstrap (#dc3545) ซึ่งได้อัตราส่วนความต่างแค่ 4.15 บนพื้นสว่าง
-   จึงบังคับให้ใช้โทนแดงของแอปที่ผ่านเกณฑ์ เหมือนที่ทำไว้กับปุ่มปฏิเสธของเอเจนต์ */
-#nlPane .btn-outline-danger { --bs-btn-color: var(--danger-text); --bs-btn-border-color: var(--sev-4);
-  --bs-btn-hover-bg: var(--sev-4-bg); --bs-btn-hover-color: var(--danger-text);
-  --bs-btn-hover-border-color: var(--sev-4); --bs-btn-active-bg: var(--sev-4-bg); --bs-btn-active-color: var(--danger-text); }
-#nlPane .btn-link.text-danger { color: var(--danger-text) !important; }
-
-.nl-profile-note.nl-auto { color: var(--text); background: var(--success-soft); border: 1px solid var(--success);
-  border-radius: 6px; padding: 4px 8px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
-.nl-dirty {
-  font-size: .68rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
-  background: var(--sev-3-bg); color: var(--warning-text);
-}
-
-.nl-kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-.nl-sample { font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
-.nl-dict-wrap { max-height: 420px; overflow-y: auto; }
-.nl-dict-wrap .form-control { font-size: .76rem; }
-.nl-pattern { font-family: var(--font-mono, ui-monospace, monospace); }
-.nl-custom td:first-child { border-left: 3px solid var(--primary); }
-
-.nl-overlap { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.nl-overlap li { display: flex; justify-content: space-between; gap: 10px; font-size: .78rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
-.nl-overlap b { font-variant-numeric: tabular-nums; }
-
-.nl-unmatched { list-style: none; margin: 6px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
-.nl-unmatched li { font-size: .76rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
-
-.nl-mined { margin-bottom: 8px; }
-.nl-term {
-  display: inline-flex; align-items: center; gap: 5px; margin: 0 4px 4px 0; padding: 3px 10px;
-  border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface);
-  color: var(--text); font-size: .76rem;
-}
-.nl-term:hover { border-color: var(--primary); background: var(--primary-soft); color: var(--accent-bright); }
-.nl-term b { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .7rem; }
-
-.nl-ai-proposal {
-  margin-bottom: 10px; padding: 9px 11px; border-radius: 10px;
-  background: var(--surface-soft); border: 1px solid color-mix(in srgb, var(--ai, #7A3FB8) 35%, var(--mix-base));
-  font-size: .8rem;
-}
-.nl-ai-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--border); }
-.nl-ai-row:first-of-type { border-top: 0; }
-.nl-ai-row span { flex: 1; min-width: 0; }
-.nl-ai-row code { font-size: .72rem; color: var(--text-soft); display: block; word-break: break-all; }
-.nl-ai-row small { display: block; color: var(--muted); font-size: .7rem; }
-
-.nl-mixbar { display: flex; height: 16px; border-radius: 999px; overflow: hidden; margin: 8px 0 6px; background: var(--surface-hover); }
-.nl-mixbar i { display: block; height: 100%; }
-.nl-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .72rem; color: var(--text-soft); margin-bottom: 4px; }
-.nl-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
-
-.nl-pair { border: 1px solid var(--border); border-left: 3px solid var(--sev-3); border-radius: 0 10px 10px 0; padding: 7px 10px; margin-bottom: 7px; }
-.nl-pair-head { font-size: .72rem; color: var(--muted); margin-bottom: 3px; }
-.nl-pair-row { display: flex; align-items: center; gap: 8px; font-size: .78rem; padding: 2px 0; }
-.nl-pair-row b { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-@media (max-width: 767.98px) {
-  .nl-profile .form-select { min-width: 0; flex: 1 1 100%; max-width: none; min-height: 44px; }
-  .nl-profile .btn { min-height: 44px; }
-  .nl-dict-wrap .form-control { min-height: 44px; }
-  .nl-term { min-height: 44px; }
-  .nl-sample { max-width: 180px; }
-}
-
-/* =====================================================================
-   47. แท็บผู้รับจ้าง: ประเภทงานและความถนัด · สัญญาณการแข่งขัน
-   ===================================================================== */
-
-/* ป้ายสรุปในรายการผู้รับจ้าง — ต้องเล็กพอที่จะไม่ดันแถวให้ยาวจนเลื่อนหายาก */
-.con-row-tags { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0 2px; }
-.con-tag {
-  font-size: .66rem; line-height: 1.5; padding: 0 6px; border-radius: 999px;
-  background: var(--surface-soft); border: 1px solid var(--border); color: var(--text-soft); white-space: nowrap;
-}
-.con-tag.is-warn { background: var(--sev-3-bg); border-color: color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)); color: var(--warning-text); }
-.item.active .con-tag { background: var(--surface); }
-
-.con-spec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; font-size: var(--text-sm); color: var(--text-soft); margin-bottom: 8px; }
-.con-spec-badge {
-  display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: .74rem; font-weight: 600;
-  background: var(--surface-soft); border: 1px solid var(--border-strong); color: var(--text);
-}
-.con-spec-badge.is-focus { background: var(--sev-2-bg); border-color: var(--sev-2); }
-.con-mix .ma-bandbar { margin-bottom: 4px; }
-.con-mix .ma-list-title { margin-bottom: 3px; }
-
-/* คอลัมน์ "เทียบตลาด": ลดน้อยกว่าคนอื่นในสนามเดียวกันให้เห็นชัดโดยไม่ตะโกน */
-.mini-table td.is-low { color: var(--warning-text); font-weight: 600; }
-
-.con-nobid {
-  font-size: .76rem; line-height: 1.6; padding: 8px 10px; border-radius: 9px; margin-bottom: 9px;
-  background: var(--sev-3-bg); border: 1px solid color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)); color: var(--text);
-}
-/* code ของ Bootstrap ใช้ชมพูปริยาย ได้อัตราส่วนแค่ 3.6-4.1 บนพื้นเตือน จึงใช้สีตัวอักษรปกติแทน */
-.con-nobid code { font-size: .72rem; color: var(--text); background: var(--surface); padding: 0 4px; border-radius: 4px; }
-.con-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.con-method-note { font-size: .74rem; color: var(--text-soft); line-height: 1.6; margin-top: 7px; }
-
-.con-lot { border: 1px solid var(--border); border-radius: 9px; padding: 7px 9px; margin-bottom: 6px; background: var(--surface-soft); }
-.con-lot-head { font-size: var(--text-sm); display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; }
-.con-lot-head .small-muted { font-size: .7rem; }
-.con-lot-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: baseline;
-  font-size: .74rem; padding: 2px 0; border-top: 1px solid var(--border);
-}
-.con-lot-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.con-lot-row b { font-variant-numeric: tabular-nums; }
-.con-lot-row em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
-.con-lot-row.is-me { background: var(--primary-soft); border-radius: 5px; padding-left: 4px; padding-right: 4px; font-weight: 600; }
-
-@media (max-width: 991.98px) {
-  .con-kpis { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 575.98px) {
-  .con-lot-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .con-lot-row em { grid-column: 2; }
-}
-
-/* ลดน้อยกว่าสนาม (ตารางรวมทั้งชุด) */
-.ub-row { cursor: pointer; }
-.ub-row:hover, .ub-row:focus-visible { background: var(--surface-hover); outline: none; }
-.ub-row:focus-visible { box-shadow: inset 0 0 0 2px var(--primary); }
-.ub-bar {
-  display: inline-block; width: var(--w); max-width: 54px; height: 6px; border-radius: 999px;
-  background: var(--sev-3); margin-right: 5px; vertical-align: middle;
-}
-
-/* กิจการค้าร่วม */
-.jv-warn {
-  font-size: .74rem; line-height: 1.6; padding: 7px 9px; border-radius: 9px; margin: 8px 0;
-  background: var(--sev-3-bg); border: 1px solid color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)); color: var(--text);
-}
-.jv-list { max-height: 46vh; overflow-y: auto; margin-top: 6px; }
-.jv-group { border: 1px solid var(--border); border-radius: 9px; padding: 7px 9px; margin-bottom: 6px; background: var(--surface-soft); }
-.jv-head { font-size: var(--text-sm); display: flex; flex-direction: column; gap: 1px; }
-.jv-head .small-muted { font-size: .7rem; }
-.jv-entity {
-  display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
-  font-size: .76rem; font-weight: 600; margin-top: 4px; padding-bottom: 3px; border-bottom: 1px solid var(--border);
-}
-.jv-entity.is-off { color: var(--warning-text); font-weight: 500; }
-.jv-entity b { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.jv-member {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto 38px; gap: 8px; align-items: baseline;
-  font-size: .74rem; padding: 2px 0 2px 10px;
-}
-.jv-member span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jv-member b { font-variant-numeric: tabular-nums; }
-.jv-member em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
-
-@media (max-width: 575.98px) {
-  .jv-list { max-height: none; }
-  .ub-bar { display: none; }
-}
-.jv-flag {
-  display: inline-block; font-size: .62rem; padding: 0 5px; border-radius: 999px; vertical-align: middle;
-  background: var(--sev-3-bg); border: 1px solid color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)); color: var(--warning-text);
-}
-
-/* contrast: code ในกล่องอธิบาย และตัวเลขรองบนพื้นที่เข้มขึ้น */
-#tab-contractor .ma-how code {
-  color: var(--text); background: var(--surface-soft); padding: 0 4px; border-radius: 4px;
-}
-.con-lot-row em { color: var(--text-soft); }
-.item.active .small-muted { color: var(--text-soft); }
-
-/* =====================================================================
-   48. จังหวะเวลาตามปีงบประมาณ · ใบสรุปผู้รับจ้าง 1 หน้า
-   ===================================================================== */
-
-.ft-chart { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; align-items: end; }
-.ft-col { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
-.ft-bar { position: relative; width: 100%; height: 66px; background: var(--surface-soft); border-radius: 4px 4px 0 0; }
-.ft-bar i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--primary); border-radius: 4px 4px 0 0; }
-.ft-ref { position: absolute; left: -1px; right: -1px; height: 2px; background: var(--sev-3); border-radius: 2px; }
-.ft-lab { font-size: .62rem; color: var(--muted); white-space: nowrap; }
-.ft-n { font-size: .64rem; color: var(--text-soft); font-variant-numeric: tabular-nums; min-height: 1em; }
-/* เดือนที่ต้นทางไม่มีข้อมูล ต้องต่างจากเดือนที่มีข้อมูลแต่รายนี้ไม่มีงาน */
-.ft-col.is-nodata .ft-bar { background: repeating-linear-gradient(45deg, var(--surface-soft), var(--surface-soft) 3px, var(--border) 3px, var(--border) 4px); }
-.ft-col.is-nodata .ft-lab, .ft-col.is-nodata .ft-n { opacity: .55; }
-.ft-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: .68rem; color: var(--text-soft); }
-.ft-legend span { display: inline-flex; align-items: center; gap: 4px; }
-.ft-legend i { width: 12px; height: 8px; border-radius: 2px; display: inline-block; }
-.ft-key-bar { background: var(--primary); }
-.ft-key-ref { background: var(--sev-3); height: 3px !important; }
-.ft-key-no { background: repeating-linear-gradient(45deg, var(--surface-soft), var(--surface-soft) 3px, var(--border) 3px, var(--border) 4px); border: 1px solid var(--border); }
-
-/* ใบสรุป: ซ่อนบนจอ แสดงเฉพาะตอนพิมพ์ */
-#printSheet { display: none; }
-
-@media print {
-  /* พิมพ์เฉพาะใบสรุป — ซ่อนทุกอย่างที่เหลือรวมทั้งแถบข้าง แผนที่ และกราฟ */
-  body.is-printing > *:not(#printSheet) { display: none !important; }
-  body.is-printing { background: #fff; }
-  body.is-printing #printSheet { display: block; color: #000; font-size: 9.5pt; line-height: 1.45; }
-  @page { size: A4 portrait; margin: 12mm 12mm 10mm; }
-
-  #printSheet .ps-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10mm; border-bottom: 2px solid #000; padding-bottom: 3mm; }
-  #printSheet .ps-title { font-size: 8pt; letter-spacing: .08em; text-transform: uppercase; color: #444; }
-  #printSheet .ps-name { font-size: 15pt; font-weight: 700; line-height: 1.25; }
-  #printSheet .ps-sub { font-size: 8.5pt; color: #333; }
-  #printSheet .ps-score { text-align: center; border: 1.5px solid #000; border-radius: 3mm; padding: 2mm 4mm; }
-  #printSheet .ps-score-n { font-size: 20pt; font-weight: 700; line-height: 1; }
-  #printSheet .ps-score-l { font-size: 6.5pt; color: #333; }
-
-  #printSheet .ps-prov { font-size: 8pt; background: #f2f2f2; padding: 2mm 3mm; margin: 3mm 0; border-radius: 2mm; }
-  #printSheet .ps-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2mm; margin-bottom: 3mm; }
-  #printSheet .ps-grid div { border: 0.5pt solid #999; border-radius: 2mm; padding: 1.5mm 2mm; }
-  #printSheet .ps-grid span { display: block; font-size: 7pt; color: #444; }
-  #printSheet .ps-grid b { font-size: 10.5pt; }
-
-  #printSheet .ps-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-bottom: 3mm; }
-  #printSheet h3 { font-size: 9.5pt; font-weight: 700; margin: 0 0 1.5mm; border-bottom: 0.5pt solid #000; padding-bottom: 0.7mm; }
-  #printSheet h3.mt { margin-top: 3mm; }
-  #printSheet .ps-line { margin: 0 0 1mm; font-size: 8.5pt; }
-  #printSheet .ps-note { margin: 1mm 0 0; font-size: 7.5pt; color: #333; }
-  #printSheet .ps-warn { margin: 0 0 1.5mm; font-size: 7.5pt; border-left: 1.5pt solid #000; padding-left: 2mm; }
-  #printSheet .ps-dim { display: grid; grid-template-columns: 22mm 1fr 10mm; gap: 2mm; align-items: center; font-size: 8.5pt; margin-bottom: 1mm; }
-  #printSheet .ps-dim i { display: block; height: 2.6mm; background: #ddd; border-radius: 1mm; }
-  #printSheet .ps-dim u { display: block; height: 100%; background: #000; border-radius: 1mm; }
-  #printSheet .ps-dim b { text-align: right; font-variant-numeric: tabular-nums; }
-
-  #printSheet .ps-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-  #printSheet .ps-table th { text-align: left; border-bottom: 0.5pt solid #000; padding: 0.8mm 1mm; font-weight: 600; }
-  #printSheet .ps-table td { border-bottom: 0.3pt solid #ccc; padding: 0.6mm 1mm; vertical-align: top; }
-  #printSheet .ps-table td:first-child { max-width: 46mm; }
-  #printSheet .ps-table td.n, #printSheet .ps-table th:not(:first-child) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  #printSheet .ps-dim-id { font-size: 6.5pt; color: #666; }
-  #printSheet section { break-inside: avoid; }
-
-  #printSheet .ps-foot { margin-top: 4mm; padding-top: 2mm; border-top: 0.5pt solid #000; font-size: 7.5pt; color: #222; }
-}
-
-@media (max-width: 575.98px) {
-  .ft-bar { height: 48px; }
-  .ft-lab { font-size: .56rem; }
-  .ft-n { display: none; }
-}
-
-/* =====================================================================
-   49. แท็บแผนที่: แผนที่เป็นพระเอก · แผงเล็กใต้แผนที่ · ชั้นข้อมูลนำเข้า
-   ===================================================================== */
-
-/* การ์ดแผนที่ไม่มีหัวเรื่องแล้ว ปุ่มเต็มจอย้ายไปอยู่บนแผนที่ ความสูงที่ได้คืนมาให้แผนที่ทั้งหมด */
-.map-card.is-bare { padding: 6px; }
-#tab-explain #map { height: 68vh; min-height: 420px; }
-.map-fullscreen #map { height: 100% !important; }
-
-/* แผงเดียวใต้แผนที่แทนการ์ดใหญ่หลายใบ */
-.gis-panel { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
-.gis-tabs { display: flex; align-items: center; gap: 2px; padding: 5px 6px; border-bottom: 1px solid var(--border); background: var(--surface-soft); }
-.gis-tabs-scroll { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.gis-tab {
-  border: 0; background: transparent; border-radius: 8px; padding: 5px 10px; min-height: 32px;
-  font-size: var(--text-sm); font-weight: 600; color: var(--text-soft);
-}
-.gis-tab:hover { background: var(--surface-hover); color: var(--text); }
-.gis-tab.is-on { background: var(--primary); color: #fff; }
-.gis-tab:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
-.gis-n { font-weight: 400; font-size: .72rem; opacity: .85; }
-.gis-collapse { flex: 0 0 auto; margin-left: auto; border: 0; background: transparent; color: var(--text-soft); border-radius: 8px; min-width: 32px; min-height: 32px; }
-.gis-collapse:hover { background: var(--surface-hover); color: var(--text); }
-.gis-body { padding: 9px 11px; max-height: 42vh; overflow-y: auto; }
-.gis-panel.is-min .gis-body { display: none; }
-#tab-explain .list-box { max-height: none; }
-
-/* ชั้นข้อมูลที่นำเข้า */
-.map-layer-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
-.map-layer-hint { font-size: .68rem; color: var(--muted); }
-.map-layer-list { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
-.map-layer-empty { font-size: .7rem; color: var(--muted); line-height: 1.5; margin: 2px 0 0; }
-.map-layer-msg { font-size: .7rem; color: var(--text-soft); margin-top: 5px; line-height: 1.5; min-height: 1em; }
-.ly-row { display: grid; grid-template-columns: 26px 22px minmax(0, 1fr) 54px 26px 26px; gap: 4px; align-items: center; }
-.ly-eye, .ly-btn {
-  border: 1px solid var(--border); background: var(--surface); border-radius: 7px; min-height: 26px;
-  font-size: .72rem; color: var(--text-soft); padding: 0;
-}
-.ly-eye.is-on { border-color: var(--primary); color: var(--accent-bright); }
-.ly-btn:hover { border-color: var(--border-strong); color: var(--text); }
-.ly-btn.is-del:hover { border-color: var(--sev-4); color: var(--danger-text); }
-.ly-color { position: relative; width: 22px; height: 22px; margin: 0; cursor: pointer; }
-.ly-color input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-.ly-color i { display: block; width: 100%; height: 100%; border-radius: 6px; border: 1px solid var(--border-strong); }
-.ly-meta { min-width: 0; }
-.ly-name { font-size: .74rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ly-sub { font-size: .64rem; color: var(--muted); }
-.ly-op { width: 54px; }
-.ly-note { font-size: .64rem; color: var(--warning-text); line-height: 1.45; padding: 0 2px 2px 52px; }
-.ly-pop table { font-size: .72rem; border-collapse: collapse; margin-top: 3px; }
-.ly-pop th { text-align: left; color: var(--muted); font-weight: 500; padding-right: 8px; vertical-align: top; }
-.ly-pop td { padding: 1px 0; }
-
-@media (max-width: 991.98px) {
-  #tab-explain #map { height: 56vh; min-height: 340px; }
-  .gis-body { max-height: 46vh; }
-}
-@media (max-width: 575.98px) {
-  #tab-explain #map { height: 50vh; min-height: 300px; }
-  /* จอแคบพอที่แท็บ 5 อันจะตกลงสองแถวเสมอ ทำให้แผงดูรกและกินที่สูงขึ้นทั้งที่ตั้งใจให้กระชับ
-     จึงเปลี่ยนเป็นแถบเดียวเลื่อนซ้ายขวาได้แบบแท็บบนมือถือทั่วไป (ปุ่มย่อแผงไม่เลื่อนตาม อยู่นิ่งด้านขวาเสมอ) */
-  .gis-tabs-scroll { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .gis-tabs-scroll::-webkit-scrollbar { display: none; }
-  .gis-tab { min-height: 40px; flex: 0 0 auto; white-space: nowrap; }
-  .gis-collapse { min-height: 40px; }
-  .ly-row { grid-template-columns: 30px 24px minmax(0, 1fr) 30px 30px; }
-  .ly-op { display: none; }
-  .ly-note { padding-left: 58px; }
-  .map-layer-add .btn { min-height: 44px; }
-}
-
-/* =====================================================================
-   50. แท็บภาพรวม: คิวตรวจสอบวันนี้ (auditQueue)
-   ===================================================================== */
-
-/* รายการคิวงาน ใช้โครง .item เดียวกับรายการจัดอันดับผู้รับจ้าง/หน่วยงาน
-   ต่างกันจุดเดียวคือไม่จำกัด max-height เพราะเป็นเนื้อหาหลักของหน้านี้ ไม่ใช่แผงข้างเล็ก ๆ */
-.queue-list { display: flex; flex-direction: column; gap: 8px; }
-
-/* ป้าย "ติดคิวเพราะมูลค่าสูง" ต้องแยกจาก .con-tag.is-warn (แปลว่าสัญญาณผิดปกติ)
-   เพราะคนละความหมาย ใช้สีม่วงตามธรรมเนียมเดิมของแอปที่ใช้ม่วง = "อยู่นอกกลไกให้คะแนนปกติ"
-   (แท่งกฎสาธิตใน ovRuleBar ก็ใช้ม่วงด้วยเหตุผลเดียวกัน) */
-.con-tag.is-materiality {
-  background: var(--violet-soft); border-color: color-mix(in srgb, var(--violet) 40%, var(--mix-base));
-  color: var(--violet);
-}
-
-/* =====================================================================
-   51. กรรมการที่ซ้ำกันข้ามผู้รับจ้าง (ข้อมูลที่ผู้ใช้กรอกเอง)
-   ===================================================================== */
-
-/* แถวเพิ่มกรรมการในโปรไฟล์ผู้รับจ้าง: ชื่อ + บทบาท + ปุ่ม เรียงแนวนอนบนจอกว้าง ตกบรรทัดบนจอแคบ */
-.dir-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.dir-add .form-control, .dir-add .form-select { flex: 1 1 160px; min-width: 0; }
-
-/* ปุ่มลบเล็กติดในชิป .con-tag ของกรรมการที่บันทึกแล้ว */
-/* ข้อความแจ้งข้อผิดพลาดใต้ฟอร์ม ใช้โทเค็น --danger-text ที่ปรับตามธีมเอง
-   (คลาส text-danger ของ Bootstrap เป็นสีแดงตายตัว โหมดมืดวัดได้ 3.89:1 ต่ำกว่าเกณฑ์ 4.5:1) */
-.dir-msg { color: var(--danger-text); }
-
-.dir-x {
-  border: 0; background: transparent; color: inherit; opacity: .75; margin-left: 4px;
-  font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 2px;
-}
-.dir-x:hover { opacity: 1; color: var(--danger-text); }
-.dir-x:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: 4px; opacity: 1; }
-
-@media (max-width: 767.98px) {
-  /* พื้นที่กดขั้นต่ำ 44px ตามแนวทางเดียวกับหัวข้อ 27 */
-  .dir-x { min-width: 32px; min-height: 32px; margin-left: 2px; }
-  .dir-add .btn { min-height: 44px; }
-}
-
-/* =====================================================================
-   52. แท็บย่อยในแท็บหน่วยงาน: วิเคราะห์เชิงลึกวิธีจัดหา (3E + Integrity)
-   ===================================================================== */
-
-/* แถบแท็บย่อย — โทนฟ้าอ่อนจากโทเค็น --sev-2 ที่มีอยู่แล้ว (ปรับตามธีมสว่าง/มืดเอง) ไม่สร้างสีใหม่ */
-.ag-views {
-  display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 12px;
-  border: 1px solid var(--border); border-radius: 12px;
-  background: var(--surface); box-shadow: var(--shadow-sm);
-}
-.ag-views .ag-view {
-  border: 0; background: transparent; border-radius: 9px; padding: 7px 14px; min-height: 36px;
-  font-size: var(--text-sm); font-weight: 600; color: var(--text-soft); cursor: pointer;
-  transition: background-color .14s ease, color .14s ease;
-}
-.ag-views .ag-view:hover { background: var(--surface-hover); color: var(--text); }
-.ag-views .ag-view.is-on { background: var(--sev-2-bg); color: var(--sev-2-ink); box-shadow: inset 0 0 0 1px var(--sev-2); }
-.ag-views .ag-view:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
-[data-ag-pane][hidden] { display: none !important; }
-
-/* คำถามวิเคราะห์หลักประจำส่วน — อ่านแล้วรู้ทันทีว่าการ์ดนี้ตอบคำถามอะไรของผู้ตรวจ */
-.method-q {
-  border-left: 3px solid var(--sev-2); background: var(--sev-2-bg); color: var(--sev-2-ink);
-  padding: 6px 10px; border-radius: 0 8px 8px 0; font-size: var(--text-sm); margin-bottom: 10px;
-}
-
-/* แถบบอกขอบเขตข้อมูลที่กำลังวิเคราะห์ + ปุ่มสลับ */
-.method-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.method-scope-now { font-size: var(--text-sm); color: var(--text-soft); }
-.method-scope-now b { color: var(--text); }
-.method-scope .btn { white-space: nowrap; }
-
-/* บรรทัดสรุปจุดเสี่ยงท้ายแท็บ — ระดับความสำคัญกำหนดสีแถบซ้าย */
-.method-find { display: flex; gap: 8px; align-items: flex-start; padding: 7px 10px; margin-bottom: 6px;
-  border-left: 3px solid var(--border-strong); background: var(--surface-soft); border-radius: 0 8px 8px 0; }
-.method-find.is-high { border-left-color: var(--sev-4); background: var(--sev-4-bg); }
-.method-find.is-mid  { border-left-color: var(--sev-3); background: var(--sev-3-bg); }
-.method-find b { display: block; font-size: var(--text-sm); }
-.method-find span { font-size: var(--text-sm); color: var(--text-soft); }
-
-@media (max-width: 767.98px) {
-  /* ต้องใช้ .ag-views .ag-view ให้ specificity เท่ากฎฐาน (0,2,0) ไม่งั้น min-height 36px ยังชนะ */
-  .ag-views .ag-view { min-height: 44px; flex: 1 1 auto; }
-  .method-scope .btn { min-height: 44px; }
-}

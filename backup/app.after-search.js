@@ -23,37 +23,20 @@ const App = (() => {
       buyerLevel: 'agency',
     },
     contractor: { q: '', riskMin: 0, contractMin: 1, selected: null },
-    agency: { q: '', hhiMin: 0, contractMin: 1, level: 'agency', selected: null,
-      view: 'overview', methodScope: 'auto' },   // แท็บย่อยและขอบเขตของ "วิเคราะห์เชิงลึกวิธีจัดหา"
-    agencyProfiles: null, agencyProfilesLevel: null,
     ts: { dimension: 'purchase_method_name', metric: 'counts' },
-    queue: { mode: 'exposure', n: 40, materiality: 0 },  // materiality คำนวณจริงใน activateDataset()
     selectedRecord: null,
     map: {
-      mode: 'cluster', colorBy: 'band', basemap: 'light', sizeByValue: true, baseOpacity: 1,
-      hideStacked: false,  // ซ่อนกลุ่มพิกัดที่ซ้ำกันเป๊ะ (พิกัดตั้งต้น) ที่กติกา shared ของ ETL จับไม่ได้
+      mode: 'cluster', colorBy: 'band', basemap: 'light', sizeByValue: true,
       hideShared: true,    // ซ่อนพิกัดที่ใช้ร่วมหลายโครงการ (น่าจะเป็นพิกัดสำนักงาน)
       hidden: new Set(),   // กลุ่มที่ถูกปิดจากคำอธิบายสัญลักษณ์
       timelapse: { playing: false, monthIndex: 0, months: [], timer: null },
       hotspot: { metric: 'priority', spacingKm: 20, minN: 5 },
-      tool: null, draft: [], radiusKm: 10, area: null, footprint: null, fpMore: [],
-      gisPane: 'list',   // แผงใต้แผนที่กำลังเปิดหน้าไหน
-      // การตั้งค่ารอยเท้าผู้รับจ้าง — ผู้ใช้ปรับได้ทุกตัวจากแผงใต้แผนที่
-      fp: {
-        scope: 'all',      // ฐานข้อมูล: ทั้งชุด หรือเฉพาะที่ตัวกรองเลือกอยู่
-        center: 'median',  // ศูนย์กลาง: มัธยฐานพิกัด หรือถ่วงด้วยมูลค่า
-        shape: 'hull',     // ขอบเขต: รูปหุ้มงาน / วงรัศมี 90% / ไม่วาด
-        color: 'map',      // สีจุด: ตามแผนที่ / ตามเวลา / ตามระยะ
-        farMode: 'km', farKm: 100,
-        spokes: true, shared: false, focus: true,   // focus = ซ่อนหมุดอื่นระหว่างดูรอยเท้า
-        month: null, playing: false, open: false, neighOpen: false,
-      },
+      tool: null, draft: [], radiusKm: 10, area: null, footprint: null,
     },
     dataset: { id: 'base', name: 'ชุดข้อมูลหลักของระบบ', kind: 'base' },   // ชุดข้อมูลที่ทั้งแอปใช้อยู่
     datasetNotice: '',
     compare: { a: null, b: null },            // ใช้กับ modal เปรียบเทียบหน่วยงานในแท็บเครือข่ายเท่านั้น
     contractorCompare: { a: null, b: null },  // การ์ดเปรียบเทียบผู้รับจ้างที่ฝังอยู่ในแท็บผู้รับจ้าง
-    agencyCompare: { a: null, b: null },      // การ์ดเปรียบเทียบหน่วยงานที่ฝังอยู่ในแท็บหน่วยงาน (คนละตัวกับ compare ด้านบน)
     dirty: new Set(),
   };
 
@@ -66,7 +49,6 @@ const App = (() => {
     'tab-anomaly': renderAnomaly,
     'tab-network': renderNetwork,
     'tab-contractor': renderContractor,
-    'tab-agency': renderAgency,
     'tab-time': renderTimeseries,
     'tab-rules': renderRuleSettings,
     'tab-demo': renderDemo,
@@ -99,9 +81,8 @@ const App = (() => {
 
   /** เปลี่ยนชุดข้อมูลที่ทั้งแอปใช้ — ทำสิ่งเดียวกับที่ boot() ทำ บวกการล้างแคชที่ผูกกับระเบียนชุดเก่า
    *  ลำดับสำคัญ 3 จุด (มีคอมเมนต์กำกับไว้ในโค้ด) ห้ามสลับ */
-  function activateDataset(payload, { id = BASE_DATASET.id, name = BASE_DATASET.name, kind = 'base', bootMsg = null, first = false, notice = '' } = {}) {
+  function activateDataset(payload, { id = BASE_DATASET.id, name = BASE_DATASET.name, kind = 'base', bootMsg = null, first = false } = {}) {
     state.dataset = { id, name, kind };
-    state.datasetNotice = notice;   // ข้อความประจำชุดข้อมูลนี้ อยู่จนกว่าจะสลับชุดถัดไป
     state.payload = payload;
     state.records = payload.records || [];
 
@@ -129,48 +110,29 @@ const App = (() => {
     if (bootMsg) bootMsg.textContent = 'กำลังประเมินกฎความเสี่ยง...';
     Rules.evaluate(state.records, state.ctx, state.settings);
 
-    // เกณฑ์เริ่มต้นตั้งจากเปอร์เซ็นไทล์ที่ 99 ของมูลค่าสัญญาจริง (ไม่ใช่ตัวเลขที่ตั้งลอย ๆ)
-    // วัดจากชุดข้อมูลหลัก (10,166 สัญญาที่มีมูลค่า) ได้ ≈36 ล้านบาท ปัดเป็น 35 ล้าน
-    // ต้องคำนวณใหม่ทุกครั้งที่สลับชุดข้อมูล เพราะสเกลมูลค่าของแต่ละชุดต่างกัน
-    const pricedForQueue = state.records.map(r => r.contract_price_agree).filter(v => v > 0).sort((a, b) => a - b);
-    const p99Queue = pricedForQueue.length ? U.quantile(pricedForQueue, 0.99) : 0;
-    state.queue = { mode: 'exposure', n: 40, materiality: Math.round(p99Queue / 5e6) * 5e6 };
-
     // ★ ล้างแคชทุกตัวที่ถือระเบียนของชุดเก่าไว้ ก่อนที่อะไรจะวาด
     state.profiles = null;
-    state.agencyProfiles = null; state.agencyProfilesLevel = null;
     state.summary = null;
     search.index = null;
     state.selectedRecord = null;
     state.contractor.selected = null;
-    state.agency.selected = null;
     state.compare = { a: null, b: null };
     state.contractorCompare = { a: null, b: null };
-    state.agencyCompare = { a: null, b: null };
     state.net.agency = ''; state.net.contractor = '';
     state.map.exportRows = null;
     state.map.lastGroups = null;
     state.map.hidden = new Set();
-    state.map.area = null; state.map.footprint = null; state.map.fpMore = [];
-    stackExactCache = null; stack.groups = null; stack.sig = '';
-    terr.rows = null; terr.sig = '';
-    conMarket = null;
-    ub.rows = null; ub.sig = '';
-    fiscalCal = null; gapCoverCache = null; lastSheet = null;
+    state.map.area = null; state.map.footprint = null;
     state.map.timelapse.months = [];
     state.filters.bounds = null; state.filters.area = null;
     if (!first) {
       aiMeterCache.clear();
       lab.health = null; lab.mine = null; lab.mineRows = null; lab.backtest = null;
-      nameLab.result = null; nameLab.purposeResult = null; nameLab.findings = null;
-      nameLab.findingsFor = null; nameLab.mined = null; nameLab.minedPurpose = null;
       labelsCache = null;
     }
     // ★ ต้องหลังสลับ state.records และหลังล้าง byKey ไม่งั้นจะได้ระเบียนของชุดก่อนหน้า
     cart.byKey = null;
     loadCart();
-
-    state.nameProfileApplied = autoApplyNameProfile();
 
     buildFilterOptions();          // ★ ต้องก่อน applyFilters() เพราะการเติมตัวเลือกใหม่จะรีเซ็ตค่าในกล่องเลือก
     if (!first) reconcileFilters();
@@ -270,6 +232,7 @@ const App = (() => {
           <button type="button" class="btn btn-sm btn-outline-secondary" data-goto-import>จัดการชุดข้อมูล</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" data-dataset-base>กลับชุดหลัก</button>
         </span>`}`);
+    state.datasetNotice = '';
   }
 
   function renderImport() {
@@ -314,16 +277,10 @@ const App = (() => {
   }
 
   async function boot() {
-    // ตัวจัดการคลิกหลายจุดเป็น async ข้อผิดพลาดข้างในจึงกลายเป็น unhandled rejection ที่เงียบสนิท
-    // จับไว้ให้ขึ้น console อย่างน้อยหนึ่งที่ เวลาอะไรไม่ทำงานจะได้รู้ว่าพังตรงไหน
-    window.addEventListener('unhandledrejection', ev => {
-      console.error('งานเบื้องหลังล้มเหลว:', ev.reason);
-    });
     const bootMsg = U.$('bootMessage');
     try {
       let payload = null;
       let info = BASE_DATASET;
-      let bootNotice = '';
       const active = Datasets.getActive();
 
       if (active) {
@@ -337,24 +294,17 @@ const App = (() => {
         if (!payload) {
           // ชุดที่เลือกไว้หายไป (ล้างข้อมูลเบราว์เซอร์ เปลี่ยนเครื่อง หรือถูกลบ) — กลับชุดหลักอย่างเงียบ ๆ
           Datasets.setActive(null);
-          bootNotice = `ไม่พบชุดข้อมูล "${active.name}" ที่เคยเลือกไว้ จึงกลับมาใช้ชุดหลัก`;
+          state.datasetNotice = `ไม่พบชุดข้อมูล "${active.name}" ที่เคยเลือกไว้ จึงกลับมาใช้ชุดหลัก`;
         }
       }
       if (!payload) payload = await fetchBasePayload(bootMsg);
 
-      activateDataset(payload, { ...info, bootMsg, first: true, notice: bootNotice });
+      activateDataset(payload, { ...info, bootMsg, first: true });
 
       wireGlobalFilters();
       wireTabs();
       wireControls();
-      wireNetTerritory();
-      wireMapStack();
-      wireContractorExtras();
-      wireAgencyExtras();
-      wireGisPanel();
       wireImport();
-      renderDirectorsPanel();
-      wireDirectorsPanel();
       wireSidebar();
       wireTheme();
       wireSearchShortcut();
@@ -443,7 +393,6 @@ const App = (() => {
     wireFilterShortcuts();
     wireMoreFilters();
     wireFilterCollapse();
-    wireFilterHide();
     wireSearchSuggest();
   }
 
@@ -555,53 +504,6 @@ const App = (() => {
     else if (mq.addListener) mq.addListener(syncDefault);   // Safari รุ่นเก่า
   }
 
-  /** ซ่อนแถบตัวกรองทั้งแถบไปเลย — คนละระดับกับ "ย่อ" ด้านบนซึ่งยังเหลือบรรทัดสรุปเสมอ
-   *  ใช้ตอนต้องการพื้นที่คืนเต็มที่จริงๆ และรู้ตัวอยู่แล้วว่ากรองอะไรไว้
-   *  ปุ่ม "ตัวกรอง" บนแถบบน (เห็นได้จากทุกแท็บเหมือนช่องค้นหา) เป็นทางเดียวที่เรียกกลับมาได้ */
-  const FILTER_HIDDEN_KEY = 'pa_filter_hidden';
-
-  function applyFilterHidden(hidden, { persist = true } = {}) {
-    const bar = document.querySelector('.filter-bar');
-    const showBtn = U.$('filterShowBtn');
-    if (!bar) return;
-    bar.hidden = hidden;
-    if (showBtn) showBtn.hidden = !hidden;
-    if (persist) {
-      try { localStorage.setItem(FILTER_HIDDEN_KEY, hidden ? '1' : '0'); }
-      catch (e) { /* ไม่สำคัญ */ }
-    }
-    updateFilterShowBadge();
-    const pane = document.querySelector('.tab-pane.active');
-    if (pane) setTimeout(() => Charts.resizeIn(pane), 60);
-    if (map) setTimeout(() => map.invalidateSize(), 80);
-  }
-
-  /** ป้ายจำนวนบนปุ่ม "ตัวกรอง" ต้องตรงกับจำนวนเงื่อนไขที่กรองอยู่จริงเสมอ ใช้ตัวนับเดียวกับชิปบนแผนที่ */
-  function updateFilterShowBadge() {
-    const badge = U.$('filterShowN');
-    if (!badge) return;
-    const n = activeFilterCount();
-    badge.hidden = !n;
-    badge.textContent = String(n);
-  }
-
-  function wireFilterHide() {
-    const hideBtn = U.$('gfHide');
-    const showBtn = U.$('filterShowBtn');
-    if (!hideBtn || !showBtn) return;
-    hideBtn.addEventListener('click', () => applyFilterHidden(true));
-    showBtn.addEventListener('click', () => {
-      applyFilterHidden(false);
-      // เปิดกลับมาแล้วควรเห็นตัวกรองเต็ม ไม่ใช่แค่บรรทัดสรุปที่อาจย่อค้างไว้จากรอบก่อน
-      applyFilterCollapse(false);
-      document.querySelector('.filter-bar')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    });
-
-    let saved = null;
-    try { saved = localStorage.getItem(FILTER_HIDDEN_KEY); } catch (e) { /* ไม่สำคัญ */ }
-    if (saved === '1') applyFilterHidden(true, { persist: false });
-  }
-
   /** ตัวกรองที่ใช้ไม่บ่อยถูกพับไว้ ลดจำนวนช่องที่เห็นครั้งแรกจาก 8 เหลือ 4 */
   function wireMoreFilters() {
     const btn = U.$('gfMoreToggle');
@@ -662,10 +564,8 @@ const App = (() => {
       (b.contract_price_agree || 0) - (a.contract_price_agree || 0));
     state.summary = Rules.summarize(state.filtered);
     state.profiles = null;
-    state.agencyProfiles = null; state.agencyProfilesLevel = null;
     state.selectedRecord = state.filtered[0] || null;
     state.contractor.selected = null;
-    state.agency.selected = null;
 
     renderKPIs();
     renderQuickFilters();
@@ -714,6 +614,45 @@ const App = (() => {
       ` title="ล้างตัวกรองทั้งหมด">ล้างทั้งหมด</button>`);
   }
 
+  /* เส้นแนวโน้มจิ๋วบนการ์ด KPI — การ์ดจึงบอกได้ทั้ง "เท่าไร" และ "กำลังไปทางไหน"
+     วาดเป็น SVG ตรงๆ ไม่ผ่าน Plotly เพราะเป็นเส้นเดียวขนาด 26px การเรียกไลบรารีไม่คุ้ม */
+  function kpiSparklines() {
+    const months = new Map();
+    for (const r of state.filtered) {
+      const m = U.monthKey(r.contract_date);
+      if (m === null) continue;
+      let b = months.get(m);
+      if (!b) { b = { total: 0, priority: 0, priorityValue: 0, flagged: 0 }; months.set(m, b); }
+      b.total++;
+      if (r.risk_band === 'critical' || r.risk_band === 'high') {
+        b.priority++;
+        b.priorityValue += r.contract_price_agree || 0;
+      }
+      if ((r.rule_hits || []).length) b.flagged++;
+    }
+    const keys = [...months.keys()].sort();
+    const series = k => keys.map(m => months.get(m)[k]);
+    return { total: series('total'), priority: series('priority'),
+      priorityValue: series('priorityValue'), flagged: series('flagged') };
+  }
+
+  function sparklineSVG(values) {
+    if (!values || values.length < 3) return '';
+    const w = 100, h = 26, pad = 2;
+    const max = Math.max(...values), min = Math.min(...values);
+    const span = max - min || 1;
+    const pts = values.map((v, i) => {
+      const x = pad + i * (w - pad * 2) / (values.length - 1);
+      const y = h - pad - ((v - min) / span) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"
+        aria-hidden="true" focusable="false">
+      <polyline points="${pts.join(' ')}" fill="none" stroke="currentColor"
+                stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" opacity=".55"/>
+    </svg>`;
+  }
+
   function renderKPIs() {
     const s = state.summary;
     const value = U.sum(state.filtered.map(r => r.contract_price_agree));
@@ -726,19 +665,19 @@ const App = (() => {
     const priorityValue = U.sum(priority.map(r => r.contract_price_agree));
 
     // การ์ดที่มี shortcut กดแล้วกรองให้ตรงกับตัวเลขที่การ์ดนับอยู่จริง
-    // (ตัดเส้นแนวโน้มจิ๋วออกแล้ว — ผู้ใช้ขอให้การ์ดกระชับเหลือ 3 บรรทัด: ป้าย ▸ ตัวเลข ▸ คำอธิบาย)
     const items = [
-      ['สัญญาที่แสดงอยู่', U.num(s.total), 'สัญญา', `มูลค่ารวม ${U.money(value)} บาท`, null],
+      ['สัญญาที่แสดงอยู่', U.num(s.total), 'สัญญา', `มูลค่ารวม ${U.money(value)} บาท`, null, 'total'],
       ['ควรตรวจสอบก่อน', U.num(priority.length), 'สัญญา',
         `วิกฤต ${U.num(s.bandCounts.critical)} · สูง ${U.num(s.bandCounts.high)}` +
-        (s.total ? ` (${U.pct(priority.length / s.total)})` : ''), 'priority'],
+        (s.total ? ` (${U.pct(priority.length / s.total)})` : ''), 'priority', 'priority'],
       ['มูลค่าที่ควรตรวจสอบก่อน', U.money(priorityValue), 'บาท',
-        value ? `${U.pct(priorityValue / value)} ของมูลค่ารวม` : '-', 'priority'],
+        value ? `${U.pct(priorityValue / value)} ของมูลค่ารวม` : '-', 'priority', 'priorityValue'],
       ['พบสัญญาณอย่างน้อย 1 ข้อ', U.num(s.flagged), 'สัญญา',
-        `กฎที่ทำงานจริง ${realRules} จาก ${Rules.DEFS.filter(d => d.source === 'real').length} ข้อ`, 'flagged'],
+        `กฎที่ทำงานจริง ${realRules} จาก ${Rules.DEFS.filter(d => d.source === 'real').length} ข้อ`, 'flagged', 'flagged'],
     ];
+    const spark = kpiSparklines();
     U.setHTML('kpis', items.map(i => {
-      const [label, val, unit, sub, shortcut] = i;
+      const [label, val, unit, sub, shortcut, sparkKey] = i;
       const on = shortcut === 'flagged' ? state.filters.flagged : state.filters.band === shortcut;
       const tag = shortcut ? 'button' : 'div';
       const attrs = shortcut
@@ -746,15 +685,15 @@ const App = (() => {
           ` title="คลิกเพื่อกรองเฉพาะกลุ่มนี้ กดซ้ำเพื่อยกเลิก"`
         : '';
       return `
-      <div class="col-6 col-lg-3"><${tag} class="cardx kpi kpi-compact${shortcut ? ' kpi-clickable' : ''}${on ? ' is-on' : ''}"${attrs}>
+      <div class="col-6 col-lg-3"><${tag} class="cardx kpi${shortcut ? ' kpi-clickable' : ''}${on ? ' is-on' : ''}"${attrs}>
         <div class="small-muted">${label}</div>
         <div class="v">${val}<span class="unit">${unit}</span></div>
+        ${sparklineSVG(spark[sparkKey])}
         <div class="small-muted">${sub}</div>
         ${shortcut ? '<span class="kpi-hint" aria-hidden="true">คลิกเพื่อกรอง</span>' : ''}
       </${tag}></div>`;
     }).join(''));
     renderNavCounts();
-    updateFilterShowBadge();
   }
 
   /* =========================================================
@@ -1362,64 +1301,19 @@ const App = (() => {
      แท็บภาพรวม
      ========================================================= */
 
-  /** คิวตรวจสอบวันนี้ — จัดด้วย Analytics.auditQueue() (คะแนน × มูลค่า เป็นค่าเริ่มต้น)
-   *  แสดงเป็นรายการเดียวกับโครง .item ของแท็บผู้รับจ้าง/หน่วยงาน แต่ไม่จำกัด max-height
-   *  เพราะเป็นเนื้อหาหลักของหน้านี้ ไม่ใช่แผงข้างเล็ก ๆ */
-  function renderOverviewQueue() {
-    const q = Analytics.auditQueue(state.filtered, state.queue);
-
-    U.setHTML('ovQueueList', q.items.map((x, i) => `
-      <div class="item" data-idx="${i}">
-        <div class="d-flex justify-content-between gap-2">
-          <span class="small"><span class="rank-badge">${i + 1}</span>
-            ${clickable('project', x.r.project_id, truncate(x.r.project_name, 44))}</span>
-          <span class="d-flex align-items-center gap-1 flex-shrink-0">
-            ${cartBtn(x.r)}
-            <span class="badge ${Rules.band(x.score).cls}">${U.num(x.score)}</span>
-          </span>
-        </div>
-        <div class="small-muted">${U.esc(truncate(x.r.dept_name, 30))} · ${U.esc(truncate(x.r.winner_name, 30))} · ${U.money(x.value)}</div>
-        <div class="con-row-tags">${x.includedBy === 'materiality' ? '<span class="con-tag is-materiality">มูลค่าสูง แม้คะแนนต่ำ</span>' : ''}</div>
-      </div>`).join('') || U.emptyState('ไม่มีสัญญาตามเงื่อนไขนี้'));
-
-    U.setHTML('ovQueueSummary',
-      `แผนนี้ ${U.num(q.items.length)} เรื่อง${q.renderTruncated ? ` (จากทั้งหมด ${U.num(q.totalItems)})` : ''} ` +
-      `ครอบคลุมมูลค่า ${U.money(q.totalValue)} บาท (${U.pct(q.coveragePct)} ของมูลค่ารวมในตัวกรองนี้)` +
-      (q.materialityOnlyCount ? ` · ${U.num(q.materialityOnlyCount)} เรื่องติดคิวเพราะมูลค่าสูงแม้คะแนนต่ำ` : ''));
-
-    U.$('ovQueueList').querySelectorAll('.item').forEach(el => {
-      el.addEventListener('click', e => {
-        if (e.target.closest('.cart-btn, .detail-clickable')) return;
-        openProfile(q.items[Number(el.dataset.idx)].r.project_id);
-      });
-    });
-  }
-
-  function wireOverviewQueue() {
-    U.$('ovQueueMateriality').value = state.queue.materiality / 1e6;
-    U.$('ovQueueMode').addEventListener('change', e => {
-      state.queue.mode = e.target.value; state.dirty.add('tab-overview'); renderActiveTab();
-    });
-    U.$('ovQueueN').addEventListener('change', e => {
-      state.queue.n = Number(e.target.value); state.dirty.add('tab-overview'); renderActiveTab();
-    });
-    U.$('ovQueueMateriality').addEventListener('input', U.debounce(e => {
-      state.queue.materiality = Math.max(0, Number(e.target.value) || 0) * 1e6;
-      state.dirty.add('tab-overview'); renderActiveTab();
-    }, 300));
-    U.$('ovQueueExport').addEventListener('click', () => {
-      const q = Analytics.auditQueue(state.filtered, { ...state.queue, capRender: Infinity });
-      exportRecords(q.items.map(x => x.r), 'คิวตรวจสอบ.csv');
-    });
-  }
-
   function renderOverview() {
     const s = state.summary;
     const rows = state.filtered;
-    renderOverviewQueue();
     renderScopeNote();
     renderWorkGroups();
     renderOverviewHero();
+
+    const cliff = Analytics.thresholdCliff(rows);
+    const priority = rows.filter(r => r.risk_band === 'critical' || r.risk_band === 'high');
+    // ตัวเลขหลักอยู่ในแผงพาดหัวแล้ว บรรทัดนี้เหลือไว้เฉพาะข้อสังเกตที่แผงไม่ได้แสดง
+    U.setHTML('overviewLede', cliff.ratio
+      ? `ข้อสังเกต: สัญญาในช่วงใต้เพดาน ${U.money(cliff.ceiling)} บาท มีจำนวนมากกว่าช่วงเหนือเพดาน ${cliff.ratio.toFixed(1)} เท่า`
+      : '');
 
     const bands = Rules.BANDS.filter(b => (s.bandCounts[b.key] || 0) > 0);
     Charts.donut('ovBandDonut', bands.map(b => b.label),
@@ -1515,9 +1409,6 @@ const App = (() => {
         U.$('list').querySelectorAll('.item').forEach(x => x.classList.remove('active'));
         el.classList.add('active');
         pickRecord(shown[Number(el.dataset.idx)]);
-        // แผงรายการ/รายละเอียดเดิมเคยเป็นการ์ดคู่กันเห็นพร้อมกัน ตอนนี้ถูกยุบเป็นแท็บเดียวกัน
-        // คลิกแล้วต้องพาไปแท็บ "รายละเอียด" เอง ไม่งั้นผู้ใช้จะไม่เห็นผลของการคลิกเลย
-        if (typeof setGisPane === 'function') setGisPane('detail');
       });
     });
 
@@ -1543,16 +1434,13 @@ const App = (() => {
     U.setHTML('detail', `
       <div class="mb-2 d-flex justify-content-between align-items-start gap-2">
         <strong>${U.esc(r.project_name)}</strong>
-        <span class="d-flex gap-1 flex-shrink-0">
-          ${entityCartBtn('project', r.project_id, r.project_name)}
-          <button class="btn btn-sm btn-outline-primary detail-clickable"
-                  data-type="project" data-id="${U.esc(r.project_id)}">ดูแบบเต็ม</button>
-        </span>
+        <button class="btn btn-sm btn-outline-primary flex-shrink-0 detail-clickable"
+                data-type="project" data-id="${U.esc(r.project_id)}">ดูแบบเต็ม</button>
       </div>
       <div class="detail-cart-row">${cartBtn(r, { label: true })}</div>
       ${kv('รหัสโครงการ', U.esc(r.project_id))}
-      ${kv('หน่วยงาน', `${clickable('agency', r.dept_key, r.dept_name)} ${entityCartBtn('agency', r.dept_key, r.dept_name)}`)}
-      ${kv('ผู้รับจ้าง', `${clickable('contractor', r.winner_key, r.winner_name)} ${entityCartBtn('contractor', r.winner_key, r.winner_name)}`)}
+      ${kv('หน่วยงาน', clickable('agency', r.dept_key, r.dept_name))}
+      ${kv('ผู้รับจ้าง', clickable('contractor', r.winner_key, r.winner_name))}
       ${kv('เลขผู้เสียภาษี', U.esc(r.winner_tin) + (r.tin_is_masked ? ' <span class="badge badge-none">ถูกปิดบัง</span>' : ''))}
       ${kv('วิธีจัดหา', U.esc(r.purchase_method_name))}
       ${kv('ประเภท', U.esc(r.project_type_name))}
@@ -1634,50 +1522,6 @@ const App = (() => {
       attribution: 'Tiles &copy; Esri', maxNativeZoom: 18, dark: true,
     },
   };
-  /* เพิ่มค่ายอื่นเพื่อให้เลือกพื้นหลังที่เหมาะกับงานได้จริง
-     ทั้งหมดผ่านการตรวจแล้วว่าโหลดข้ามโดเมนได้ (crossOrigin) จึงยังส่งออก PNG ได้เหมือนเดิม
-     ไม่มี Google Maps เพราะเงื่อนไขการใช้งานห้ามดึงไทล์ตรงโดยไม่ผ่าน SDK ที่มีคีย์ */
-  Object.assign(BASEMAPS, {
-    osmHot: {
-      url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-      attribution: '&copy; ผู้ร่วมสร้าง OpenStreetMap · สไตล์ Humanitarian OSM Team',
-      maxNativeZoom: 19, dark: false, group: 'OpenStreetMap', label: 'มนุษยธรรม (HOT)',
-    },
-    cartoLight: {
-      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-      attribution: '&copy; ผู้ร่วมสร้าง OpenStreetMap &copy; CARTO',
-      maxNativeZoom: 20, dark: false, group: 'CARTO', label: 'สว่างสะอาด (Positron)',
-    },
-    cartoDark: {
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      attribution: '&copy; ผู้ร่วมสร้าง OpenStreetMap &copy; CARTO',
-      maxNativeZoom: 20, dark: true, group: 'CARTO', label: 'มืดสนิท (Dark Matter)',
-    },
-    cartoVoyager: {
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      attribution: '&copy; ผู้ร่วมสร้าง OpenStreetMap &copy; CARTO',
-      maxNativeZoom: 20, dark: false, group: 'CARTO', label: 'Voyager',
-    },
-    esriTopo: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
-      maxNativeZoom: 19, dark: false, group: 'Esri', label: 'ภูมิประเทศ',
-    },
-    esriStreet: {
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, USGS',
-      maxNativeZoom: 19, dark: false, group: 'Esri', label: 'ถนน',
-    },
-    openTopo: {
-      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-      attribution: 'แผนที่ &copy; OpenTopoMap (CC-BY-SA) · ข้อมูล &copy; ผู้ร่วมสร้าง OpenStreetMap, SRTM',
-      maxNativeZoom: 17, dark: false, group: 'OpenTopoMap', label: 'เส้นชั้นความสูง',
-    },
-  });
-  BASEMAPS.light.group = 'OpenStreetMap'; BASEMAPS.light.label = 'มาตรฐาน';
-  BASEMAPS.gray.group = 'Esri'; BASEMAPS.gray.label = 'เทาอ่อน · เน้นหมุด';
-  BASEMAPS.dark.group = 'Esri'; BASEMAPS.dark.label = 'เทาเข้ม';
-  BASEMAPS.satellite.group = 'Esri'; BASEMAPS.satellite.label = 'ภาพถ่ายดาวเทียม';
   // ชื่อคีย์เดิมของตัวเลือก "ถนน" ยังใช้ได้ กันไม่ให้ค่าที่จำไว้หรือลิงก์เก่าตกไปหาชุดผิด
   BASEMAPS.street = BASEMAPS.light;
 
@@ -1822,10 +1666,8 @@ const App = (() => {
       attribution: cfg.attribution,
       maxZoom: 19,
       maxNativeZoom: cfg.maxNativeZoom,
-      // โหลดแบบ CORS เพื่อให้วาดลงภาพ PNG ตอนส่งออกได้ ทุกค่ายที่ใส่ไว้ตรวจแล้วว่าไม่ทำให้ canvas เสีย
+      // โหลดแบบ CORS เพื่อให้วาดลงภาพ PNG ตอนส่งออกได้ ผู้ให้บริการทั้ง 4 ชุดส่ง Access-Control-Allow-Origin: *
       crossOrigin: 'anonymous',
-      opacity: state.map.baseOpacity ?? 1,
-      subdomains: cfg.url.includes('{s}') ? (cfg.url.includes('cartocdn') ? 'abcd' : 'abc') : 'abc',
     }).addTo(map);
     baseLayer.setZIndex(0);
     U.$('mapCard').classList.toggle('map-dark', !!cfg.dark);
@@ -1879,7 +1721,6 @@ const App = (() => {
       applyFilters();
     });
 
-    wireUserLayers();
     U.$('mapFullscreen').addEventListener('click', toggleMapFullscreen);
     document.addEventListener('fullscreenchange', () => {
       const on = !!document.fullscreenElement;
@@ -2147,7 +1988,7 @@ const App = (() => {
           <div class="mp-actions">
             <button type="button" class="mp-btn is-primary detail-clickable" data-type="project" data-id="${U.esc(r.project_id)}" title="เปิดโปรไฟล์สัญญาแบบเต็ม">🔎 โปรไฟล์</button>
             ${cartBtn(r, { label: true })}
-            <button type="button" class="mp-btn is-ai" data-map-ai="${U.esc(k)}" title="เปิดแท็บ AI Lab แล้วให้อธิบายสัญญานี้">✨ ถาม AI</button>
+            <button type="button" class="mp-btn is-ai" data-map-ai="${U.esc(k)}" title="เปิดแท็บผู้ช่วย AI แล้วให้อธิบายสัญญานี้">✨ ถาม AI</button>
             <button type="button" class="mp-btn" data-map-zoom="${r.lat},${r.lon}" title="ซูมเข้าไปที่ตำแหน่งนี้">⌖ ซูม</button>
             <button type="button" class="mp-btn" data-map-footprint="${U.esc(r.winner_key)}" title="ดูทุกงานของผู้รับจ้างรายนี้บนแผนที่">👣 รอยเท้า</button>
           </div>
@@ -2191,9 +2032,8 @@ const App = (() => {
     const fp = state.map.footprint;
     const fpChip = U.$('mapChipFootprint');
     fpChip.classList.toggle('is-on', !!fp);
-    const more = state.map.fpMore.length;
     fpChip.title = fp
-      ? `กำลังแสดงรอยเท้า${fp.kind === 'dept' ? 'หน่วยงาน' : 'ผู้รับจ้าง'} ${fp.name}${more ? ` และอีก ${more} ราย` : ''} · กดเพื่อเปลี่ยนหรือล้าง`
+      ? `กำลังแสดงรอยเท้าของ ${fp.name} · กดเพื่อเปลี่ยนหรือล้าง`
       : 'ดูรอยเท้าผู้รับจ้าง: พิมพ์หรือเลือกชื่อผู้รับจ้าง เพื่อดูทุกงานของรายนั้นบนแผนที่';
     syncSheetMode();
   }
@@ -2248,9 +2088,6 @@ const App = (() => {
 
   function onMarkerClick(marker, r, g) {
     showRecord(r);
-    // ป๊อปอัปบนแผนที่โชว์ข้อมูลหลักอยู่แล้ว แต่กฎที่พบและที่มาของคะแนนอยู่ในแผงด้านล่าง
-    // ถ้าไม่สลับแท็บให้ ข้อมูลจะเปลี่ยนไปเงียบ ๆ โดยผู้ใช้ไม่เห็น
-    if (typeof setGisPane === 'function') setGisPane('detail');
     if (isSheetMode()) {
       map.closePopup();
       highlightRecord(r);
@@ -2346,11 +2183,7 @@ const App = (() => {
     const t = e.target.closest('[data-map-pick],[data-cluster-zoom],[data-cluster-spider],[data-cluster-all],[data-cluster-cart],[data-sheet-back]');
     if (!t) return;
     const d = t.dataset, ac = state.map.activeCluster;
-    if (d.mapPick) {
-      pickRecord(recordByCartKey(d.mapPick));
-      // เหมือนกับคลิกจากรายการ: ต้องพาไปแท็บ "รายละเอียด" ให้เอง (ไม่มีผลบนมือถือที่ใช้แผ่นข้อมูลแยกอยู่แล้ว)
-      if (typeof setGisPane === 'function') setGisPane('detail');
-    }
+    if (d.mapPick) pickRecord(recordByCartKey(d.mapPick));
     else if ('sheetBack' in d) { highlightRecord(null); openSheetList(); }
     else if (!ac) return;
     else if ('clusterZoom' in d) {
@@ -2560,7 +2393,6 @@ const App = (() => {
     map.on('popupclose', () => { if (!isSheetMode()) highlightRecord(null); });
 
     U.$('mapChipFilter').addEventListener('click', () => {
-      applyFilterHidden(false);   // เผื่อผู้ใช้ซ่อนทั้งแถบไว้ ต้องเรียกกลับมาก่อนจึงจะย่อ/แก้ได้
       applyFilterCollapse(false);
       const body = U.$('gfBody');
       (body.closest('section, .filter-bar, .cardx') || body).scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -2941,19 +2773,10 @@ ${placemarks.join('\n')}
     return 2 * R * Math.asin(Math.sqrt(h));
   }
 
-  /** เงื่อนไขเดียวที่ทุกที่ใช้ร่วมกันว่าจุดหนึ่งจะขึ้นบนแผนที่ไหม
-   *  ถ้าแยกกันเขียน การซ่อนจะไปมีผลบางที่ไม่มีผลบางที่ แล้วตัวเลขในแผงจะไม่ตรงกับหมุด */
-  function mapPointShown(r) {
-    if (r.lat === null || r.lon === null) return false;
-    if (state.map.hideShared && r.geo_quality === 'shared') return false;
-    const ex = stackedExactSet();
-    if (ex && ex.has(`${r.lat.toFixed(6)},${r.lon.toFixed(6)}`)) return false;
-    return true;
-  }
-
   /** จุดที่วาดบนแผนที่ ณ ตอนนี้ (ตัวกรอง เดือน และการซ่อนพิกัดร่วม) — ใช้เป็นฐานของทุกเครื่องมือ */
   function mapGeoRows() {
-    return mapRowsForDisplay().filter(mapPointShown);
+    return mapRowsForDisplay().filter(r => r.lat !== null && r.lon !== null &&
+      !(state.map.hideShared && r.geo_quality === 'shared'));
   }
 
   function normalCdf(z) {
@@ -3334,11 +3157,6 @@ ${placemarks.join('\n')}
 
   let footprintLayer = null;
   let footprintBaseline = null;
-  let fpTimer = null;
-
-  /* สีประจำรายเวลาเทียบหลายราย — ต่างเฉดพอให้แยกออกทั้งจอสว่างและจอมืด */
-  const FP_COLORS = ['#C2410C', '#1D4ED8', '#047857', '#86198F'];
-  const FP_MAX = 4;
 
   function convexHull(points) {
     const pts = points.map(p => ({ p, xy: toKm(p[0], p[1]) })).sort((a, b) => a.xy[0] - b.xy[0] || a.xy[1] - b.xy[1]);
@@ -3350,111 +3168,24 @@ ${placemarks.join('\n')}
     return [...lower.slice(0, -1), ...upper.slice(0, -1)].map(x => x.p);
   }
 
-  /** ฐานข้อมูลที่รอยเท้าใช้ — เดิมใช้ state.records เสมอ ทำให้ตัวเลขในแผงไม่ตรงกับหมุดบนแผนที่
-   *  ตอนที่มีตัวกรองเปิดอยู่ ตอนนี้ผู้ใช้เลือกเองได้ว่าจะดู "ทั้งชุด" หรือ "เฉพาะที่กรองอยู่" */
-  const fpRows = () => (state.map.fp.scope === 'filtered' ? state.filtered : state.records);
-
-  const fpMonthsOf = rows => [...new Set(rows.map(r => U.monthKey(r.contract_date)).filter(m => m !== null))].sort();
-
-  /** ศูนย์กลางถ่วงน้ำหนักด้วยมูลค่า — ตอบคำถามคนละข้อกับมัธยฐาน
-   *  มัธยฐาน = "ปกติทำงานแถวไหน" · ถ่วงมูลค่า = "เงินก้อนใหญ่อยู่แถวไหน" */
-  function fpWeightedCenter(rows) {
-    let sw = 0, la = 0, lo = 0;
-    for (const r of rows) { const w = Math.max(1, r.contract_price_agree || 0); sw += w; la += r.lat * w; lo += r.lon * w; }
-    return sw ? [la / sw, lo / sw] : null;
-  }
-
-  const FP_KINDS = {
-    contractor: { field: 'winner_key', nameOf: r => r.winner_name, label: 'ผู้รับจ้าง',
-      mixField: r => r.dept_name || r.dept_key, mixLabel: 'หน่วยงาน', mixKey: r => r.dept_key },
-    dept: { field: 'dept_key', nameOf: r => r.dept_name || r.dept_key, label: 'หน่วยงาน',
-      mixField: r => r.winner_name || r.winner_key, mixLabel: 'ผู้รับจ้าง', mixKey: r => r.winner_key },
-  };
-
-  /** รอยเท้าใช้ได้สองทาง: ของผู้รับจ้าง (งานของรายนี้อยู่ที่ไหนบ้าง)
-   *  และกลับด้านเป็นของหน่วยงาน (หน่วยงานนี้กระจายงานไปที่ไหน ให้ใคร)
-   *  โครงเดียวกันทั้งหมด ต่างแค่ฟิลด์ที่ใช้กรองกับมิติที่เอามาแจกแจงเป็น "ส่วนผสม" */
-  function footprintStats(key, kind = 'contractor') {
-    const cfg = state.map.fp;
-    const K = FP_KINDS[kind] || FP_KINDS.contractor;
-    const all = fpRows().filter(r => r[K.field] === key);
+  function footprintStats(key) {
+    const all = state.records.filter(r => r.winner_key === key);
     const geo = all.filter(r => r.lat !== null && r.lon !== null);
-    // ใช้เงื่อนไขเดียวกับหมุดบนแผนที่ ยกเว้นเรื่องพิกัดใช้ร่วมที่รอยเท้ามีสวิตช์ของตัวเอง
-    const ex = stackedExactSet();
-    const notStacked = r => !ex || !ex.has(`${r.lat.toFixed(6)},${r.lon.toFixed(6)}`);
-    const good = (cfg.shared ? geo : geo.filter(r => r.geo_quality !== 'shared')).filter(notStacked);
-    // ถ้าตัดพิกัดใช้ร่วมออกแล้วเหลือจุดเดียว ภาพจะอ่านไม่ได้เลย จึงตกกลับไปใช้ทั้งหมดเหมือนเดิม
+    const good = geo.filter(r => r.geo_quality !== 'shared');
     const use = good.length >= 2 ? good : geo;
-    const months = fpMonthsOf(use);
-    const base = { key, kind, name: all[0] ? K.nameOf(all[0]) : key, all, geo, use, months, sharedN: geo.length - good.length };
-    if (!use.length) return base;
-
-    const shown = cfg.month ? use.filter(r => { const m = U.monthKey(r.contract_date); return m !== null && m <= cfg.month; }) : use;
-    if (!shown.length) return { ...base, shown, center: null };
-
-    const center = (cfg.center === 'value' && fpWeightedCenter(shown)) || [U.median(shown.map(r => r.lat)), U.median(shown.map(r => r.lon))];
-    const dist = shown.map(r => ({ r, km: haversineKm(center, [r.lat, r.lon]) })).sort((a, b) => a.km - b.km);
+    if (!use.length) return { key, name: all[0]?.winner_name || key, all, geo, use };
+    const center = [U.median(use.map(r => r.lat)), U.median(use.map(r => r.lon))];
+    const dist = use.map(r => ({ r, km: haversineKm(center, [r.lat, r.lon]) })).sort((a, b) => a.km - b.km);
     const kms = dist.map(d => d.km);
-    const medKm = U.median(kms), p90Km = U.quantile(kms, 0.9);
-    // เกณฑ์ "ไกล" สองแบบ: ระยะตายตัว หรือเทียบกับพฤติกรรมของรายนั้นเอง (>3 เท่าของระยะกลางตัวเอง)
-    const farKm = cfg.farMode === 'self' ? Math.max(5, medKm * 3) : cfg.farKm;
-    const hull = convexHull(shown.map(r => [r.lat, r.lon]));
-
-    // ส่วนผสมอีกฝั่ง (หน่วยงานที่จ้าง หรือผู้รับจ้างที่ได้งาน) นับจากสัญญาทั้งหมด ไม่ใช่เฉพาะที่มีพิกัด
-    const mix = [...U.countBy(all, K.mixField)].sort((a, b) => b[1] - a[1]);
+    const hull = convexHull(use.map(r => [r.lat, r.lon]));
     return {
-      ...base, shown, center, dist, medKm, p90Km, farKm, mixLabel: K.mixLabel,
-      zones: kind === 'dept' ? fpZones(shown, K) : null,
-      maxKm: kms[kms.length - 1], far: dist[dist.length - 1].r,
-      overFar: kms.filter(k => k > farKm).length,
-      value: shown.reduce((s, r) => s + (r.contract_price_agree || 0), 0),
-      provinces: [...U.countBy(shown, r => r.province)].sort((a, b) => b[1] - a[1]),
-      mix, topShare: mix.length ? mix[0][1] / all.length : 0,
-      mixN: mix.length,
+      key, name: all[0].winner_name, all, geo, use, center, dist,
+      medKm: U.median(kms), p90Km: U.quantile(kms, 0.9), maxKm: kms[kms.length - 1], far: dist[dist.length - 1].r,
+      over100: kms.filter(k => k > 100).length,
+      provinces: [...U.countBy(use, r => r.province)].sort((a, b) => b[1] - a[1]),
+      agencies: new Set(use.map(r => r.dept_key)).size,
       hullKm2: hull.length >= 3 ? areaKm2({ kind: 'polygon', points: hull }) : 0, hull,
     };
-  }
-
-  /** หน่วยงานนี้ "แบ่งพื้นที่" ให้ผู้รับจ้างหรือไม่
-   *  เทียบระยะสองอย่าง: งานของผู้รับจ้างรายเดียวกันอยู่ห่างกันแค่ไหน (ภายในราย)
-   *  กับศูนย์กลางของผู้รับจ้างต่างรายห่างกันแค่ไหน (ข้ามราย)
-   *  ข้ามราย > ภายในราย มาก ๆ = ต่างคนต่างมีโซนของตัวเอง · ใกล้เคียงกัน = ทำงานปนกันทั้งพื้นที่
-   *  ★ ข้อจำกัดที่ต้องบอก: หน่วยงานที่มีงานทั้งประเทศจะได้ค่าสูงเองโดยไม่ได้แปลว่าแบ่งโซนกัน
-   *  (วัดแล้ว กรมการปกครอง ได้ 189 เท่า เพราะงานอยู่คนละภาค ไม่ใช่เพราะจัดสรรพื้นที่) */
-  function fpZones(rows, K) {
-    const byW = new Map();
-    for (const r of rows) {
-      const k = K.mixKey(r);
-      let v = byW.get(k);
-      if (!v) byW.set(k, v = { name: K.mixField(r), rows: [] });
-      v.rows.push(r);
-    }
-    const big = [...byW.values()].filter(v => v.rows.length >= 2);
-    if (big.length < 2) return null;
-    const within = [], centers = [];
-    for (const v of big) {
-      const c = [U.median(v.rows.map(r => r.lat)), U.median(v.rows.map(r => r.lon))];
-      centers.push({ c, name: v.name, n: v.rows.length });
-      within.push(...v.rows.map(r => haversineKm(c, [r.lat, r.lon])));
-    }
-    const between = [];
-    for (let i = 0; i < centers.length; i++) {
-      for (let j = i + 1; j < centers.length; j++) between.push(haversineKm(centers[i].c, centers[j].c));
-    }
-    const w = U.median(within), b = U.median(between);
-    return { players: big.length, withinKm: w, betweenKm: b, ratio: b / Math.max(0.1, w), centers };
-  }
-
-  function fpZonesHTML(f) {
-    const z = f.zones;
-    if (!z) return '';
-    const territorial = z.ratio >= 2;
-    return `<p class="ma-note fp-zone">
-      ${territorial ? '🧩' : '🔀'} ${U.esc(f.mixLabel)} ${U.num(z.players)} รายที่มีงานตั้งแต่ 2 แห่ง ·
-      งานของรายเดียวกันห่างกันกลาง ๆ <b>${fpKm(z.withinKm)} กม.</b> · ศูนย์กลางข้ามรายห่างกัน <b>${fpKm(z.betweenKm)} กม.</b>
-      (${z.ratio >= 10 ? 'มากกว่า ' : ''}${z.ratio.toFixed(1)} เท่า) —
-      ${territorial ? 'แต่ละรายมีโซนของตัวเองค่อนข้างชัด' : 'ทำงานปนกันทั่วพื้นที่ ไม่ได้แบ่งโซน'}
-      ${z.betweenKm > 150 ? '<br><span class="small-muted">หน่วยงานนี้มีงานกระจายทั้งประเทศ ตัวเลขนี้จึงสะท้อนระยะทางมากกว่าการจัดสรรพื้นที่</span>' : ''}</p>`;
   }
 
   /** ค่ากลางของ "ระยะกลางจากศูนย์กลางงาน" ของผู้รับจ้างทั้งหมดที่มีงานมีพิกัด ≥5 แห่ง ใช้เป็นเกณฑ์เทียบ */
@@ -3470,817 +3201,69 @@ ${placemarks.join('\n')}
     return footprintBaseline;
   }
 
-  /** ผู้รับจ้างรายอื่นที่ทำงานอยู่ในพื้นที่เดียวกัน — เรียงรายที่ "ถูกจ้างโดยหน่วยงานเดียวกัน" ขึ้นก่อน
-   *  วัดกับข้อมูลจริงแล้วพบ 772 คู่ที่พื้นที่ทับกันและมีหน่วยงานร่วมกัน จึงเป็นรายการที่มีของให้ดูจริง */
-  function fpNeighbors(f, limit = 10) {
-    if (!f.center) return [];
-    const radius = Math.max(5, f.p90Km || 10);
-    const mine = new Set(f.all.map(r => r.dept_key));
-    const near = new Map();
-    for (const r of fpRows()) {
-      if (r.lat === null || r.lon === null || r.winner_key === f.key) continue;
-      if (!state.map.fp.shared && r.geo_quality === 'shared') continue;
-      if (haversineKm(f.center, [r.lat, r.lon]) > radius) continue;
-      let e = near.get(r.winner_key);
-      if (!e) near.set(r.winner_key, e = { key: r.winner_key, name: r.winner_name, n: 0, value: 0, depts: new Set() });
-      e.n++; e.value += r.contract_price_agree || 0; e.depts.add(r.dept_key);
-    }
-    return [...near.values()]
-      .map(e => ({ ...e, shared: [...e.depts].filter(d => mine.has(d)).length }))
-      .sort((a, b) => b.shared - a.shared || b.n - a.n)
-      .slice(0, limit);
-  }
-
-  const fpAll = () => [state.map.footprint, ...state.map.fpMore].filter(Boolean);
-
-  function mixHex(a, b, t) {
-    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-    const [r1, g1, b1] = p(a), [r2, g2, b2] = p(b);
-    const h2 = v => Math.round(v).toString(16).padStart(2, '0');
-    return '#' + h2(r1 + (r2 - r1) * t) + h2(g1 + (g2 - g1) * t) + h2(b1 + (b2 - b1) * t);
-  }
-
-  /** สีของจุดในรอยเท้า: เทียบหลายราย = สีประจำราย · รายเดียว = ตามที่เลือก (สีแผนที่/เวลา/ระยะ) */
-  function fpDotColor(r, km, f, idx, multi) {
-    if (multi) return FP_COLORS[idx % FP_COLORS.length];
-    const cfg = state.map.fp;
-    // รอยเท้าหน่วยงานตอบคำถามว่า "ใครได้งานตรงไหน" สีจึงต้องเป็นของผู้รับจ้าง ไม่ใช่คะแนนความเสี่ยง
-    if (f.kind === 'dept' && cfg.color === 'map') {
-      const i = f.mix.findIndex(m => m[0] === (r.winner_name || r.winner_key));
-      return i < 0 || i >= 8 ? '#94a3b8' : categoryColor(i, Math.min(8, f.mix.length));
-    }
-    if (cfg.color === 'time' && f.months.length > 1) {
-      const m = U.monthKey(r.contract_date);
-      const i = m === null ? 0 : Math.max(0, f.months.indexOf(m));
-      return mixHex('#FDBA74', '#7C2D12', i / (f.months.length - 1));
-    }
-    if (cfg.color === 'dist') return mixHex('#60A5FA', '#7F1D1D', Math.min(1, km / Math.max(1, f.maxKm)));
-    return colorOf(r).color;
-  }
-
-  function drawOneFootprint(f, idx, multi) {
-    const cfg = state.map.fp;
-    const tone = FP_COLORS[idx % FP_COLORS.length];
-    if (cfg.shape === 'hull' && f.hull.length >= 3) {
-      L.polygon(f.hull, { color: tone, weight: 1.5, dashArray: '4 4', fillColor: tone, fillOpacity: 0.07, interactive: false }).addTo(footprintLayer);
-    } else if (cfg.shape === 'circle' && f.p90Km > 0) {
-      L.circle(f.center, { radius: f.p90Km * 1000, color: tone, weight: 1.5, dashArray: '4 4', fillColor: tone, fillOpacity: 0.06, interactive: false }).addTo(footprintLayer);
-    }
-    if (cfg.spokes) {
-      f.dist.forEach(({ r, km }) => {
-        const isFar = km > f.farKm;
-        L.polyline([f.center, [r.lat, r.lon]], { color: tone, weight: isFar ? 1.6 : 1, opacity: isFar ? 0.85 : 0.35, interactive: false }).addTo(footprintLayer);
-      });
+  function drawFootprint() {
+    if (footprintLayer) { footprintLayer.remove(); footprintLayer = null; }
+    const f = state.map.footprint;
+    if (!f || !f.center) return;
+    footprintLayer = L.featureGroup().addTo(map);
+    if (f.hull.length >= 3) {
+      L.polygon(f.hull, { color: '#C2410C', weight: 1.5, dashArray: '4 4', fillColor: '#FB7A2E', fillOpacity: 0.08, interactive: false }).addTo(footprintLayer);
     }
     f.dist.forEach(({ r, km }) => {
-      // งานที่ไกลกว่า 90% ของงานรายนี้เอง = นอกพื้นที่ปกติของตัวเอง ตีวงประไว้ให้เห็นโดยไม่ต้องอ่านตัวเลข
-      if (km > f.p90Km && km > 1) {
-        L.circleMarker([r.lat, r.lon], { radius: radiusOf(r) + 4, color: tone, weight: 1.5, dashArray: '2 3', fill: false, interactive: false }).addTo(footprintLayer);
-      }
-      L.circleMarker([r.lat, r.lon], {
-        radius: radiusOf(r), color: '#fff', weight: 1.5,
-        fillColor: fpDotColor(r, km, f, idx, multi), fillOpacity: 0.95,
-      })
-        .bindTooltip(`${multi ? `<b>${U.esc(truncate(f.name, 26))}</b><br>` : ''}${U.esc(truncate(r.project_name, 60))} · ${Math.round(km)} กม. จากศูนย์กลาง`, { className: 'hx-tip' })
+      L.polyline([f.center, [r.lat, r.lon]], { color: km > 100 ? '#C2410C' : '#9A3412', weight: km > 100 ? 1.6 : 1, opacity: km > 100 ? 0.85 : 0.45, interactive: false }).addTo(footprintLayer);
+    });
+    f.dist.forEach(({ r, km }) => {
+      const b = Rules.band(r.risk_score);
+      L.circleMarker([r.lat, r.lon], { radius: radiusOf(r), color: '#fff', weight: 1.5, fillColor: b.color, fillOpacity: 0.95 })
+        .bindTooltip(`${U.esc(truncate(r.project_name, 60))} · ${Math.round(km)} กม. จากศูนย์กลาง`, { className: 'hx-tip' })
         .bindPopup(() => popupHTML(r, null), { maxWidth: 300, className: 'map-popup-wrap' })
         .addTo(footprintLayer);
     });
     L.marker(f.center, {
-      icon: L.divIcon({
-        className: 'fp-center',
-        html: `<span style="background:${tone}" title="${U.esc(f.name)} · ${cfg.center === 'value' ? 'ศูนย์กลางถ่วงน้ำหนักด้วยมูลค่า' : 'ค่ามัธยฐานของพิกัดงาน (ไม่ใช่ที่อยู่บริษัท)'}">★</span>`,
-        iconSize: [26, 26],
-      }),
+      icon: L.divIcon({ className: 'fp-center', html: '<span title="ค่ามัธยฐานของพิกัดงาน (ไม่ใช่ที่อยู่บริษัท)">★</span>', iconSize: [26, 26] }),
       interactive: false,
     }).addTo(footprintLayer);
   }
 
-  /** ระหว่างดูรอยเท้า หมุดของสัญญาอื่นอีกห้าพันจุดจะบังเส้นและวงจนอ่านไม่ออก
-   *  จึงซ่อนชั้นอื่นไว้ก่อนเป็นค่าตั้งต้น (ปิดได้ในตัวเลือก) — คำอธิบายสัญลักษณ์และการส่งออกยังคิดจากของจริงเหมือนเดิม */
-  function applyFpFocus() {
-    if (!map || !state.map.footprint || !state.map.fp.focus) return;
-    for (const l of [clusterLayer, pointLayer, heatLayer, hotspotLayer]) {
-      if (l && map.hasLayer(l)) map.removeLayer(l);
-    }
-  }
-
-  function drawFootprint() {
-    if (footprintLayer) { footprintLayer.remove(); footprintLayer = null; }
-    const list = fpAll().filter(f => f.center);
-    if (!list.length) return;
-    footprintLayer = L.featureGroup().addTo(map);
-    const multi = list.length > 1;
-    list.forEach((f, i) => drawOneFootprint(f, i, multi));
-    applyFpFocus();
-  }
-
-  /** คำนวณใหม่ทั้งชุด — เรียกทุกครั้งที่การตั้งค่าหรือไทม์ไลน์เปลี่ยน */
-  function fpRefresh({ fit = false } = {}) {
-    if (state.map.footprint) state.map.footprint = footprintStats(state.map.footprint.key, state.map.footprint.kind);
-    state.map.fpMore = state.map.fpMore.map(f => footprintStats(f.key, f.kind));
+  function showFootprint(key, { fit = true } = {}) {
+    const f = footprintStats(key);
+    state.map.footprint = f;
     drawFootprint();
-    if (fit && footprintLayer) map.flyToBounds(footprintLayer.getBounds(), { padding: [30, 30], maxZoom: 12, duration: 0.7 });
+    if (fit && footprintLayer && f.center) map.flyToBounds(footprintLayer.getBounds(), { padding: [30, 30], maxZoom: 12, duration: 0.7 });
     renderAnalysisPanel();
     updateMapChrome();
-  }
-
-  function showFootprint(key, { fit = true, add = false, kind = 'contractor' } = {}) {
-    if (add && state.map.footprint) {
-      if (state.map.footprint.key === key || state.map.fpMore.some(f => f.key === key)) return;
-      if (state.map.fpMore.length >= FP_MAX - 1) state.map.fpMore.shift();
-      state.map.fpMore.push(footprintStats(key, kind));
-    } else {
-      state.map.footprint = footprintStats(key, kind);
-      state.map.fpMore = [];
-      state.map.fp.month = null;
-      fpStopPlay();
-    }
-    drawFootprint();
-    if (fit && footprintLayer) map.flyToBounds(footprintLayer.getBounds(), { padding: [30, 30], maxZoom: 12, duration: 0.7 });
-    renderAnalysisPanel();
-    updateMapChrome();
-  }
-
-  function fpStopPlay() {
-    if (fpTimer) { clearInterval(fpTimer); fpTimer = null; }
-    state.map.fp.playing = false;
-  }
-
-  function fpTogglePlay() {
-    const f = state.map.footprint;
-    if (!f || f.months.length < 2) return;
-    if (state.map.fp.playing) { fpStopPlay(); renderAnalysisPanel(); return; }
-    state.map.fp.playing = true;
-    state.map.fp.month = f.months[0];
-    fpRefresh();
-    fpTimer = setInterval(() => {
-      const months = state.map.footprint ? state.map.footprint.months : [];
-      const i = months.indexOf(state.map.fp.month);
-      if (i < 0 || i >= months.length - 1) { fpStopPlay(); state.map.fp.month = null; fpRefresh(); return; }
-      state.map.fp.month = months[i + 1];
-      fpRefresh();
-    }, 900);
-  }
-
-  /** ส่งออกรอยเท้าเป็น GeoJSON — จุดงาน + ขอบเขต + ศูนย์กลาง พร้อมที่มาและเงื่อนไขที่ใช้
-   *  งานตรวจสอบต้องอ้างได้ว่าภาพนี้มาจากข้อมูลชุดไหนและตั้งค่าอะไรไว้ */
-  function fpExportGeoJSON() {
-    const list = fpAll().filter(f => f.center);
-    if (!list.length) return 0;
-    const cfg = state.map.fp;
-    const features = [];
-    for (const f of list) {
-      for (const { r, km } of f.dist) {
-        features.push({
-          type: 'Feature', geometry: { type: 'Point', coordinates: [r.lon, r.lat] },
-          properties: {
-            footprint_of: f.name, footprint_kind: f.kind, footprint_key: f.key,
-            project_id: r.project_id, project_name: r.project_name, winner_name: r.winner_name,
-            dept_name: r.dept_name, province: r.province, contract_date: r.contract_date,
-            contract_price_agree: r.contract_price_agree, risk_score: r.risk_score,
-            km_from_center: +km.toFixed(2), beyond_own_p90: km > f.p90Km,
-          },
-        });
-      }
-      if (f.hull.length >= 3) {
-        features.push({
-          type: 'Feature',
-          geometry: { type: 'Polygon', coordinates: [[...f.hull, f.hull[0]].map(p => [p[1], p[0]])] },
-          properties: { footprint_of: f.name, footprint_kind: f.kind, kind: 'footprint_hull', area_km2: Math.round(f.hullKm2) },
-        });
-      }
-      features.push({
-        type: 'Feature', geometry: { type: 'Point', coordinates: [f.center[1], f.center[0]] },
-        properties: {
-          footprint_of: f.name, footprint_kind: f.kind, kind: 'center',
-          method: cfg.center === 'value' ? 'ถ่วงน้ำหนักด้วยมูลค่า' : 'มัธยฐานพิกัดงาน',
-          median_km: +(f.medKm || 0).toFixed(2),
-        },
-      });
-    }
-    downloadBlob(new Blob([JSON.stringify({
-      type: 'FeatureCollection',
-      properties: {
-        source: `${state.dataset.name} · ${U.num(state.records.length)} สัญญา`,
-        exported_at: new Date().toISOString(),
-        scope: cfg.scope === 'filtered' ? 'เฉพาะที่ตัวกรองเลือกอยู่' : 'ทั้งชุดข้อมูล',
-        shared_points_included: cfg.shared,
-        month_cutoff: cfg.month || 'ทั้งหมด',
-        far_threshold_km: cfg.farMode === 'self' ? '3 เท่าของระยะกลางรายนั้น' : cfg.farKm,
-        note: 'ศูนย์กลางคำนวณจากพิกัดงาน ไม่ใช่ที่ตั้งบริษัท',
-      },
-      features,
-    }, null, 1)], { type: 'application/geo+json' }), `footprint-${exportStamp()}.geojson`);
-    return features.length;
-  }
-
-  /* ---------- แผงรอยเท้า ---------- */
-
-  const fpKm = x => (x === null || x === undefined ? '-' : x < 10 ? x.toFixed(1) : U.num(Math.round(x)));
-
-  function fpSettingsHTML() {
-    const c = state.map.fp;
-    const sel = (name, label, opts, val) => `<label>${label}
-      <select class="form-select form-select-sm" data-fp-set="${name}">
-        ${opts.map(([v, t]) => `<option value="${v}"${String(v) === String(val) ? ' selected' : ''}>${t}</option>`).join('')}
-      </select></label>`;
-    return `<details class="ma-how fp-settings"${c.open ? ' open' : ''} data-fp-details="settings"><summary>⚙ ปรับแต่งรอยเท้า</summary>
-      <div class="ma-controls fp-grid">
-        ${sel('scope', 'ฐานข้อมูล', [['all', 'ทั้งชุดข้อมูล'], ['filtered', 'เฉพาะที่กรองอยู่']], c.scope)}
-        ${sel('center', 'ศูนย์กลาง', [['median', 'มัธยฐานพิกัด'], ['value', 'ถ่วงด้วยมูลค่า']], c.center)}
-        ${sel('shape', 'ขอบเขต', [['hull', 'รูปหุ้มงาน'], ['circle', 'วงรัศมี 90%'], ['none', 'ไม่วาด']], c.shape)}
-        ${sel('color', 'สีจุด', [['map', 'ตามแผนที่'], ['time', 'ตามเวลา'], ['dist', 'ตามระยะ']], c.color)}
-        ${sel('farMode', 'นับว่าไกลเมื่อ', [['km', 'เกินระยะที่ตั้ง'], ['self', 'เกิน 3 เท่าของตัวเอง']], c.farMode)}
-        ${c.farMode === 'km' ? `<label>ระยะ (กม.)
-          <input type="number" class="form-control form-control-sm" data-fp-set="farKm" value="${c.farKm}" min="1" max="2000" step="10"></label>` : '<span></span>'}
-      </div>
-      <div class="fp-checks">
-        <label class="form-check-label"><input type="checkbox" class="form-check-input" data-fp-set="spokes"${c.spokes ? ' checked' : ''}> ลากเส้นจากศูนย์กลาง</label>
-        <label class="form-check-label"><input type="checkbox" class="form-check-input" data-fp-set="shared"${c.shared ? ' checked' : ''}> นับพิกัดที่ใช้ร่วมหลายโครงการด้วย</label>
-        <label class="form-check-label"><input type="checkbox" class="form-check-input" data-fp-set="focus"${c.focus ? ' checked' : ''}> ซ่อนหมุดของสัญญาอื่นระหว่างดูรอยเท้า</label>
-      </div>
-    </details>`;
-  }
-
-  /** ส่วนผสมหน่วยงานของผู้รับจ้างรายนี้
-   *  วัดกับข้อมูลจริง: ในบรรดารายที่มีงานพร้อมพิกัดตั้งแต่ 3 แห่ง ครึ่งหนึ่ง (49.5%) ทำงานให้หน่วยงานเดียวล้วน
-   *  ตัวเลขนี้จึงอ่านคู่กับรอยเท้าได้ตรง ๆ ว่า "พื้นที่แคบเพราะลูกค้ารายเดียว" หรือ "แคบทั้งที่มีลูกค้าหลายราย" */
-  function fpDeptMixHTML(f) {
-    if (!f.mix || f.mix.length < 2) return '';
-    const total = f.all.length;
-    const top = f.mix.slice(0, 4);
-    const restN = total - top.reduce((n, d) => n + d[1], 0);
-    // ใช้จานสีเดียวกับหมุดในโหมดรอยเท้าหน่วยงาน แถบกับจุดบนแผนที่จะได้อ่านคู่กันได้
-    const palN = f.kind === 'dept' ? Math.min(8, f.mix.length) : 5;
-    const seg = top.map((d, i) => ({ label: d[0], n: d[1], color: categoryColor(i, palN) }));
-    if (restN > 0) seg.push({ label: `อีก ${f.mix.length - top.length} ${f.mixLabel}`, n: restN, color: 'var(--border-strong)' });
-    return `<div class="fp-mix">
-      <div class="ma-list-title">ส่วนผสม${f.mixLabel} · ${U.num(f.mix.length)} ราย · รายใหญ่สุด ${U.pct(f.topShare, 0)}</div>
-      <div class="ma-bandbar" role="img" aria-label="สัดส่วนสัญญาแยกตามหน่วยงาน">
-        ${seg.map(x => `<i style="width:${(x.n / total * 100).toFixed(1)}%;background:${x.color}" title="${U.esc(x.label)} ${U.num(x.n)} สัญญา"></i>`).join('')}
-      </div>
-      <div class="fp-mix-legend">
-        ${seg.map(x => `<span><i style="background:${x.color}"></i>${U.esc(truncate(x.label, 26))} <b>${U.num(x.n)}</b></span>`).join('')}
-      </div>
-    </div>`;
-  }
-
-  function fpTimelineHTML(f) {
-    if (f.months.length < 2) return '';
-    const c = state.map.fp;
-    const i = c.month ? f.months.indexOf(c.month) : f.months.length - 1;
-    return `<div class="fp-time">
-      <button type="button" class="mp-btn${c.playing ? ' is-on' : ''}" data-fp-play aria-label="${c.playing ? 'หยุดการเล่นตามเวลา' : 'เล่นการขยายพื้นที่ตามเวลา'}">${c.playing ? '⏸' : '▶'}</button>
-      <input type="range" class="form-range" data-fp-month min="0" max="${f.months.length - 1}" value="${i < 0 ? f.months.length - 1 : i}"
-             aria-label="เลือกเดือนที่ต้องการดูรอยเท้าสะสมถึง">
-      <span class="fp-time-label">${c.month ? `ถึง ${U.thaiMonthLabel(c.month)} · ${U.num(f.shown.length)}/${U.num(f.use.length)} งาน` : `ทั้งช่วง ${f.months.length} เดือน`}</span>
-    </div>`;
-  }
-
-  function fpCompareHTML() {
-    const more = state.map.fpMore;
-    const f = state.map.footprint;
-    if (!more.length) return '';
-    return `<div class="fp-cmp">
-      <span class="fp-chip" style="--fpc:${FP_COLORS[0]}">${U.esc(truncate(f.name, 22))}</span>
-      ${more.map((m, i) => `<span class="fp-chip" style="--fpc:${FP_COLORS[(i + 1) % FP_COLORS.length]}">${U.esc(truncate(m.name, 22))}
-        <button type="button" data-fp-drop="${U.esc(m.key)}" aria-label="เอา ${U.esc(m.name)} ออกจากการเทียบ">✕</button></span>`).join('')}
-      <button type="button" class="mp-btn" data-fp-clearcmp>ล้างการเทียบ</button>
-    </div>`;
-  }
-
-  /** รายชื่อผู้รับจ้างของหน่วยงานนี้ในพื้นที่ กดเพื่อซ้อนรอยเท้าของรายนั้นทับลงไป */
-  function fpPlayersHTML(f) {
-    if (f.kind !== 'dept' || !f.mix || f.mix.length < 2) return '';
-    const byName = new Map();
-    for (const r of f.all) byName.set(r.winner_name || r.winner_key, r.winner_key);
-    const palN = Math.min(8, f.mix.length);
-    return `<details class="ma-list fp-neigh"${state.map.fp.neighOpen ? ' open' : ''} data-fp-details="neigh">
-      <summary class="ma-list-title">ผู้รับจ้างของหน่วยงานนี้ (${U.num(f.mix.length)} ราย)</summary>
-      ${f.mix.slice(0, 12).map(([name, n], i) => {
-        const key = byName.get(name) || name;
-        const on = state.map.fpMore.some(m => m.key === key);
-        return `<button type="button" class="ma-row${on ? ' is-on' : ''}" data-fp-add="${U.esc(key)}" aria-pressed="${on}"
-          title="${on ? 'เอารายนี้ออกจากการเทียบ' : 'ซ้อนรอยเท้าของรายนี้ทับลงไป'}">
-          <i style="background:${i < palN ? categoryColor(i, palN) : 'var(--border-strong)'}"></i>
-          <span>${U.esc(truncate(name, 34))}</span>
-          <b>${U.num(n)} สัญญา</b>
-          <em>${U.pct(n / f.all.length, 0)}</em></button>`;
-      }).join('')}
-      <p class="ma-note">สีตรงกับหมุดบนแผนที่ (8 รายแรก) กดเพื่อดูว่ารายนั้นรับงานที่ไหนบ้าง รวมงานของหน่วยงานอื่นด้วย</p>
-    </details>`;
-  }
-
-  function fpNeighborHTML(f) {
-    if (f.kind === 'dept') return fpPlayersHTML(f);
-    const list = fpNeighbors(f);
-    if (!list.length) return '';
-    const withDept = list.filter(n => n.shared).length;
-    return `<details class="ma-list fp-neigh"${state.map.fp.neighOpen ? ' open' : ''} data-fp-details="neigh"><summary class="ma-list-title">ใครทำงานอยู่แถวนี้อีก (${U.num(list.length)} ราย${withDept ? ` · ${withDept} รายถูกจ้างโดยหน่วยงานเดียวกัน` : ''})</summary>
-      ${list.map(n => {
-        const on = state.map.fpMore.some(m => m.key === n.key);
-        const tone = on ? FP_COLORS[(state.map.fpMore.findIndex(m => m.key === n.key) + 1) % FP_COLORS.length] : (n.shared ? 'var(--sev-3)' : 'var(--border-strong)');
-        return `<button type="button" class="ma-row${on ? ' is-on' : ''}" data-fp-add="${U.esc(n.key)}" aria-pressed="${on}"
-          title="${on ? 'เอารายนี้ออกจากการเทียบ' : 'ซ้อนรอยเท้าของรายนี้ทับลงไป'}">
-        <i style="background:${tone}"></i>
-        <span>${U.esc(truncate(n.name, 34))}</span>
-        <b>${U.num(n.n)} งาน</b>
-        <em>${n.shared ? `หน่วยงานร่วม ${n.shared}` : ''}</em></button>`;
-      }).join('')}
-      <p class="ma-note">ทำงานพื้นที่เดียวกันเป็นเรื่องปกติของธุรกิจรับเหมา สิ่งที่ควรดูคือรายที่ถูกจ้างโดย<b>หน่วยงานเดียวกัน</b>
-        แล้วไม่เคยเสนอราคาแข่งกันเลย</p>
-    </details>`;
   }
 
   function footprintPanelHTML() {
     const f = state.map.footprint;
     if (!f) return '';
     const base = footprintBaselineKm();
-    const cfg = state.map.fp;
-    const lock = f.kind === 'contractor' && f.topShare >= 0.999 && f.all.length >= 5;
+    const km = x => (x === null || x === undefined ? '-' : x < 10 ? x.toFixed(1) : U.num(Math.round(x)));
     return `<section class="ma-card is-footprint" aria-labelledby="maFpTitle">
-      <div class="ma-head"><h3 id="maFpTitle">👣 รอยเท้า${f.kind === 'dept' ? 'หน่วยงาน' : 'ผู้รับจ้าง'}</h3>
-        <button type="button" class="ma-close" data-fp-clear aria-label="ปิดรอยเท้า">✕</button></div>
-      <p class="ma-title">${clickable(f.kind === 'dept' ? 'agency' : 'contractor', f.key, truncate(f.name, 60))}</p>
-      ${!f.center ? `<p class="ma-note">${f.use.length
-        ? 'ช่วงเวลาที่เลือกยังไม่มีงานของรายนี้ ลองเลื่อนแถบเวลาไปทางขวา'
-        : `ผู้รับจ้างรายนี้มี ${U.num(f.all.length)} สัญญา แต่ไม่มีพิกัดงานในข้อมูล${f.sharedN ? ` (มี ${U.num(f.sharedN)} จุดที่เป็นพิกัดใช้ร่วม เปิดดูได้ในตัวเลือกด้านล่าง)` : ''}`}</p>
-        ${fpSettingsHTML()}` : `
+      <div class="ma-head"><h3 id="maFpTitle">👣 รอยเท้าผู้รับจ้าง</h3>
+        <button type="button" class="ma-close" data-fp-clear aria-label="ปิดรอยเท้าผู้รับจ้าง">✕</button></div>
+      <p class="ma-title">${clickable('contractor', f.key, truncate(f.name, 60))}</p>
+      ${!f.center ? `<p class="ma-note">ผู้รับจ้างรายนี้มี ${U.num(f.all.length)} สัญญา แต่ไม่มีพิกัดงานในข้อมูล</p>` : `
         <div class="ma-kpis">
-          <div><span>งานมีพิกัด</span><b>${U.num(f.shown.length)}</b><em>จาก ${U.num(f.all.length)} สัญญา</em></div>
-          ${f.kind === 'dept'
-            // เกณฑ์ "ระยะกลาง" ตั้งไว้เทียบผู้รับจ้าง หน่วยงานระดับประเทศย่อมได้ค่าสูงอยู่แล้วโดยไม่มีความหมาย
-            // จึงเปลี่ยนเป็นตัวเลขที่ตอบคำถามของฝั่งหน่วยงานแทน: จ้างใครบ้าง กระจุกที่รายเดียวไหม กระจายกี่จังหวัด
-            ? `<div class="${f.topShare > 0.5 && f.all.length >= 5 ? 'is-warn' : ''}"><span>ผู้รับจ้าง</span><b>${U.num(f.mixN)} ราย</b><em>รายใหญ่สุด ${U.pct(f.topShare, 0)}</em></div>
-               <div><span>กระจายใน</span><b>${U.num(f.provinces.length)} จังหวัด</b><em>${U.num(Math.round(f.hullKm2))} ตร.กม.</em></div>`
-            : `<div class="${base.km && f.shown.length >= 5 && f.medKm > base.km * 3 ? 'is-warn' : ''}"><span>ระยะกลางจากศูนย์กลาง</span><b>${fpKm(f.medKm)} กม.</b><em>ทั่วไป ${fpKm(base.km)} กม.</em></div>
-               <div class="${f.overFar ? 'is-warn' : ''}"><span>ไกลกว่า ${fpKm(f.farKm)} กม.</span><b>${U.num(f.overFar)}</b><em>ไกลสุด ${fpKm(f.maxKm)} กม.</em></div>`}
+          <div><span>งานมีพิกัด</span><b>${U.num(f.use.length)}</b><em>จาก ${U.num(f.all.length)} สัญญา</em></div>
+          <div class="${base.km && f.use.length >= 5 && f.medKm > base.km * 3 ? 'is-warn' : ''}"><span>ระยะกลางจากศูนย์กลาง</span><b>${km(f.medKm)} กม.</b><em>ทั่วไป ${km(base.km)} กม.</em></div>
+          <div class="${f.over100 ? 'is-warn' : ''}"><span>ไกลกว่า 100 กม.</span><b>${U.num(f.over100)}</b><em>ไกลสุด ${km(f.maxKm)} กม.</em></div>
         </div>
-        ${lock ? `<p class="fp-lock">⚠ งานทั้ง ${U.num(f.all.length)} สัญญาของรายนี้มาจากหน่วยงานเดียว —
-          ${U.esc(truncate(f.mix[0][0], 44))}</p>` : fpDeptMixHTML(f)}
-        ${fpZonesHTML(f)}
-        ${fpTimelineHTML(f)}
-        <p class="ma-note">พื้นที่ครอบคลุม ${U.num(Math.round(f.hullKm2))} ตร.กม. · ${U.num(f.mixN)} ${U.esc(f.mixLabel)} · มูลค่าที่แสดง ${U.money(f.value)} ·
-          จังหวัด: ${f.provinces.slice(0, 4).map(([p, n]) => `${U.esc(p || '-')} ${n}`).join(', ')}${f.provinces.length > 4 ? ` และอีก ${f.provinces.length - 4}` : ''}</p>
-        ${fpCompareHTML()}
-        ${f.overFar && f.kind !== 'dept' ? `<div class="ma-list"><div class="ma-list-title">งานที่อยู่ไกลที่สุด</div>
-          ${f.dist.slice(-3).reverse().map(({ r, km: k }) => `<div class="ma-li">${clickable('project', r.project_id, truncate(r.project_name, 40))} <b>${fpKm(k)} กม.</b></div>`).join('')}</div>` : ''}
-        ${fpNeighborHTML(f)}
+        <p class="ma-note">พื้นที่ครอบคลุม ${U.num(Math.round(f.hullKm2))} ตร.กม. · ${U.num(f.agencies)} หน่วยงาน ·
+          จังหวัดของหน่วยงาน: ${f.provinces.slice(0, 4).map(([p, n]) => `${U.esc(p)} ${n}`).join(', ')}${f.provinces.length > 4 ? ` และอีก ${f.provinces.length - 4}` : ''}</p>
+        ${f.over100 ? `<div class="ma-list"><div class="ma-list-title">งานที่อยู่ไกลที่สุด</div>
+          ${f.dist.slice(-3).reverse().map(({ r, km: k }) => `<div class="ma-li">${clickable('project', r.project_id, truncate(r.project_name, 40))} <b>${km(k)} กม.</b></div>`).join('')}</div>` : ''}
         <div class="ma-actions">
           <button type="button" class="mp-btn" data-fp-fit>⤢ ซูมพอดี</button>
-          <button type="button" class="mp-btn" data-fp-cart>🛒 ใส่ตะกร้า ${U.num(fpAll().reduce((n, x) => n + x.all.length, 0))}</button>
-          <button type="button" class="mp-btn" data-fp-export title="จุดงาน + ขอบเขต + ศูนย์กลาง พร้อมเงื่อนไขที่ใช้">🗺 ส่งออก GeoJSON</button>
+          <button type="button" class="mp-btn" data-fp-cart>🛒 ใส่ตะกร้า ${U.num(f.all.length)}</button>
           <button type="button" class="mp-btn is-ai" data-fp-ai>✨ ถาม AI</button>
         </div>
-        ${fpSettingsHTML()}
         <details class="ma-how"><summary>อ่านภาพนี้อย่างไร</summary>
-          ★ คือ${cfg.center === 'value' ? 'ศูนย์กลางถ่วงน้ำหนักด้วยมูลค่าสัญญา' : 'ค่ามัธยฐานของพิกัดงานทั้งหมด'} (ข้อมูลไม่มีที่อยู่บริษัท) ·
-          วงประรอบหมุดคืองานที่ไกลกว่า 90% ของงานรายนี้เอง ·
-          ${f.kind === 'dept'
-            ? `สีของหมุดคือผู้รับจ้าง 8 รายแรกของหน่วยงานนี้ ที่เหลือเป็นสีเทา ·
-               ใช้ดูว่างานของหน่วยงานกระจุกอยู่กับใครและตรงไหน · กดชื่อผู้รับจ้างในรายการเพื่อซ้อนรอยเท้าของรายนั้น
-               ซึ่งจะเห็นงานที่เขารับจากหน่วยงานอื่นด้วย`
-            : `"ระยะกลางทั่วไป" คือค่ากลางของผู้รับจ้าง ${U.num(base.n)} รายที่มีงานมีพิกัดตั้งแต่ 5 แห่ง ·
-               <b>ระยะทางกับคะแนนความเสี่ยงแทบไม่สัมพันธ์กันในชุดนี้</b> (งานไกลเกิน 100 กม. เฉลี่ย 31.2 คะแนน · งานใกล้ 30.2)
-               การรับงานไกลจึงไม่ใช่ข้อกล่าวหาในตัวเอง แต่ถ้าผู้รับจ้างรายเล็กชนะงานกระจายทั่วประเทศ ควรตรวจว่าทำงานเองหรือส่งต่อ`}
+          ★ คือค่ามัธยฐานของพิกัดงานทั้งหมด (ข้อมูลไม่มีที่อยู่บริษัท) เส้นสีเข้มคืองานที่ไกลจากศูนย์กลางเกิน 100 กม. ·
+          "ระยะกลางทั่วไป" คือค่ากลางของผู้รับจ้าง ${U.num(base.n)} รายที่มีงานมีพิกัดตั้งแต่ 5 แห่ง ·
+          การรับงานไกลไม่ใช่ความผิด แต่ถ้าผู้รับจ้างรายเล็กชนะงานกระจายทั่วประเทศ ควรตรวจว่าทำงานเองหรือส่งต่อ
         </details>`}
     </section>`;
-  }
-
-  /* ---------- ⑩ จุดเดียวหลายสัญญา ---------- */
-
-  const stack = { tab: 'exact', groups: null, sig: '' };
-
-  function stackGroups() {
-    const sig = `${state.filtered.length}|${JSON.stringify(state.filters)}`;
-    if (stack.sig === sig && stack.groups) return stack.groups;
-    stack.groups = Analytics.stackedPoints(state.filtered, { minContracts: 3, limit: 80 });
-    stack.sig = sig;
-    return stack.groups;
-  }
-
-  function renderMapStack() {
-    if (!U.$('mapStackBody')) return;
-    const all = stackGroups();
-    const exact = all.filter(g => g.kind === 'exact');
-    const cluster = all.filter(g => g.kind === 'cluster');
-    const rows = stack.tab === 'exact' ? exact : cluster;
-
-    document.querySelectorAll('[data-stack-tab]').forEach(b => {
-      const on = b.dataset.stackTab === stack.tab;
-      b.classList.toggle('is-on', on);
-      b.setAttribute('aria-selected', String(on));
-    });
-
-    const sumRows = g => g.reduce((n, x) => n + x.n, 0);
-    const sumVal = g => g.reduce((n, x) => n + x.value, 0);
-    const head = stack.tab === 'exact'
-      ? `<div class="stack-head">
-          <div class="ma-kpis">
-            <div class="${exact.length ? 'is-warn' : ''}"><span>จุดที่พิกัดตรงกันเป๊ะ</span><b>${U.num(exact.length)}</b><em>ตั้งแต่ 3 สัญญาขึ้นไป</em></div>
-            <div><span>สัญญาที่ได้รับผลกระทบ</span><b>${U.num(sumRows(exact))}</b><em>${U.pct(sumRows(exact) / Math.max(1, state.filtered.length), 2)} ของที่กรองอยู่</em></div>
-            <div><span>มูลค่ารวม</span><b>${U.money(sumVal(exact))}</b><em>ปักอยู่จุดเดียว</em></div>
-          </div>
-          ${exact.length ? `<label class="form-check-label stack-hide">
-            <input type="checkbox" class="form-check-input" id="mapHideStacked"${state.map.hideStacked ? ' checked' : ''}>
-            ซ่อนจุดเหล่านี้ออกจากแผนที่ (มีผลกับหมุด จุดร้อน และรอยเท้า)</label>` : ''}
-        </div>`
-      : `<p class="small-muted mb-2">จุดที่อยู่ในรัศมีราว 550 เมตรเดียวกัน ตั้งแต่ 3 สัญญาขึ้นไป และเป็นคนละพิกัดกัน
-          พบ ${U.num(cluster.length)} จุด · รวม ${U.num(sumRows(cluster))} สัญญา · ${U.money(sumVal(cluster))}</p>`;
-
-    if (!rows.length) {
-      U.setHTML('mapStackBody', head + U.emptyState(stack.tab === 'exact'
-        ? 'ไม่พบพิกัดที่ซ้ำกันเป๊ะตั้งแต่ 3 สัญญาขึ้นไป ในขอบเขตที่กรองอยู่'
-        : 'ไม่พบจุดที่มีงานซ้ำหลายสัญญา ในขอบเขตที่กรองอยู่'));
-      return;
-    }
-
-    U.setHTML('mapStackBody', head + `
-      <div class="stack-list" role="list">
-        ${rows.slice(0, 25).map((g, i) => `
-        <div class="stack-row" role="listitem">
-          <div class="stack-main">
-            <div class="stack-title">${U.esc(truncate(g.depts[0][0], 34))}${g.depts.length > 1 ? ` +${g.depts.length - 1}` : ''}
-              <span class="stack-prov">${U.esc(g.province || '-')}</span></div>
-            <div class="stack-meta">${U.num(g.n)} สัญญา · ${U.num(g.winners.length)} ผู้รับจ้าง ·
-              ${g.kind === 'exact' ? 'พิกัดเดียวกันทุกฉบับ' : `${U.num(g.nCoords)} พิกัด`}
-              ${g.firstDate ? ` · ${U.thaiDate(g.firstDate)}${g.lastDate !== g.firstDate ? ` ถึง ${U.thaiDate(g.lastDate)}` : ''}` : ''}</div>
-            <div class="stack-sample">${U.esc(truncate(g.rows[0].project_name, 62))}</div>
-          </div>
-          <div class="stack-val">${U.money(g.value)}</div>
-          <div class="stack-act">
-            <button type="button" class="mp-btn" data-stack-zoom="${i}" title="ซูมแผนที่ไปยังจุดนี้">⌖ ซูม</button>
-            <button type="button" class="mp-btn" data-stack-cart="${i}" title="ใส่สัญญาทั้งหมดที่จุดนี้ลงตะกร้า">🛒 ${U.num(g.n)}</button>
-          </div>
-        </div>`).join('')}
-      </div>
-      ${rows.length > 25 ? `<p class="small-muted mt-2">แสดง 25 จุดแรกจาก ${U.num(rows.length)} จุด</p>` : ''}
-      <details class="ma-how mt-2"><summary>อ่านรายการนี้อย่างไร</summary>
-        ${stack.tab === 'exact'
-          ? `ETL มีกติกาอยู่แล้วว่าพิกัดเดียวกันที่ใช้กับงาน "ชื่อต่างกันตั้งแต่ 3 แบบ" ให้ถือเป็นพิกัดใช้ร่วม (ซ่อนได้จากแผงตัวเลือก) ·
-             แต่กลุ่มในรายการนี้ชื่องานเกือบเหมือนกันหมด จึงรอดกติกานั้นมาและยังถ่วงแผนที่อยู่ ·
-             ตัวอย่างที่ชัดที่สุดในชุดข้อมูลหลักคือ 13 สัญญาของผู้รับจ้าง 13 รายรวม 2,305 ล้านบาท
-             ปักที่จุดเดียวกันในกรุงเทพฯ ทั้งที่ชื่องานเป็นระบบประปาบาดาลคนละแห่ง ·
-             <b>นี่เป็นปัญหาคุณภาพพิกัด ไม่ใช่สัญญาณทุจริต</b> ใช้เพื่อรู้ว่าแผนที่เชื่อได้แค่ไหน และเพื่อแจ้งกลับต้นทางข้อมูล`
-          : `จุดเหล่านี้เป็นสถานที่จริงที่มีงานหลายสัญญา · <b>วัดแล้วพบว่าส่วนใหญ่เป็นย่านที่มีงานหนาแน่นตามปกติ</b>
-             เช่น งานวางท่อของการประปานครหลวงในกรุงเทพฯ ไม่ใช่การผลัดกันรับงานที่จุดเดียว ·
-             สิ่งที่ควรดูคือจุดที่ <b>หน่วยงานเดียว</b> จ้างงานชื่อคล้ายกันซ้ำในเวลาไล่เลี่ยกัน ซึ่งอาจเป็นการแบ่งซอยสัญญา
-             (กฎ R10 จับจากวันที่กับมูลค่าอยู่แล้ว ข้อนี้เพิ่มมุมที่ตั้งเข้าไป)`}
-      </details>`);
-  }
-
-  /* ---------- แผงข้อมูลใต้แผนที่ (รายการ · รายละเอียด · สัญญาณ · คะแนน · จุดซ้ำ) ---------- */
-
-  function setGisPane(name) {
-    document.querySelectorAll('[data-gis-tab]').forEach(b => {
-      const on = b.dataset.gisTab === name;
-      b.classList.toggle('is-on', on);
-      b.setAttribute('aria-selected', String(on));
-    });
-    document.querySelectorAll('[data-gis-pane]').forEach(p => { p.hidden = p.dataset.gisPane !== name; });
-    state.map.gisPane = name;
-    // Plotly วัดขนาดตอนวาด ถ้าวาดตอนแผงถูกซ่อนอยู่กราฟจะกว้าง 0
-    if (name === 'score' && window.Plotly) Plotly.Plots.resize(U.$('waterfall'));
-    if (name === 'stack') renderMapStack();
-  }
-
-  function wireGisPanel() {
-    const panel = U.$('gisPanel');
-    if (!panel) return;
-    panel.addEventListener('click', e => {
-      const tab = e.target.closest('[data-gis-tab]');
-      if (tab) { setGisPane(tab.dataset.gisTab); return; }
-      if (e.target.closest('#gisPanelToggle')) {
-        const on = panel.classList.toggle('is-min');
-        U.$('gisPanelToggle').setAttribute('aria-expanded', String(!on));
-        U.$('gisPanelToggle').textContent = on ? '▴' : '▾';
-        setTimeout(() => map && map.invalidateSize(), 220);
-      }
-    });
-  }
-
-  function wireMapStack() {
-    const body = U.$('mapStackBody');
-    if (!body) return;
-    const card = body.closest('.gis-panel') || body.closest('.cardx');
-    card.addEventListener('click', e => {
-      const tab = e.target.closest('[data-stack-tab]');
-      if (tab) { stack.tab = tab.dataset.stackTab; renderMapStack(); return; }
-      const t = e.target.closest('[data-stack-zoom],[data-stack-cart]');
-      if (!t) return;
-      const rows = stackGroups().filter(g => g.kind === stack.tab);
-      const g = rows[Number(t.dataset.stackZoom ?? t.dataset.stackCart)];
-      if (!g) return;
-      if (t.dataset.stackCart !== undefined) { addManyToCart(g.rows); return; }
-      map.flyTo([g.lat, g.lon], 17, { duration: 0.7 });
-      U.$('mapCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
-    });
-    card.addEventListener('change', e => {
-      if (e.target.id !== 'mapHideStacked') return;
-      state.map.hideStacked = e.target.checked;
-      stackExactCache = null;
-      updateMapLayers(mapRowsForDisplay());
-      if (state.map.footprint) fpRefresh();
-      renderMapStack();
-    });
-  }
-
-  /** เซ็ตพิกัดที่ต้องซ่อน คำนวณครั้งเดียวต่อชุดข้อมูล ไม่ผูกกับตัวกรอง
-   *  เพราะถ้าผูก การกรองจังหวัดเดียวจะทำให้กลุ่มไม่ถึง 3 สัญญาแล้วจุดโผล่กลับมาเอง */
-  let stackExactCache = null;
-  function stackedExactSet() {
-    if (!state.map.hideStacked) return null;
-    if (!stackExactCache) stackExactCache = Analytics.stackedExactKeys(state.records, { minContracts: 3 });
-    return stackExactCache;
-  }
-
-  /* ---------- ⑪ ชั้นข้อมูลที่ผู้ใช้นำเข้าเอง ---------- */
-
-  const LAYER_COLORS = ['#7C3AED', '#0891B2', '#CA8A04', '#BE185D', '#15803D', '#B45309'];
-  const userLayers = [];            // {id, name, kind, color, opacity, visible, layer, n, bounds, note}
-  let layerSeq = 0;
-
-  /** โหลดไลบรารีเมื่อจำเป็นเท่านั้น รูปแบบเดียวกับที่ dataio ใช้โหลด SheetJS
-   *  ถ้าโหลดไม่ได้ต้องบอกตรง ๆ ว่าเพราะอะไร ไม่ใช่เงียบแล้วไม่มีอะไรเกิดขึ้น */
-  function loadScriptOnce(src, globalName) {
-    if (window[globalName]) return Promise.resolve(window[globalName]);
-    return new Promise((res, rej) => {
-      const el = document.createElement('script');
-      el.src = src;
-      el.onload = () => (window[globalName] ? res(window[globalName]) : rej(new Error('โหลดไลบรารีแล้วแต่ไม่พบตัวแปรที่ต้องใช้')));
-      el.onerror = () => rej(new Error('โหลดไลบรารีจากอินเทอร์เน็ตไม่สำเร็จ'));
-      document.head.appendChild(el);
-    });
-  }
-
-  /* กรอบประเทศไทยแบบหลวม ๆ ใช้ตรวจว่าพิกัดที่ได้ "อยู่ในโลกจริง" หรือยังเป็นหน่วยเมตรของระบบฉาย */
-  const TH_BOUNDS = { minLat: 5, maxLat: 21.5, minLon: 96, maxLon: 106.5 };
-
-  /** แปลง UTM (โซน 47N/48N บน WGS84) กลับเป็นละติจูด/ลองจิจูด
-   *  ชุดข้อมูล GIS ของไทยส่วนใหญ่ส่งมาเป็น UTM ไม่ใช่ WGS84 องศา ถ้าไม่แปลงจะวางหมุดผิดทั้งชั้น
-   *  สูตรผกผันของ Transverse Mercator (Snyder) — ตรวจกับกรุงเทพฯ แล้วคลาดเคลื่อนต่ำกว่า 1 เมตร */
-  function utmToLatLon(easting, northing, zone) {
-    const a = 6378137, f = 1 / 298.257223563;
-    const e2 = f * (2 - f), e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
-    const k0 = 0.9996;
-    const x = easting - 500000, y = northing;
-    const M = y / k0;
-    const mu = M / (a * (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256));
-    const phi1 = mu
-      + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
-      + (21 * e1 * e1 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
-      + (151 * e1 ** 3 / 96) * Math.sin(6 * mu)
-      + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
-    const ep2 = e2 / (1 - e2);
-    const C1 = ep2 * Math.cos(phi1) ** 2;
-    const T1 = Math.tan(phi1) ** 2;
-    const N1 = a / Math.sqrt(1 - e2 * Math.sin(phi1) ** 2);
-    const R1 = a * (1 - e2) / (1 - e2 * Math.sin(phi1) ** 2) ** 1.5;
-    const D = x / (N1 * k0);
-    const lat = phi1 - (N1 * Math.tan(phi1) / R1) * (D * D / 2
-      - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D ** 4 / 24
-      + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D ** 6 / 720);
-    const lon = (D - (1 + 2 * T1 + C1) * D ** 3 / 6
-      + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D ** 5 / 120) / Math.cos(phi1);
-    return [lat * 180 / Math.PI, (zone * 6 - 183) + lon * 180 / Math.PI];
-  }
-
-  /** เดินทุกพิกัดใน GeoJSON แล้วแปลงด้วยฟังก์ชันที่ให้มา (แก้ในที่) */
-  function mapGeoCoords(geo, fn) {
-    const walk = c => {
-      if (typeof c[0] === 'number') { const [lat, lon] = fn(c[0], c[1]); c[0] = lon; c[1] = lat; return; }
-      c.forEach(walk);
-    };
-    const feats = geo.type === 'FeatureCollection' ? geo.features : [geo];
-    for (const f of feats) {
-      const g = f.type === 'Feature' ? f.geometry : f;
-      if (!g || !g.coordinates) continue;
-      walk(g.coordinates);
-    }
-  }
-
-  /** ช่วงค่าพิกัดของทั้งชั้น ใช้ตัดสินว่าเป็นองศาหรือเมตร และใช้ซูมให้พอดี */
-  function geoExtent(geo) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, n = 0;
-    const walk = c => {
-      if (typeof c[0] === 'number') {
-        n++;
-        minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]);
-        minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]);
-        return;
-      }
-      c.forEach(walk);
-    };
-    const feats = geo.type === 'FeatureCollection' ? (geo.features || []) : [geo];
-    for (const f of feats) {
-      const g = f.type === 'Feature' ? f.geometry : f;
-      if (g && g.coordinates) walk(g.coordinates);
-    }
-    return { minX, maxX, minY, maxY, n };
-  }
-
-  /** ถ้าพิกัดยังเป็นหน่วยเมตร ให้เดาโซน UTM จากค่า northing/easting แล้วแปลงให้
-   *  ไทยอยู่โซน 47N (ตะวันตก) กับ 48N (ตะวันออก) — เลือกโซนที่แปลงแล้วตกในกรอบประเทศ */
-  function reprojectIfNeeded(geo) {
-    const ex = geoExtent(geo);
-    if (!ex.n) return { ok: false, note: 'ไฟล์นี้ไม่มีพิกัดที่อ่านได้' };
-    const looksDegrees = Math.abs(ex.minX) <= 180 && Math.abs(ex.maxX) <= 180 &&
-      Math.abs(ex.minY) <= 90 && Math.abs(ex.maxY) <= 90;
-    if (looksDegrees) {
-      const inThai = ex.minY >= TH_BOUNDS.minLat - 5 && ex.maxY <= TH_BOUNDS.maxLat + 5;
-      return { ok: true, note: inThai ? '' : 'พิกัดอยู่นอกประเทศไทย แสดงตามค่าที่อยู่ในไฟล์' };
-    }
-    for (const zone of [47, 48]) {
-      const test = utmToLatLon(ex.minX, ex.minY, zone);
-      const test2 = utmToLatLon(ex.maxX, ex.maxY, zone);
-      const inTh = [test, test2].every(([la, lo]) =>
-        la >= TH_BOUNDS.minLat && la <= TH_BOUNDS.maxLat && lo >= TH_BOUNDS.minLon && lo <= TH_BOUNDS.maxLon);
-      if (inTh) {
-        mapGeoCoords(geo, (x, y) => utmToLatLon(x, y, zone));
-        return { ok: true, note: `พิกัดในไฟล์เป็นหน่วยเมตร แปลงจาก UTM โซน ${zone}N ให้แล้ว` };
-      }
-    }
-    return { ok: false, note: 'พิกัดในไฟล์ไม่ใช่องศาและแปลงจาก UTM โซน 47N/48N แล้วไม่ตกในประเทศไทย ' +
-      'กรุณาแปลงเป็น WGS84 (EPSG:4326) จาก QGIS ก่อนนำเข้า' };
-  }
-
-  async function parseLayerFile(file) {
-    const name = file.name;
-    const ext = name.toLowerCase().split('.').pop();
-    if (ext === 'geojson' || ext === 'json') {
-      return { geo: JSON.parse(await file.text()), kind: 'GeoJSON' };
-    }
-    if (ext === 'kml' || ext === 'gpx') {
-      await loadScriptOnce('https://cdn.jsdelivr.net/npm/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js', 'toGeoJSON');
-      const doc = new DOMParser().parseFromString(await file.text(), 'text/xml');
-      if (doc.querySelector('parsererror')) throw new Error('ไฟล์ XML เสียหรือไม่ใช่รูปแบบที่รองรับ');
-      return { geo: toGeoJSON[ext === 'kml' ? 'kml' : 'gpx'](doc), kind: ext.toUpperCase() };
-    }
-    if (ext === 'zip' || ext === 'shp') {
-      await loadScriptOnce('https://cdn.jsdelivr.net/npm/shpjs@6.1.0/dist/shp.min.js', 'shp');
-      const buf = await file.arrayBuffer();
-      let out;
-      try {
-        out = ext === 'zip' ? await shp.parseZip(buf) : await shp(buf);
-      } catch (err) {
-        // shpjs โยนข้อความ minified ที่อ่านไม่รู้เรื่อง (เช่น "but-unzip~2") จึงแปลเป็นคำอธิบายที่ใช้ได้จริงแทน
-        throw new Error(ext === 'zip'
-          ? 'เปิดไฟล์ .zip ไม่สำเร็จ ตรวจว่าเป็น shapefile จริง (มี .shp .dbf .prj อยู่ในไฟล์เดียวกัน) และไม่ใช่ zip ที่มีโฟลเดอร์ซ้อนข้างใน'
-          : 'อ่านไฟล์ .shp ไม่สำเร็จ — ไฟล์ .shp เพียงไฟล์เดียวมักขาด .dbf ที่เก็บคุณสมบัติ ลองบีบอัดทั้งชุด (.shp .shx .dbf .prj) เป็น .zip แล้วนำเข้าใหม่');
-      }
-      // shapefile หนึ่งไฟล์ zip อาจมีหลายชั้น ไลบรารีจะคืนเป็น array
-      const geo = Array.isArray(out)
-        ? { type: 'FeatureCollection', features: out.flatMap(x => x.features || []) }
-        : out;
-      return { geo, kind: 'Shapefile' };
-    }
-    throw new Error(`ยังไม่รองรับไฟล์ .${ext}`);
-  }
-
-  function layerPopupHTML(props, layerName) {
-    const rows = Object.entries(props || {}).filter(([, v]) => v !== null && v !== '' && typeof v !== 'object').slice(0, 14);
-    if (!rows.length) return `<div class="ly-pop"><b>${U.esc(layerName)}</b><div class="small-muted">ไม่มีข้อมูลประกอบในรูปนี้</div></div>`;
-    return `<div class="ly-pop"><b>${U.esc(layerName)}</b><table>${rows.map(([k, v]) =>
-      `<tr><th>${U.esc(truncate(String(k), 22))}</th><td>${U.esc(truncate(String(v), 40))}</td></tr>`).join('')}</table></div>`;
-  }
-
-  function buildLeafletLayer(geo, entry) {
-    return L.geoJSON(geo, {
-      style: () => ({ color: entry.color, weight: 2, opacity: entry.opacity, fillColor: entry.color, fillOpacity: entry.opacity * 0.18 }),
-      pointToLayer: (f, latlng) => L.circleMarker(latlng,
-        { radius: 5, color: '#fff', weight: 1.4, fillColor: entry.color, fillOpacity: entry.opacity }),
-      onEachFeature: (f, lyr) => lyr.bindPopup(() => layerPopupHTML(f.properties, entry.name), { maxWidth: 300 }),
-    });
-  }
-
-  async function addUserLayers(files) {
-    const msg = U.$('mapLayerMsg');
-    for (const file of files) {
-      msg.textContent = `กำลังอ่าน ${file.name}...`;
-      try {
-        const { geo, kind } = await parseLayerFile(file);
-        const proj = reprojectIfNeeded(geo);
-        if (!proj.ok) throw new Error(proj.note);
-        const ex = geoExtent(geo);
-        const entry = {
-          id: 'ly' + (++layerSeq),
-          name: file.name.replace(/\.[^.]+$/, ''),
-          kind, color: LAYER_COLORS[(layerSeq - 1) % LAYER_COLORS.length],
-          opacity: 0.9, visible: true, note: proj.note,
-          n: geo.type === 'FeatureCollection' ? (geo.features || []).length : 1,
-          points: ex.n,
-        };
-        entry.layer = buildLeafletLayer(geo, entry);
-        entry.layer.addTo(map);
-        entry.bounds = entry.layer.getBounds();
-        userLayers.push(entry);
-        msg.textContent = `เพิ่ม "${entry.name}" แล้ว · ${U.num(entry.n)} รูป${proj.note ? ' · ' + proj.note : ''}`;
-        if (entry.bounds.isValid()) map.flyToBounds(entry.bounds, { padding: [24, 24], maxZoom: 14, duration: 0.7 });
-      } catch (err) {
-        console.warn('นำเข้าชั้นข้อมูลไม่สำเร็จ', err);
-        msg.textContent = `${file.name}: ${String(err.message || err).slice(0, 140)}`;
-      }
-      renderLayerList();
-    }
-  }
-
-  function renderLayerList() {
-    const box = U.$('mapLayerList');
-    if (!box) return;
-    if (!userLayers.length) {
-      U.setHTML('mapLayerList', '<p class="map-layer-empty">ยังไม่มีชั้นข้อมูล — เพิ่มขอบเขตตำบล แนวท่อ ผังโครงการ หรือพื้นที่รับผิดชอบ เพื่อดูทับกับหมุดสัญญาได้</p>');
-      return;
-    }
-    U.setHTML('mapLayerList', userLayers.map(l => `
-      <div class="ly-row" role="listitem">
-        <button type="button" class="ly-eye${l.visible ? ' is-on' : ''}" data-ly-toggle="${l.id}"
-                aria-pressed="${l.visible}" title="${l.visible ? 'ซ่อนชั้นนี้' : 'แสดงชั้นนี้'}">${l.visible ? '👁' : '◻'}</button>
-        <label class="ly-color" title="เปลี่ยนสีของชั้นนี้">
-          <input type="color" value="${l.color}" data-ly-color="${l.id}" aria-label="สีของชั้น ${U.esc(l.name)}">
-          <i style="background:${l.color}"></i></label>
-        <div class="ly-meta">
-          <div class="ly-name" title="${U.esc(l.name)}">${U.esc(truncate(l.name, 22))}</div>
-          <div class="ly-sub">${l.kind} · ${U.num(l.n)} รูป${l.note ? ' · ⚠' : ''}</div>
-        </div>
-        <input type="range" class="ly-op" min="10" max="100" step="10" value="${Math.round(l.opacity * 100)}"
-               data-ly-op="${l.id}" aria-label="ความทึบของชั้น ${U.esc(l.name)}" title="ความทึบ">
-        <button type="button" class="ly-btn" data-ly-fit="${l.id}" title="ซูมไปที่ชั้นนี้" aria-label="ซูมไปที่ ${U.esc(l.name)}">⤢</button>
-        <button type="button" class="ly-btn is-del" data-ly-del="${l.id}" title="ลบชั้นนี้" aria-label="ลบชั้น ${U.esc(l.name)}">✕</button>
-      </div>
-      ${l.note ? `<div class="ly-note">${U.esc(l.note)}</div>` : ''}`).join(''));
-  }
-
-  function restyleLayer(entry) {
-    if (!entry.layer) return;
-    entry.layer.setStyle(() => ({
-      color: entry.color, weight: 2, opacity: entry.opacity,
-      fillColor: entry.color, fillOpacity: entry.opacity * 0.18,
-    }));
-    entry.layer.eachLayer(l => {
-      if (l.setRadius) l.setStyle({ color: '#fff', fillColor: entry.color, fillOpacity: entry.opacity });
-    });
-  }
-
-  function wireUserLayers() {
-    const input = U.$('mapLayerInput');
-    if (!input) return;
-    input.addEventListener('change', async () => {
-      const files = [...input.files];
-      input.value = '';
-      if (files.length) await addUserLayers(files);
-    });
-
-    U.$('mapLayerList').addEventListener('click', e => {
-      const t = e.target.closest('[data-ly-toggle],[data-ly-fit],[data-ly-del]');
-      if (!t) return;
-      const id = t.dataset.lyToggle || t.dataset.lyFit || t.dataset.lyDel;
-      const i = userLayers.findIndex(l => l.id === id);
-      if (i < 0) return;
-      const entry = userLayers[i];
-      if (t.dataset.lyToggle) {
-        entry.visible = !entry.visible;
-        if (entry.visible) entry.layer.addTo(map); else map.removeLayer(entry.layer);
-        renderLayerList();
-      } else if (t.dataset.lyFit) {
-        if (entry.bounds && entry.bounds.isValid()) map.flyToBounds(entry.bounds, { padding: [24, 24], duration: 0.7 });
-      } else {
-        map.removeLayer(entry.layer);
-        userLayers.splice(i, 1);
-        U.$('mapLayerMsg').textContent = `ลบชั้น "${entry.name}" แล้ว`;
-        renderLayerList();
-      }
-    });
-
-    U.$('mapLayerList').addEventListener('input', e => {
-      const id = e.target.dataset.lyOp || e.target.dataset.lyColor;
-      const entry = userLayers.find(l => l.id === id);
-      if (!entry) return;
-      if (e.target.dataset.lyOp) entry.opacity = Number(e.target.value) / 100;
-      else entry.color = e.target.value;
-      restyleLayer(entry);
-      if (e.target.dataset.lyColor) renderLayerList();
-    });
-
-    const op = U.$('mapBaseOpacity');
-    op.addEventListener('input', () => {
-      state.map.baseOpacity = Number(op.value) / 100;
-      U.$('mapBaseOpacityLabel').textContent = `${op.value}%`;
-      if (baseLayer) baseLayer.setOpacity(state.map.baseOpacity);
-    });
-
-    // รายการพื้นหลังสร้างจาก BASEMAPS จริง จะได้ไม่มีวันหลุดกันระหว่าง HTML กับโค้ด
-    const sel = U.$('mapBasemap');
-    const groups = new Map();
-    for (const [key, cfg] of Object.entries(BASEMAPS)) {
-      if (key === 'street' || !cfg.group) continue;     // street เป็นชื่อพ้องของ light
-      if (!groups.has(cfg.group)) groups.set(cfg.group, []);
-      groups.get(cfg.group).push([key, cfg.label || key]);
-    }
-    U.setHTML('mapBasemap', [...groups].map(([g, list]) =>
-      `<optgroup label="${U.esc(g)}">${list.map(([k, label]) =>
-        `<option value="${U.esc(k)}">${U.esc(label)}</option>`).join('')}</optgroup>`).join(''));
-    sel.value = state.map.basemap;
-    renderLayerList();
   }
 
   /* ---------- แผงวิเคราะห์และการผูกเหตุการณ์ ---------- */
@@ -4314,42 +3297,21 @@ ${placemarks.join('\n')}
 
     document.querySelectorAll('[data-map-tool]').forEach(b => b.addEventListener('click', () => startDrawing(b.dataset.mapTool)));
 
-    // รายชื่อสำหรับช่องค้นรอยเท้า สร้างใหม่ทุกครั้งที่สลับระหว่างผู้รับจ้างกับหน่วยงาน
-    let fpKind = 'contractor';
-    let fpCounts = [];
-    const fillFootprintList = () => {
-      const K = FP_KINDS[fpKind];
-      const geoRows = state.records.filter(r => r.lat !== null);
-      fpCounts = [...U.countBy(geoRows, r => r[K.field])].filter(x => x[1] >= 2).sort((a, b) => b[1] - a[1]);
-      // พิกัดที่ใช้ร่วมหลายโครงการ (มักเป็นสำนักงาน) ไม่ถูกนับในรอยเท้า จึงบอกแยกไว้ ตัวเลขในรายการกับในแผงจะได้ตรงกัน
-      const sharedCount = U.countBy(geoRows.filter(r => r.geo_quality === 'shared'), r => r[K.field]);
-      U.setHTML('mapFootprintList', fpCounts.slice(0, 1500).map(([k, n]) => {
-        const sh = sharedCount.get(k) || 0;
-        return `<option value="${U.esc(k)}">${n - sh} งานมีพิกัด${sh ? ` (+${sh} พิกัดใช้ร่วม)` : ''}</option>`;
-      }).join(''));
-      U.$('mapFootprintInput').placeholder = fpKind === 'dept' ? 'รอยเท้าหน่วยงาน: พิมพ์ชื่อ' : 'รอยเท้าผู้รับจ้าง: พิมพ์ชื่อ';
-    };
-    fillFootprintList();
-
-    document.querySelectorAll('[data-fp-kind]').forEach(b => b.addEventListener('click', () => {
-      fpKind = b.dataset.fpKind;
-      document.querySelectorAll('[data-fp-kind]').forEach(x => {
-        const on = x === b;
-        x.classList.toggle('is-on', on);
-        x.setAttribute('aria-pressed', String(on));
-      });
-      fillFootprintList();
-      U.$('mapFootprintInput').focus();
-    }));
-
+    // รายชื่อผู้รับจ้างที่มีงานมีพิกัดอย่างน้อย 2 แห่ง เรียงจากจำนวนมาก
+    const counts = [...U.countBy(state.records.filter(r => r.lat !== null), r => r.winner_key)].filter(x => x[1] >= 2).sort((a, b) => b[1] - a[1]);
+    // พิกัดที่ใช้ร่วมหลายโครงการ (มักเป็นสำนักงาน) ไม่ถูกนับในรอยเท้า จึงบอกแยกไว้ ตัวเลขในรายการกับในแผงจะได้ตรงกัน
+    const sharedCount = U.countBy(state.records.filter(r => r.lat !== null && r.geo_quality === 'shared'), r => r.winner_key);
+    U.setHTML('mapFootprintList', counts.slice(0, 1500).map(([k, n]) => {
+      const sh = sharedCount.get(k) || 0;
+      return `<option value="${U.esc(k)}">${n - sh} งานมีพิกัด${sh ? ` (+${sh} พิกัดใช้ร่วม)` : ''}</option>`;
+    }).join(''));
     const fpInput = U.$('mapFootprintInput');
     const tryFootprint = () => {
       const v = fpInput.value.trim();
       if (!v) return;
-      const field = FP_KINDS[fpKind].field;
-      const exact = state.records.find(r => r[field] === v);
-      const key = exact ? v : (fpCounts.find(([k]) => k.includes(v)) || [])[0];
-      if (key) { showFootprint(key, { kind: fpKind }); fpInput.value = ''; }
+      const exact = state.records.find(r => r.winner_key === v);
+      const key = exact ? v : (counts.find(([k]) => k.includes(v)) || [])[0];
+      if (key) { showFootprint(key); fpInput.value = ''; }
     };
     fpInput.addEventListener('change', tryFootprint);
     fpInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tryFootprint(); } });
@@ -4357,27 +3319,6 @@ ${placemarks.join('\n')}
     const panel = U.$('mapAnalysis');
     panel.addEventListener('change', e => {
       const cfg = state.map.hotspot;
-      const fpSet = e.target.dataset.fpSet;
-      if (fpSet) {
-        const f = state.map.fp;
-        if (fpSet === 'spokes' || fpSet === 'shared' || fpSet === 'focus') f[fpSet] = e.target.checked;
-        else if (fpSet === 'farKm') f.farKm = Math.max(1, Number(e.target.value) || 100);
-        else f[fpSet] = e.target.value;
-        if (fpSet !== 'spokes' && fpSet !== 'color' && fpSet !== 'focus') fpStopPlay();
-        f.open = true;                 // ผู้ใช้เพิ่งปรับค่า อย่าหุบแผงตั้งค่าตอนวาดใหม่
-        if (fpSet === 'focus' && !f.focus) updateMapLayers(mapRowsForDisplay());
-        fpRefresh();
-        return;
-      }
-      if (e.target.dataset.fpMonth !== undefined) {
-        const f = state.map.footprint;
-        if (!f) return;
-        fpStopPlay();
-        const i = Number(e.target.value);
-        state.map.fp.month = i >= f.months.length - 1 ? null : f.months[i];
-        fpRefresh();
-        return;
-      }
       if (e.target.id === 'hotMetric') cfg.metric = e.target.value;
       else if (e.target.id === 'hotSpacing') cfg.spacingKm = Number(e.target.value);
       else if (e.target.id === 'hotMinN') cfg.minN = Number(e.target.value);
@@ -4386,36 +3327,9 @@ ${placemarks.join('\n')}
       updateMapLayers(mapRowsForDisplay());
     });
 
-    // แถบเวลาให้ลากแล้วเห็นผลทันที — แต่ห้ามวาดแผงใหม่ระหว่างลาก ไม่งั้นตัวเลื่อนจะถูกสร้างใหม่และหลุดมือ
-    panel.addEventListener('input', e => {
-      if (e.target.dataset.fpMonth === undefined) return;
-      const f = state.map.footprint;
-      if (!f) return;
-      fpStopPlay();
-      const i = Number(e.target.value);
-      state.map.fp.month = i >= f.months.length - 1 ? null : f.months[i];
-      const next = footprintStats(f.key, f.kind);
-      state.map.footprint = next;
-      state.map.fpMore = state.map.fpMore.map(m => footprintStats(m.key, m.kind));
-      drawFootprint();
-      const label = panel.querySelector('.fp-time-label');
-      if (label) {
-        label.textContent = state.map.fp.month
-          ? `ถึง ${U.thaiMonthLabel(state.map.fp.month)} · ${U.num((next.shown || []).length)}/${U.num(next.use.length)} งาน`
-          : `ทั้งช่วง ${next.months.length} เดือน`;
-      }
-    });
-
-    // จำว่าแผงตั้งค่าเปิดอยู่ไหม ไม่งั้นทุกครั้งที่วาดใหม่จะหุบกลับเอง
-    panel.addEventListener('toggle', e => {
-      const which = e.target.dataset.fpDetails;
-      if (which === 'settings') state.map.fp.open = e.target.open;
-      else if (which === 'neigh') state.map.fp.neighOpen = e.target.open;
-    }, true);
-
     // ปุ่มในแผงวิเคราะห์ ป๊อปอัปของช่องหกเหลี่ยม และป๊อปอัปหมุด
     const onAction = e => {
-      const t = e.target.closest('[data-map-mode-exit],[data-hex-go],[data-hex-select],[data-hex-cart],[data-area-cancel],[data-area-finish],[data-area-undo],[data-area-clear],[data-area-cart],[data-area-filter],[data-area-ai],[data-fp-clear],[data-fp-fit],[data-fp-cart],[data-fp-ai],[data-fp-export],[data-fp-play],[data-fp-add],[data-fp-drop],[data-fp-clearcmp],[data-map-footprint]');
+      const t = e.target.closest('[data-map-mode-exit],[data-hex-go],[data-hex-select],[data-hex-cart],[data-area-cancel],[data-area-finish],[data-area-undo],[data-area-clear],[data-area-cart],[data-area-filter],[data-area-ai],[data-fp-clear],[data-fp-fit],[data-fp-cart],[data-fp-ai],[data-map-footprint]');
       if (!t) return;
       const d = t.dataset;
       if ('mapModeExit' in d) setMapMode('cluster');
@@ -4449,31 +3363,9 @@ ${placemarks.join('\n')}
         if (ai.opts) ai.opts.scope = 'filter';
         else try { localStorage.setItem('pa_ai_opts_v1', JSON.stringify({ ...JSON.parse(localStorage.getItem('pa_ai_opts_v1') || '{}'), scope: 'filter' })); } catch (err) { /* ไม่สำคัญ */ }
         openAITask('brief');
-      } else if ('fpClear' in d) {
-        fpStopPlay();
-        state.map.footprint = null; state.map.fpMore = [];
-        drawFootprint();
-        updateMapLayers(mapRowsForDisplay());   // คืนหมุดที่ซ่อนไว้ตอนโหมดเน้นรอยเท้า
-        renderAnalysisPanel(); updateMapChrome();
-      }
+      } else if ('fpClear' in d) { state.map.footprint = null; drawFootprint(); renderAnalysisPanel(); updateMapChrome(); }
       else if ('fpFit' in d) { if (footprintLayer) map.flyToBounds(footprintLayer.getBounds(), { padding: [30, 30], maxZoom: 12, duration: 0.7 }); }
-      else if ('fpCart' in d) addManyToCart(fpAll().flatMap(f => f.all));
-      else if ('fpPlay' in d) fpTogglePlay();
-      else if ('fpExport' in d) {
-        const n = fpExportGeoJSON();
-        t.textContent = n ? `🗺 ส่งออกแล้ว ${U.num(n)} รายการ` : '🗺 ไม่มีจุดให้ส่งออก';
-        setTimeout(() => { if (document.contains(t)) t.textContent = '🗺 ส่งออก GeoJSON'; }, 4000);
-      }
-      else if (d.fpAdd) {
-        fpStopPlay();
-        // กดซ้ำที่รายเดิม = เอาออก จะได้เปิด/ปิดการเทียบจากรายการเดียวได้เลย
-        if (state.map.fpMore.some(f => f.key === d.fpAdd)) {
-          state.map.fpMore = state.map.fpMore.filter(f => f.key !== d.fpAdd);
-          drawFootprint(); renderAnalysisPanel();
-        } else showFootprint(d.fpAdd, { add: true, fit: false });
-      }
-      else if (d.fpDrop) { state.map.fpMore = state.map.fpMore.filter(f => f.key !== d.fpDrop); drawFootprint(); renderAnalysisPanel(); }
-      else if ('fpClearcmp' in d) { state.map.fpMore = []; drawFootprint(); renderAnalysisPanel(); }
+      else if ('fpCart' in d) addManyToCart(state.map.footprint.all);
       else if ('fpAi' in d) {
         // ผู้รับจ้างรายนี้อาจไม่อยู่ในรายชื่อของแท็บ AI (ซึ่งคิดจากตัวกรอง) จึงเติมตัวเลือกก่อนสั่งงาน
         const k = state.map.footprint.key;
@@ -4504,9 +3396,8 @@ ${placemarks.join('\n')}
     if (!map) return;
     const sharedHidden = state.map.hideShared
       ? rows.filter(r => r.lat !== null && r.geo_quality === 'shared').length : 0;
-    const geo = rows.filter(mapPointShown);
-    const stackedHidden = state.map.hideStacked
-      ? rows.filter(r => r.lat !== null && r.lon !== null && r.geo_quality !== 'shared').length - geo.length : 0;
+    const geo = rows.filter(r => r.lat !== null && r.lon !== null &&
+      !(state.map.hideShared && r.geo_quality === 'shared'));
 
     clusterLayer.clearLayers();
     if (pointLayer) { map.removeLayer(pointLayer); pointLayer = null; }
@@ -4573,8 +3464,6 @@ ${placemarks.join('\n')}
     state.map.exportRows = state.map.mode === 'heat' || state.map.mode === 'hotspot' ? geo
       : geo.slice(0, MAX_PINS).filter(r => !state.map.hidden.has(colorOf(r).key));
 
-    applyFpFocus();   // เพิ่งสร้างชั้นหมุดใหม่ ถ้ากำลังเน้นรอยเท้าอยู่ต้องซ่อนกลับ
-
     const pct = rows.length ? U.pct(geo.length / rows.length) : '-';
     // แยกเหตุผลที่จุดหายให้ชัด ระหว่างการซ่อนกลุ่มเองกับการตัดจำนวนตามเพดาน
     const hiddenCount = state.map.hidden.size
@@ -4585,7 +3474,6 @@ ${placemarks.join('\n')}
     const notes = [];
     if (hiddenCount > 0) notes.push(`ซ่อนไว้ ${U.num(hiddenCount)} จุด`);
     if (sharedHidden > 0) notes.push(`ไม่แสดงพิกัดที่ใช้ร่วมหลายโครงการ ${U.num(sharedHidden)} สัญญา`);
-    if (stackedHidden > 0) notes.push(`ไม่แสดงกลุ่มพิกัดที่ซ้ำกันเป๊ะ ${U.num(stackedHidden)} สัญญา`);
     if (capped > 0) notes.push(`เกินเพดานการวาด ${U.num(capped)} จุด`);
 
     U.setHTML('mapStats', geo.length
@@ -4594,14 +3482,7 @@ ${placemarks.join('\n')}
       : '<span class="small-muted">ไม่มีสัญญาที่มีพิกัดตามเงื่อนไขที่เลือก</span>');
 
     // พื้นที่ที่เลือกและรอยเท้าผู้รับจ้างต้องคำนวณใหม่เมื่อตัวกรองหรือเดือนเปลี่ยน
-    // ถ้ารอยเท้าผูกกับตัวกรองไว้ ตัวเลขในแผงต้องคำนวณใหม่ด้วย ไม่ใช่แค่วาดของเดิมซ้ำ
-    if (state.map.footprint && state.map.fp.scope === 'filtered') {
-      state.map.footprint = footprintStats(state.map.footprint.key, state.map.footprint.kind);
-      state.map.fpMore = state.map.fpMore.map(f => footprintStats(f.key, f.kind));
-      drawFootprint();
-    }
     if (state.map.area || state.map.footprint || state.map.mode === 'hotspot') renderAnalysisPanel();
-    if (state.map.gisPane === 'stack') renderMapStack();
     state.map.activeCluster = null;
     if (sheet.view === 'cluster') sheet.view = 'list';
     updateMapChrome();
@@ -5008,10 +3889,7 @@ ${placemarks.join('\n')}
       <div class="item" data-type="${n.type}" data-name="${U.esc(n.name)}">
         <div class="d-flex justify-content-between gap-2">
           <span class="small"><span class="rank-badge">${i + 1}</span> ${U.esc(truncate(n.name, 40))}</span>
-          <span class="d-flex align-items-center gap-1 flex-shrink-0">
-            ${entityCartBtn(n.type === 'agency' ? 'agency' : 'contractor', n.name, n.name)}
-            <span class="badge ${Rules.band(n.composite_risk_norm).cls}">${n.composite_risk_norm.toFixed(1)}</span>
-          </span>
+          <span class="badge ${Rules.band(n.composite_risk_norm).cls}">${n.composite_risk_norm.toFixed(1)}</span>
         </div>
         <div class="small-muted">${n.type === 'agency' ? 'หน่วยงาน' : 'ผู้รับจ้าง'} ·
           เชื่อมกับ ${n.degree} ราย · อยู่กลุ่มที่ ${n.community}</div>
@@ -5031,8 +3909,6 @@ ${placemarks.join('\n')}
 
     renderMarketStructure(rows);
     renderBranchConcentration(rows);
-    renderNetTerritory();
-    renderNetDirectors();
 
     const repeat = Analytics.repeatWinners(rows).slice(0, 20);
     U.setHTML('repeatWinners', repeat.map(r => `
@@ -5148,103 +4024,6 @@ ${placemarks.join('\n')}
     }
   }
 
-  /* ---------- คู่ผู้รับจ้างที่ครองพื้นที่เดียวกัน ---------- */
-
-  const terr = { share: 0.5, market: 8, sort: 'impact', rows: null, sig: '' };
-
-  function terrCompute() {
-    // จำนวนแถวอย่างเดียวไม่พอเป็นลายเซ็น สองจังหวัดอาจมีสัญญาเท่ากันพอดีแล้วได้ผลเก่าค้างมา
-    const sig = `${state.filtered.length}|${JSON.stringify(state.filters)}|${terr.share}|${terr.market}`;
-    if (terr.sig === sig && terr.rows) return terr.rows;
-    terr.rows = Analytics.territoryPairs(state.filtered, { minShare: terr.share, minMarket: terr.market, limit: 60 });
-    terr.sig = sig;
-    return terr.rows;
-  }
-
-  const TERR_SORTS = {
-    impact: (a, b) => b.share * b.taken - a.share * a.taken,
-    share: (a, b) => b.share - a.share || b.taken - a.taken,
-    value: (a, b) => b.value - a.value,
-    balance: (a, b) => b.balance - a.balance || b.taken - a.taken,
-  };
-
-  function renderNetTerritory() {
-    const box = U.$('netTerritory');
-    if (!box) return;
-    const all = terrCompute();
-    const rows = [...all].sort(TERR_SORTS[terr.sort] || TERR_SORTS.impact).slice(0, 25);
-    if (!rows.length) {
-      U.setHTML('netTerritory', U.emptyState(
-        `ไม่มีคู่ที่เข้าเกณฑ์ (ครองตั้งแต่ ${U.pct(terr.share, 0)} ของสัญญาอย่างน้อย ${terr.market} ฉบับในพื้นที่เดียวกัน) ลองลดเกณฑ์ลง`));
-      return;
-    }
-    U.setHTML('netTerritory', `
-      <p class="small-muted mb-2">พบ ${U.num(all.length)} คู่ที่เข้าเกณฑ์ · แสดง ${U.num(rows.length)} คู่แรก</p>
-      ${rows.map((p, i) => `
-      <div class="terr-row" role="listitem">
-        <div class="terr-main">
-          <div class="terr-names">
-            <span class="terr-dot" style="--c:${FP_COLORS[0]}"></span>${clickable('contractor', p.a.key, truncate(p.a.name, 30))}
-            <em>${U.num(p.a.n)}</em>
-            <span class="terr-plus" aria-hidden="true">+</span>
-            <span class="terr-dot" style="--c:${FP_COLORS[1]}"></span>${clickable('contractor', p.b.key, truncate(p.b.name, 30))}
-            <em>${U.num(p.b.n)}</em>
-          </div>
-          <div class="terr-meta">${U.esc(truncate(p.depts[0][0], 40))}${p.depts.length > 1 ? ` และอีก ${p.depts.length - 1} หน่วยงาน` : ''}
-            ${p.provinces.length ? ` · ${U.esc(p.provinces[0][0])}` : ''} · รัศมี ${Math.round(p.radiusKm)} กม. · ศูนย์กลางห่างกัน ${p.apartKm < 10 ? p.apartKm.toFixed(1) : Math.round(p.apartKm)} กม.</div>
-        </div>
-        <div class="terr-share" title="สองรายนี้ได้ ${U.num(p.taken)} จาก ${U.num(p.market)} สัญญาของหน่วยงานร่วมในรัศมีนี้">
-          <span class="terr-bar"><i style="width:${(p.share * 100).toFixed(0)}%"></i></span>
-          <b>${U.pct(p.share, 0)}</b><em>${U.num(p.taken)}/${U.num(p.market)}</em>
-        </div>
-        <div class="terr-val">${U.money(p.value)}</div>
-        <div class="terr-act">
-          <button type="button" class="mp-btn" data-terr-map="${i}" title="เปิดรอยเท้าของทั้งคู่ซ้อนกันบนแผนที่">👣 แผนที่</button>
-          <button type="button" class="mp-btn" data-terr-cart="${i}" title="ใส่สัญญาของทั้งคู่ในพื้นที่นี้ลงตะกร้า">🛒 ${U.num(p.rows.length)}</button>
-        </div>
-      </div>`).join('')}
-      <details class="ma-how mt-2"><summary>อ่านรายการนี้อย่างไร</summary>
-        "พื้นที่" ของแต่ละรายคือศูนย์กลางพิกัดงานกับรัศมีที่ครอบงาน 90% ของตัวเอง ·
-        คู่จะเข้ารายการเมื่อพื้นที่ทับกันและเคยรับงานจากหน่วยงานเดียวกัน ·
-        ตัวเลขเปอร์เซ็นต์คือสัดส่วนสัญญาของหน่วยงานร่วม <b>ที่อยู่ในรัศมีนั้น</b> ซึ่งตกเป็นของสองรายนี้ ·
-        <b>ตรวจแล้วว่าการสลับกันชนะตามเวลาของคู่เหล่านี้ไม่ต่างจากการสุ่ม</b> (เช่น สลับจริง 6 ครั้ง จากที่คาดไว้ 6.5)
-        จึงไม่ใช้เป็นสัญญาณและไม่ควรนำไปอ้างว่าผลัดกันชนะ ·
-        ข้อมูลชุดนี้ไม่มีรายชื่อผู้ยื่นเสนอราคา จึงตรวจไม่ได้ว่าทั้งคู่เคยแข่งกันจริงหรือไม่ ·
-        ตลาดที่มีผู้รับเหมาน้อยรายเป็นเรื่องปกติของงานเฉพาะทางและพื้นที่ห่างไกล รายการนี้ใช้จัดลำดับการตรวจเท่านั้น
-      </details>`);
-    wireDrill('netTerritory');
-  }
-
-  function wireNetTerritory() {
-    const card = U.$('netTerritory');
-    if (!card) return;
-    const parent = card.closest('.cardx');
-    parent.addEventListener('change', e => {
-      if (e.target.id === 'terrShare') terr.share = Number(e.target.value);
-      else if (e.target.id === 'terrMarket') terr.market = Number(e.target.value);
-      else if (e.target.id === 'terrSort') terr.sort = e.target.value;
-      else return;
-      renderNetTerritory();
-    });
-    card.addEventListener('click', e => {
-      const t = e.target.closest('[data-terr-map],[data-terr-cart]');
-      if (!t) return;
-      const rows = [...terrCompute()].sort(TERR_SORTS[terr.sort] || TERR_SORTS.impact).slice(0, 25);
-      const p = rows[Number(t.dataset.terrMap ?? t.dataset.terrCart)];
-      if (!p) return;
-      if (t.dataset.terrCart !== undefined) { addManyToCart(p.rows); return; }
-      // เปิดแท็บแผนที่แล้ววางรอยเท้าทั้งคู่ซ้อนกัน — ต้องรอให้แผนที่คำนวณขนาดใหม่ก่อนจึงจะ fit ได้ถูก
-      const pill = U.$('pill-explain');
-      if (!pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
-      setTimeout(() => {
-        map.invalidateSize();
-        showFootprint(p.a.key, { fit: false });
-        showFootprint(p.b.key, { add: true, fit: true });
-        U.$('mapCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
-      }, 350);
-    });
-  }
-
   function renderNetSummary(allEdges, matching, shown) {
     const n = state.net;
     const parts = [];
@@ -5350,13 +4129,9 @@ ${placemarks.join('\n')}
       <div class="item" data-idx="${i}">
         <div class="d-flex justify-content-between gap-2">
           <span class="small"><span class="rank-badge">${i + 1}</span> ${U.esc(truncate(p.winner_name, 38))}</span>
-          <span class="d-flex align-items-center gap-1 flex-shrink-0">
-            ${entityCartBtn('contractor', p.rows[0].winner_key, p.winner_name)}
-            <span class="badge ${Rules.band(p.risk.final).cls}">${p.risk.final.toFixed(0)}</span>
-          </span>
+          <span class="badge ${Rules.band(p.risk.final).cls}">${p.risk.final.toFixed(0)}</span>
         </div>
         <div class="small-muted">${p.n_contracts} สัญญา · ${p.n_agencies} หน่วยงาน · ${U.money(p.total_value)}</div>
-        <div class="con-row-tags">${conRowTags(p)}</div>
         ${riskBar(p.risk)}
       </div>`).join('') || U.emptyState('ไม่พบผู้รับจ้างตามเงื่อนไข'));
 
@@ -5369,8 +4144,6 @@ ${placemarks.join('\n')}
     });
 
     showContractor(state.contractor.selected || shown[0] || null);
-    renderConUnderbid();
-    renderConJv();
     renderContractorCompareInline();
   }
 
@@ -5402,596 +4175,6 @@ ${placemarks.join('\n')}
             title="${k}: ${risk[k].toFixed(1)} (น้ำหนัก ${(w * 100).toFixed(0)}%)"></div>`).join('')}</div>`;
   }
 
-  /* ---------- ประเภทงาน · สัญญาณการแข่งขัน (ของผู้รับจ้างที่เลือก) ---------- */
-
-  // ฐานเทียบตลาดคิดจากข้อมูลทั้งชุด ไม่ผูกกับตัวกรอง — ถ้าผูก การกรองจังหวัดเดียว
-  // จะทำให้ "ค่ากลางตลาด" กลายเป็นค่ากลางของจังหวัดนั้น แล้วทุกคนดูปกติไปหมด
-  let conMarket = null;
-  function contractorMarket() {
-    if (!conMarket) {
-      conMarket = {
-        baselines: Analytics.marketBaselines(state.records),
-        players: Analytics.marketPlayers(state.records),
-        lots: Analytics.multiLotProjects(state.records),
-      };
-    }
-    return conMarket;
-  }
-
-  const discPct = d => (d === null || d === undefined ? '-' : `${(d * 100).toFixed(1)}%`);
-  /** ส่วนลดติดลบแปลว่าราคาสัญญาสูงกว่าราคากลาง เขียนว่า "ลด -4.9%" แล้วอ่านผิดง่าย */
-  const discLabel = d => (d === null || d === undefined ? '-'
-    : d < -1e-9 ? `สูงกว่าราคากลาง ${(-d * 100).toFixed(1)}%`
-      : Math.abs(d) < 1e-9 ? 'ไม่ลดเลย' : `ลด ${(d * 100).toFixed(1)}%`);
-  const signedPct = d => (d === null || d === undefined ? '-' : `${d >= 0 ? '+' : ''}${(d * 100).toFixed(1)}%`);
-
-  /** แถบสัดส่วนแบบเดียวกับที่ใช้ในแผงรอยเท้า ใช้ซ้ำได้ทั้งประเภทงานและวิธีจัดหา */
-  function conMixBar(items, total, max = 5) {
-    const top = items.slice(0, max);
-    const restN = total - top.reduce((n, x) => n + x.n, 0);
-    const seg = top.map((x, i) => ({ label: x.label, n: x.n, color: categoryColor(i, max + 1) }));
-    if (restN > 0) seg.push({ label: `อื่นๆ อีก ${items.length - top.length}`, n: restN, color: 'var(--border-strong)' });
-    return `<div class="ma-bandbar" role="img" aria-label="สัดส่วนสัญญา">
-        ${seg.map(x => `<i style="width:${(x.n / total * 100).toFixed(1)}%;background:${x.color}" title="${U.esc(x.label)} ${U.num(x.n)} สัญญา"></i>`).join('')}
-      </div>
-      <div class="fp-mix-legend">
-        ${seg.map(x => `<span><i style="background:${x.color}"></i>${U.esc(truncate(x.label, 26))} <b>${U.num(x.n)}</b></span>`).join('')}
-      </div>`;
-  }
-
-  function renderContractorTypes(p, b) {
-    const box = U.$('contractorTypes');
-    if (!box) return;
-    if (!p) { U.setHTML('contractorTypes', U.emptyState('เลือกผู้รับจ้างจากรายการด้านซ้าย')); return; }
-    const m = contractorMarket();
-    // ป้ายต้องไม่ขัดกับตัวเลขข้างหลัง: 3 สัญญาในกลุ่มเดียวไม่ควรขึ้นว่า "รับงานหลายกลุ่ม"
-    // แต่ก็สรุปว่า "ถนัดเฉพาะทาง" ไม่ได้เช่นกัน เพราะตัวอย่างน้อยเกิน
-    const specState = b.n < 5 ? 'few' : b.spec >= 0.9 ? 'focus' : b.groups.length >= 3 ? 'wide' : 'mixed';
-    const specBadge = {
-      few: ['📎 สัญญาน้อยเกินกว่าจะสรุปความถนัด', ''],
-      focus: ['🎯 ทำงานกลุ่มเดียวเกือบทั้งหมด', 'is-focus'],
-      wide: ['🧰 รับงานหลายกลุ่ม', ''],
-      mixed: ['🔧 รับงาน 2 กลุ่มหลัก', ''],
-    }[specState];
-
-    // ตารางประเภทงาน: เทียบส่วนลดของรายนี้กับค่ากลางของ "ประเภทเดียวกัน" ทั้งตลาด
-    const typeRows = b.types.map(t => {
-      const gap = t.relDisc;   // เทียบกับ "วิธีจัดหา × ประเภท" เดียวกัน ฐานเดียวกับ KPI ด้านล่าง
-      return `<tr>
-        <td>${U.esc(truncate(t.label, 28))}</td>
-        ${numTd(t.n)}
-        <td class="text-end" data-sort="${t.share}">${U.pct(t.share, 0)}</td>
-        ${moneyTd(t.value)}
-        <td class="text-end" data-sort="${t.medDisc === null ? -1 : t.medDisc}">${discPct(t.medDisc)}</td>
-        <td class="text-end ${gap !== null && gap < -0.02 ? 'is-low' : ''}" data-sort="${gap === null ? 0 : gap}">
-          ${gap === null ? '<span class="small-muted">ตลาดเล็กเกินเทียบ</span>' : signedPct(gap)}</td>
-      </tr>`;
-    }).join('');
-
-    U.setHTML('contractorTypes', `
-      <p class="small-muted mb-2">ดูว่ารายนี้รับงานแบบไหนเป็นหลัก และในแต่ละประเภทลดราคาจากราคากลางมากน้อยแค่ไหน
-        คอลัมน์ "เทียบสนาม" คือส่วนต่างจากค่ากลางของสัญญาที่<b>วิธีจัดหาและประเภทเดียวกัน</b> ติดลบคือลดน้อยกว่าคู่แข่งในสนามนั้น</p>
-      <div class="con-spec">
-        <span class="con-spec-badge ${specBadge[1]}">${specBadge[0]}</span>
-        <span>กลุ่มงานหลัก <b>${U.esc(truncate(b.specLabel, 30))}</b> ${U.pct(b.spec, 0)} ของ ${U.num(b.n)} สัญญา ·
-          ทั้งหมด ${U.num(b.groups.length)} กลุ่มงาน · ${U.num(b.types.length)} ประเภท</span>
-      </div>
-      <div class="con-mix">${conMixBar(b.groups, b.n)}</div>
-      <div class="table-wrap mt-2"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">ประเภทโครงการของผู้รับจ้างรายนี้</caption>
-        <thead><tr><th scope="col">ประเภทโครงการ</th><th scope="col" class="text-end">สัญญา</th>
-          <th scope="col" class="text-end">สัดส่วน</th><th scope="col" class="text-end">มูลค่า</th>
-          <th scope="col" class="text-end">ส่วนลดกลาง</th>
-          <th scope="col" class="text-end" title="ลบ = ลดน้อยกว่าค่ากลางของสัญญาที่วิธีจัดหาและประเภทเดียวกัน">เทียบสนาม</th></tr></thead>
-        <tbody>${typeRows || U.emptyRow(6)}</tbody></table></div>
-      ${b.offSpec.length ? `<div class="ma-list mt-2"><div class="ma-list-title">งานนอกความถนัด (กลุ่มที่คิดเป็นไม่ถึง 10% ของงานรายนี้) · ${U.num(b.offSpecN)} สัญญา</div>
-        ${b.offSpec.slice(0, 6).map(g => `<div class="ma-li"><span>${U.esc(truncate(g.label, 34))}</span>
-          <b>${U.num(g.n)} สัญญา · ${U.money(g.value)}</b></div>`).join('')}
-        <p class="ma-note">การรับงานนอกกลุ่มถนัดไม่ผิดอะไรในตัวเอง แต่ถ้ามูลค่าสูงผิดกับที่เคยทำ
-          ควรดูว่ามีคุณสมบัติและเครื่องมือทำงานนั้นจริงหรือรับมาแล้วส่งต่อ</p></div>` : ''}`);
-  }
-
-  function renderContractorBids(p, b) {
-    const box = U.$('contractorBids');
-    if (!box) return;
-    if (!p) { U.setHTML('contractorBids', U.emptyState('เลือกผู้รับจ้างจากรายการด้านซ้าย')); return; }
-    const m = contractorMarket();
-    const eb = m.baselines.method.get('ประกวดราคาอิเล็กทรอนิกส์ (e-bidding)');
-    const sp = m.baselines.method.get('เฉพาะเจาะจง');
-    const specificShare = (b.methods.find(x => x.key === 'เฉพาะเจาะจง') || { share: 0 }).share;
-    const lowRel = b.relDisc !== null && b.relDisc < -0.02;
-
-    U.setHTML('contractorBids', `
-      <div class="con-nobid">⚠ <b>ชุดข้อมูลนี้ไม่มีจำนวนผู้เสนอราคาและรายชื่อผู้ยื่นซอง</b> —
-        e-GP เปิดเผยเฉพาะผู้ชนะ จึงตอบตรง ๆ ไม่ได้ว่าโครงการหนึ่งมีกี่รายเสนอราคาและแพ้ด้วยเหตุใด
-        (ตัวเลข <code>demo_n_bidders</code> ที่กฎ R5 ใช้เป็นตัวเลขสุ่มเพื่อสาธิตเท่านั้น ไม่นับรวมในคะแนน)
-        ด้านล่างคือสัญญาณการแข่งขันที่<b>วัดได้จริง</b>จากข้อมูลที่มี</div>
-
-      <div class="ma-kpis con-kpis">
-        <div class="${specificShare > 0.8 && b.n >= 5 ? 'is-warn' : ''}"><span>วิธีจัดหาที่ใช้มากสุด</span>
-          <b>${U.esc(truncate(b.methods[0] ? b.methods[0].label : '-', 18))}</b>
-          <em>${b.methods[0] ? U.pct(b.methods[0].share, 0) : '-'} ของสัญญา</em></div>
-        <div><span>ส่วนลดจากราคากลาง</span><b>${discPct(b.medDisc)}</b>
-          <em>ไม่ลดเลย ${b.zeroShare === null ? '-' : U.pct(b.zeroShare, 0)}</em></div>
-        <div class="${lowRel ? 'is-warn' : ''}"><span>เทียบสนามเดียวกัน</span><b>${signedPct(b.relDisc)}</b>
-          <em>${b.relN ? `จาก ${U.num(b.relN)} สัญญาที่เทียบได้` : 'ไม่มีตลาดที่ใหญ่พอให้เทียบ'}</em></div>
-        <div><span>คู่แข่งในสนามเดียวกัน</span><b>${U.num(b.rivals)} ราย</b>
-          <em>${U.num(b.marketCells)} ตลาด (จังหวัด × กลุ่มงาน)</em></div>
-      </div>
-
-      <div class="con-mix mt-2"><div class="ma-list-title">วิธีจัดหา</div>${conMixBar(b.methods, b.n, 4)}</div>
-
-      <div class="con-method-note">
-        ${eb && sp ? `ทั้งชุดข้อมูล: <b>e-bidding</b> ลดจากราคากลางกลาง ๆ ${discPct(eb.med)} ไม่ลดเลย ${U.pct(eb.zeroShare, 0)} ·
-        <b>เฉพาะเจาะจง</b> ลด ${discPct(sp.med)} ไม่ลดเลย ${U.pct(sp.zeroShare, 0)} —
-        วิธีจัดหาจึงเป็นตัวบอกว่ามีการแข่งขันเกิดขึ้นจริงหรือไม่ ชัดกว่าตัวเลขส่วนลดลอย ๆ` : ''}
-      </div>
-
-      ${b.relWorst.length && lowRel ? `<div class="ma-list mt-2">
-        <div class="ma-list-title">สัญญาที่ลดราคาน้อยกว่าค่ากลางของสนามเดียวกันมากที่สุด</div>
-        ${b.relWorst.slice(0, 5).map(x => `<div class="ma-li">
-          ${clickable('project', x.r.project_id, truncate(x.r.project_name, 40))}
-          <b>${signedPct(x.diff)}</b></div>`).join('')}
-      </div>` : ''}
-
-      ${b.lots.length ? `<div class="ma-list mt-2">
-        <div class="ma-list-title">โครงการที่แบ่งเป็นหลายสัญญา และรายนี้ได้ส่วนหนึ่ง (${U.num(b.lots.length)} โครงการ)</div>
-        ${b.lots.slice(0, 4).map(lot => `<div class="con-lot">
-          <div class="con-lot-head">${clickable('project', lot.project_id, truncate(lot.project_name, 48))} ${entityCartBtn('project', lot.project_id, lot.project_name)}
-            <span class="small-muted">${U.esc(truncate(lot.dept_name || '-', 26))} · ${U.num(lot.n)} สัญญา · ${U.num(lot.nWinners)} ผู้รับจ้าง ·
-              ${U.money(lot.nJv ? lot.valueNoDup : lot.value)}${lot.nJv ? ` <span class="jv-flag" title="ยอดของสมาชิกกิจการค้าร่วมซ้ำกับยอดของกิจการค้าร่วมเอง จึงไม่นับซ้ำ">ตัดยอดซ้ำ ${U.num(lot.nJv)} แถว</span>` : ''}</span></div>
-          ${lot.rows.slice(0, 8).sort((a, b2) => (b2.contract_price_agree || 0) - (a.contract_price_agree || 0)).map(r => `
-            <div class="con-lot-row${r.winner_key === p.winner_name ? ' is-me' : ''}">
-              <span>${U.esc(truncate(r.winner_key || r.winner_name, 34))}${r.is_jv ? ' <span class="jv-flag">สมาชิก JV</span>' : ''}</span>
-              <b>${U.money(r.contract_price_agree)}</b>
-              <em>${discLabel(Analytics.ceilingDiscount(r))}</em>
-            </div>`).join('')}
-          ${lot.rows.length > 8 ? `<div class="small-muted">และอีก ${U.num(lot.rows.length - 8)} สัญญา</div>` : ''}
-        </div>`).join('')}
-        <p class="ma-note">นี่เป็นจุดเดียวในชุดข้อมูลที่เห็นได้ว่า "งานก้อนเดียวกันใครได้ส่วนไหน"
-          ทั้งชุดมี 51 โครงการที่แบ่งหลายสัญญา และ 49 โครงการมีผู้ชนะมากกว่าหนึ่งราย</p>
-      </div>` : ''}
-
-      <details class="ma-how mt-2"><summary>ตัวเลขเหล่านี้แทนจำนวนผู้เสนอราคาได้แค่ไหน</summary>
-        <b>แทนได้บางส่วนเท่านั้น</b> · "เทียบสนามเดียวกัน" คือส่วนลดของรายนี้ลบด้วยค่ากลางของสัญญาที่
-        <b>วิธีจัดหาและประเภทโครงการเดียวกัน</b> ต้องแยกสองชั้นนี้เพราะวัดแล้วต่างกันมาก
-        (e-bidding ลดกลาง 14.3% · เฉพาะเจาะจง 0.09%) ถ้าเทียบรวมกันผู้รับจ้างที่รับงานเฉพาะเจาะจงจะดูผิดปกติทุกราย ·
-        "คู่แข่ง" นับจากผู้รับจ้างรายอื่นที่<b>เคยชนะ</b>งานกลุ่มเดียวกันในจังหวัดเดียวกัน ไม่ใช่ผู้ที่ยื่นเสนอราคาแข่งจริง ·
-        ค่ากลางตลาดคิดจากข้อมูลทั้งชุด ไม่เปลี่ยนตามตัวกรองด้านบน เพื่อให้เทียบกับสนามจริงเสมอ ·
-        ถ้าต้องการตอบว่า "ใครแพ้เพราะอะไร" ต้องขอข้อมูลผู้ยื่นเสนอราคารายโครงการจากกรมบัญชีกลางเพิ่ม
-      </details>`);
-  }
-
-  /** ป้ายสรุปหนึ่งบรรทัดในรายการซ้าย — กลุ่มงานหลัก วิธีจัดหาหลัก และสัญญาณเด่น
-   *  ตั้งใจให้อ่านได้โดยไม่ต้องคลิกเข้าไปดูทีละราย ซึ่งเป็นข้อติดขัดหลักของหน้านี้ */
-  function conRowTags(p) {
-    const groups = [...U.countBy(p.rows, r => r.work_group || 'other')].sort((a, b) => b[1] - a[1]);
-    const methods = [...U.countBy(p.rows, r => r.purchase_method_name)].sort((a, b) => b[1] - a[1]);
-    const specific = (methods.find(m => m[0] === 'เฉพาะเจาะจง') || [null, 0])[1] / p.rows.length;
-    const tags = [];
-    if (groups.length) {
-      tags.push(`<span class="con-tag">${U.esc(truncate(workGroupLabel(groups[0][0]), 22))}${groups.length > 1 ? ` +${groups.length - 1}` : ''}</span>`);
-    }
-    if (methods.length) {
-      const short = methods[0][0].includes('e-bidding') ? 'e-bidding' : truncate(methods[0][0], 14);
-      tags.push(`<span class="con-tag${specific >= 0.8 ? ' is-warn' : ''}">${U.esc(short)} ${U.pct(methods[0][1] / p.rows.length, 0)}</span>`);
-    }
-    if (p.n_agencies === 1 && p.n_contracts >= 5) tags.push('<span class="con-tag is-warn">หน่วยงานเดียว</span>');
-    if (p.tin_is_masked) tags.push('<span class="con-tag is-warn">เลขภาษีถูกปิดบัง</span>');
-    return tags.join('');
-  }
-
-  /* ---------- ลดน้อยกว่าสนาม (ทั้งชุด) · กิจการค้าร่วม ---------- */
-
-  const ub = { min: 3, value: 0, sort: 'rel', rows: null, sig: '' };
-  const UB_SORTS = {
-    rel: (a, b) => a.rel - b.rel,
-    gap: (a, b) => a.gapValue - b.gapValue,
-    value: (a, b) => b.value - a.value,
-  };
-
-  function ubRows() {
-    const sig = `${state.filtered.length}|${JSON.stringify(state.filters)}|${ub.min}|${ub.value}`;
-    if (ub.sig === sig && ub.rows) return ub.rows;
-    // ไม่ตัดจำนวนตั้งแต่ชั้นคำนวณ ไม่งั้นบรรทัด "เข้าเกณฑ์ N ราย" จะกลายเป็นเพดานที่ตั้งไว้เอง
-    ub.rows = Analytics.underbidRanking(state.filtered, contractorMarket().baselines,
-      { minComparable: ub.min, minValue: ub.value });
-    ub.sig = sig;
-    return ub.rows;
-  }
-
-  function renderConUnderbid() {
-    if (!U.$('conUnderbid')) return;
-    const all = ubRows();
-    const rows = [...all].sort(UB_SORTS[ub.sort] || UB_SORTS.rel).slice(0, 25);
-    if (!rows.length) {
-      U.setHTML('conUnderbid', U.emptyState('ไม่มีผู้รับจ้างที่มีสัญญาเทียบได้ถึงเกณฑ์ ลองลดเกณฑ์ลง'));
-      return;
-    }
-    const worst = Math.min(...rows.map(r => r.rel));
-    U.setHTML('conUnderbid', `
-      <p class="small-muted mb-2">เข้าเกณฑ์ ${U.num(all.length)} ราย · แสดง ${U.num(rows.length)} รายแรก</p>
-      <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">ผู้รับจ้างเรียงตามส่วนต่างจากค่ากลางของสนามเดียวกัน</caption>
-        <thead><tr><th scope="col">ผู้รับจ้าง</th><th scope="col" class="text-end">สัญญา</th>
-          <th scope="col" class="text-end">มูลค่า</th>
-          <th scope="col" class="text-end" title="ส่วนลดของรายนี้ ลบด้วยค่ากลางของสัญญาที่วิธีจัดหาและประเภทเดียวกัน">เทียบสนาม</th>
-          <th scope="col" class="text-end" title="ถ้าลดเท่าค่ากลางของสนาม มูลค่าสัญญาจะต่างไปเท่าไร">ส่วนต่าง</th></tr></thead>
-        <tbody>${rows.map(r => `
-          <tr class="ub-row" data-ub="${U.esc(r.winner_key)}" tabindex="0" role="button"
-              title="กดเพื่อเปิดข้อมูลผู้รับจ้างรายนี้ด้านบน">
-            <td><div>${U.esc(truncate(r.winner_name, 32))}</div>
-              <div class="small-muted">${U.esc(r.method.includes('e-bidding') ? 'e-bidding' : truncate(r.method, 18))} ${U.pct(r.methodShare, 0)} ·
-                เทียบได้ ${U.num(r.nComparable)} ฉบับ</div></td>
-            ${numTd(r.n)}
-            ${moneyTd(r.value)}
-            <td class="text-end ${r.rel < -0.02 ? 'is-low' : ''}" data-sort="${r.rel}">
-              <span class="ub-bar" style="--w:${Math.min(100, Math.abs(r.rel / Math.min(-0.001, worst)) * 100).toFixed(0)}%"></span>
-              ${signedPct(r.rel)}</td>
-            ${moneyTd(r.gapValue)}
-          </tr>`).join('')}</tbody></table></div>
-      <details class="ma-how mt-2"><summary>อ่านตารางนี้อย่างไร</summary>
-        ค่าติดลบแปลว่าชนะงานด้วยราคาที่<b>ลดจากราคากลางน้อยกว่า</b>ค่ากลางของสัญญาที่วิธีจัดหาและประเภทเดียวกัน ·
-        คอลัมน์ "ส่วนต่าง" คือเงินที่ต่างออกไปถ้าลดเท่าค่ากลางของสนาม ใช้จัดลำดับตามน้ำหนักจริง
-        เพราะต่ำกว่าสนาม 17% บนงาน 325 ล้าน หนักกว่าต่ำกว่า 20% บนงาน 3 ล้าน ·
-        <b>ไม่ได้แปลว่าผิด</b> — งานที่ยากกว่า พื้นที่ห่างไกล หรือสเปกสูงกว่าค่ากลาง ก็ทำให้ราคาสูงได้ตามจริง
-        ตารางนี้ใช้จัดลำดับว่าควรดูสัญญาไหนก่อน ·
-        ฐานเทียบคิดจากข้อมูลทั้งชุดเสมอ ไม่เปลี่ยนตามตัวกรอง แต่รายชื่อในตารางมาจากชุดที่กรองอยู่
-      </details>`);
-  }
-
-  function renderConJv() {
-    if (!U.$('conJv')) return;
-    const groups = Analytics.jvGroups(state.filtered);
-    if (!groups.length) {
-      U.setHTML('conJv', U.emptyState('ไม่พบสัญญากิจการค้าร่วมในชุดที่กรองอยู่'));
-      return;
-    }
-    const partners = Analytics.jvPartners(groups);
-    const members = new Set();
-    for (const g of groups) for (const m of g.members) members.add(m.winner_key);
-    const unmatched = groups.filter(g => !g.matched);
-
-    U.setHTML('conJv', `
-      <p class="small-muted mb-2">สัญญาร่วมค้าหนึ่งฉบับถูกบันทึกเป็นหลายแถว — แถวหนึ่งเป็นชื่อกิจการค้าร่วม
-        อีกหลายแถวเป็นบริษัทสมาชิกพร้อมส่วนแบ่งของตัวเอง ระบบประกอบกลับให้เห็นทั้งกลุ่ม</p>
-      <div class="ma-kpis">
-        <div><span>กลุ่มร่วมค้า</span><b>${U.num(groups.length)}</b><em>${U.num(members.size)} บริษัทสมาชิก</em></div>
-        <div><span>มูลค่ารวม</span><b>${U.money(U.sum(groups.map(g => g.memberSum)))}</b><em>นับครั้งเดียวต่อกลุ่ม</em></div>
-        <div><span>คู่ที่ร่วมค้าซ้ำ</span><b>${U.num(partners.filter(p => p.n >= 2).length)}</b><em>จาก ${U.num(partners.length)} คู่</em></div>
-      </div>
-      <div class="jv-warn">⚠ ในตารางและ KPI อื่นของแอป แถวสมาชิกถูกนับเป็นสัญญาแยกกัน
-        ทั้งที่ยอดของสมาชิกรวมกันแล้วเท่ากับยอดของกิจการค้าร่วมพอดี (ตรวจแล้ว ${U.num(groups.filter(g => g.matched).length)} จาก ${U.num(groups.length)} กลุ่ม)
-        การรวมยอดตรง ๆ จึงนับซ้ำ — เป็นข้อจำกัดของต้นทางข้อมูล ไม่ใช่ของการคำนวณ</div>
-
-      ${partners.filter(p => p.n >= 2).length ? `<div class="ma-list mt-2">
-        <div class="ma-list-title">คู่ที่จับมือกันซ้ำ</div>
-        ${partners.filter(p => p.n >= 2).slice(0, 5).map(p => `<div class="ma-li">
-          <span>${clickable('contractor', p.a, truncate(p.a, 20))} + ${clickable('contractor', p.b, truncate(p.b, 20))}</span>
-          <b>${U.num(p.n)} สัญญา · ${U.money(p.value)}</b></div>`).join('')}
-      </div>` : ''}
-
-      <div class="jv-list">
-        ${groups.slice(0, 12).map(g => `<div class="jv-group">
-          <div class="jv-head">${clickable('project', g.project_id, truncate(g.project_name, 44))}
-            <span class="small-muted">${U.esc(truncate(g.dept_name || '-', 26))}${g.contract_date ? ` · ${U.thaiDate(g.contract_date)}` : ''}</span></div>
-          ${g.entity ? `<div class="jv-entity">${U.esc(truncate(g.entity.winner_key, 34))} <b>${U.money(g.entityValue)}</b></div>`
-            : `<div class="jv-entity is-off">ไม่พบแถวของกิจการค้าร่วมที่ยอดตรงกับผลรวมสมาชิก <b>${U.money(g.memberSum)}</b></div>`}
-          ${g.members.map(mm => `<div class="jv-member">
-            <span>${clickable('contractor', mm.winner_key, truncate(mm.winner_key, 30))}</span>
-            <b>${U.money(mm.contract_price_agree)}</b>
-            <em>${g.memberSum ? U.pct((mm.contract_price_agree || 0) / g.memberSum, 0) : '-'}</em></div>`).join('')}
-        </div>`).join('')}
-      </div>
-      ${groups.length > 12 ? `<p class="small-muted mt-1">แสดง 12 กลุ่มแรกจาก ${U.num(groups.length)} กลุ่ม</p>` : ''}
-      ${unmatched.length ? `<p class="ma-note">${U.num(unmatched.length)} กลุ่มที่ยอดสมาชิกรวมไม่เท่ากับยอดกิจการค้าร่วม
-        อาจมีสมาชิกที่ต้นทางไม่ได้บันทึกไว้ครบ</p>` : ''}
-      <details class="ma-how mt-2"><summary>ประกอบกลุ่มนี้มาได้อย่างไร</summary>
-        แถวที่มีธง <code>is_jv</code> คือบริษัทสมาชิก (ETL ตั้งธงจากคำว่า "(สัญญากิจการค้าร่วม)" ในชื่อเดิม
-        แล้วตัดคำนั้นออก จึงเหลือแต่ชื่อบริษัท) · ระบบจับกลุ่มด้วย <b>project_id + contract_no ที่ตรงกัน</b>
-        แล้วหาแถวที่ยอดเท่ากับผลรวมของสมาชิกพอดีเป็น "กิจการค้าร่วม" ·
-        ไม่ได้เดาจากชื่อ เพราะโครงการใหญ่หนึ่งโครงการอาจมีผู้ชนะรายอื่นอยู่ใน project_id เดียวกันด้วย ·
-        การร่วมค้าเป็นเรื่องปกติและถูกกฎหมาย สิ่งที่ควรดูคือคู่เดิมที่จับมือกันซ้ำในหน่วยงานเดียวกันบ่อยผิดปกติ
-      </details>`);
-  }
-
-  function wireContractorExtras() {
-    const profile = U.$('contractorProfile');
-    if (profile) profile.addEventListener('click', e => {
-      if (e.target.closest('[data-con-print]')) printContractorSheet();
-
-      const dbd = e.target.closest('[data-dbd-link]');
-      if (dbd) {
-        // เว็บ DBD เป็น SPA ไม่มี URL ที่พิมพ์ชื่อไว้ล่วงหน้าได้ จึงคัดลอกชื่อไว้ให้วางในช่องค้นหาเอง
-        // (เดาพารามิเตอร์ URL ที่ไม่มีจริงจะแย่กว่า เพราะอาจพาไปหน้าผิดโดยไม่รู้ตัว)
-        const label = dbd.textContent;
-        navigator.clipboard.writeText(dbd.dataset.name)
-          .then(() => { dbd.textContent = 'คัดลอกชื่อแล้ว ✓'; setTimeout(() => { dbd.textContent = label; }, 1600); })
-          .catch(() => { dbd.textContent = 'คัดลอกไม่ได้'; setTimeout(() => { dbd.textContent = label; }, 1600); });
-        window.open('https://datawarehouse.dbd.go.th/', '_blank', 'noopener');
-      }
-
-      const save = e.target.closest('[data-dir-save]');
-      if (save) {
-        const r = Directors.add({
-          tax_id: save.dataset.dirSave, company_name: save.dataset.company,
-          person_name: U.$('dirNewName').value, role: U.$('dirNewRole').value,
-        });
-        if (r.ok) directorsChanged();
-        else {
-          // ไม่มี toast กลางที่ใช้ข้ามแท็บได้ (mapToast/cartToast ผูกกับ DOM เฉพาะแท็บตัวเอง)
-          // จึงแจ้งด้วยข้อความ inline ใต้ฟอร์ม
-          const msg = U.$('contractorDirectors').querySelector('.dir-msg');
-          if (msg) msg.textContent = r.reason;
-        }
-      }
-
-      const del = e.target.closest('[data-dir-del]');
-      if (del) { Directors.remove(del.dataset.dirDel); directorsChanged(); }
-    });
-    const ubBox = U.$('conUnderbid');
-    if (!ubBox) return;
-    const card = ubBox.closest('.cardx');
-    card.addEventListener('change', e => {
-      if (e.target.id === 'ubMin') ub.min = Number(e.target.value);
-      else if (e.target.id === 'ubValue') ub.value = Number(e.target.value);
-      else if (e.target.id === 'ubSort') ub.sort = e.target.value;
-      else return;
-      renderConUnderbid();
-    });
-    const pick = t => {
-      const key = t.dataset.ub;
-      const idx = (state.profiles || []).findIndex(p => p.winner_name === key);
-      if (idx < 0) return;
-      // รายการซ้ายอาจถูกกรองจนไม่มีรายนี้อยู่ จึงเลือกจากโปรไฟล์ตรง ๆ แล้วเลื่อนไปที่การ์ดข้อมูล
-      showContractor(state.profiles[idx]);
-      U.$('contractorProfile').closest('.cardx').scrollIntoView({ block: 'start', behavior: 'smooth' });
-    };
-    ubBox.addEventListener('click', e => {
-      const t = e.target.closest('[data-ub]');
-      if (t && !e.target.closest('.detail-clickable')) pick(t);
-    });
-    ubBox.addEventListener('keydown', e => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      const t = e.target.closest('[data-ub]');
-      if (t) { e.preventDefault(); pick(t); }
-    });
-  }
-
-  /* ---------- จังหวะเวลาของสัญญา ---------- */
-
-  const TH_MONTH_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-
-  // ปฏิทินปีงบคิดจากทั้งชุดข้อมูล ไม่ผูกกับตัวกรอง จะได้รู้ว่าเดือนไหน "ต้นทางไม่มีข้อมูล"
-  let fiscalCal = null;
-  let gapCoverCache = null;
-  /** ความครอบคลุมของ announce_gap_days — ต้องคิดจากข้อมูลจริง ไม่ฝังตัวเลขของชุดใดชุดหนึ่งไว้ */
-  function announceCoverage() {
-    if (!gapCoverCache) {
-      const n = state.records.filter(r => r.announce_gap_days !== null && r.announce_gap_days !== undefined).length;
-      gapCoverCache = { n, total: state.records.length, share: state.records.length ? n / state.records.length : 0 };
-    }
-    return gapCoverCache;
-  }
-
-  const fiscalCalendar = () => (fiscalCal || (fiscalCal = Analytics.fiscalCalendar(state.records)));
-
-  function renderContractorTiming(p, t) {
-    const box = U.$('contractorTiming');
-    if (!box) return;
-    if (!p) { U.setHTML('contractorTiming', U.emptyState('เลือกผู้รับจ้างจากรายการด้านซ้าย')); return; }
-    const cal = fiscalCalendar();
-    const maxShare = Math.max(0.0001, ...t.slots.map(s => Math.max(s.myShare, s.baseShare)));
-    const missing = t.slots.filter(s => !s.inData);
-    const gapCover = announceCoverage();
-
-    const bars = t.slots.map(s => {
-      const h = (s.myShare / maxShare * 100).toFixed(0);
-      const ref = (s.baseShare / maxShare * 100).toFixed(0);
-      const cls = !s.inData ? 'is-nodata' : s.mine === 0 ? 'is-zero' : '';
-      const title = !s.inData
-        ? `${TH_MONTH_SHORT[s.month - 1]} — ชุดข้อมูลไม่มีเดือนนี้`
-        : `${TH_MONTH_SHORT[s.month - 1]} · รายนี้ ${U.num(s.mine)} สัญญา (${U.pct(s.myShare, 0)}) · ทั้งชุด ${U.pct(s.baseShare, 0)}`;
-      return `<div class="ft-col ${cls}" title="${U.esc(title)}">
-        <div class="ft-bar"><i style="height:${h}%"></i><span class="ft-ref" style="bottom:${ref}%"></span></div>
-        <div class="ft-lab">${TH_MONTH_SHORT[s.month - 1]}</div>
-        <div class="ft-n">${s.inData ? (s.mine || '') : '–'}</div>
-      </div>`;
-    }).join('');
-
-    const peakOdd = t.peak && t.peak.baseShare > 0 && t.peak.myShare > t.peak.baseShare * 2.5 && t.myTotal >= 5;
-    const bigBurst = t.bursts[0] && t.bursts[0].n >= 5;
-
-    U.setHTML('contractorTiming', `
-      <p class="small-muted mb-2">แกนนอนเรียงตามปีงบประมาณไทย (ต.ค. ถึง ก.ย.) แท่งคือสัญญาของรายนี้
-        เส้นขีดคือสัดส่วนของทั้งชุดข้อมูลในเดือนเดียวกัน ใช้ดูว่ารายนี้เซ็นผิดจังหวะจากภาพรวมหรือไม่</p>
-      <div class="ft-chart" role="img" aria-label="สัญญารายเดือนตามปีงบประมาณ">${bars}</div>
-      <div class="ft-legend">
-        <span><i class="ft-key-bar"></i>สัญญาของรายนี้</span>
-        <span><i class="ft-key-ref"></i>สัดส่วนของทั้งชุด</span>
-        <span><i class="ft-key-no"></i>ชุดข้อมูลไม่มีเดือนนี้</span>
-      </div>
-
-      <div class="ma-kpis con-kpis mt-2">
-        <div class="${peakOdd ? 'is-warn' : ''}"><span>เดือนที่กระจุกที่สุด</span>
-          <b>${t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-'}</b>
-          <em>${t.peak ? `${U.num(t.peak.mine)} สัญญา ${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)}` : 'ไม่มีวันทำสัญญา'}</em></div>
-        <div class="${bigBurst ? 'is-warn' : ''}"><span>เซ็นวันเดียวมากสุด</span>
-          <b>${t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-'}</b>
-          <em>${t.bursts[0] ? U.thaiDate(t.bursts[0].date) : 'ไม่มีวันที่ซ้ำกันตั้งแต่ 3 ฉบับ'}</em></div>
-        <div><span>ประกาศถึงทำสัญญา</span><b>${t.gapMedian === null ? '-' : `${U.num(t.gapMedian)} วัน`}</b>
-          <em>${t.gapN ? `มีข้อมูล ${U.num(t.gapN)} จาก ${U.num(t.dated)} ฉบับ` : 'ชุดนี้ไม่มีวันประกาศ'}</em></div>
-        <div><span>ระยะเวลาสัญญา</span><b>${t.durMedian === null ? '-' : `${U.num(t.durMedian)} วัน`}</b>
-          <em>${t.durN ? `จาก ${U.num(t.durN)} ฉบับ` : '-'}</em></div>
-      </div>
-
-      ${t.bursts.length ? `<div class="ma-list mt-2">
-        <div class="ma-list-title">วันที่เซ็นหลายฉบับพร้อมกัน (ตั้งแต่ 3 ฉบับ) · รวม ${U.num(t.burstRows)} สัญญา</div>
-        ${t.bursts.slice(0, 5).map(b => `<div class="ma-li">
-          <span>${U.thaiDate(b.date)}${b.firstOfFiscalYear ? ' <span class="jv-flag">วันแรกของปีงบ</span>' : ''} ·
-            ${U.esc(truncate(b.depts[0], 26))}${b.depts.length > 1 ? ` +${b.depts.length - 1}` : ''}</span>
-          <b>${U.num(b.n)} ฉบับ · ${U.money(b.value)}</b></div>`).join('')}
-        <p class="ma-note">เซ็นพร้อมกันหลายฉบับไม่ใช่ความผิดในตัวเอง งบที่อนุมัติพร้อมกันมักทำสัญญาพร้อมกัน ·
-          ที่ควรดูคือหลายฉบับจาก<b>หน่วยงานเดียวกัน</b>ที่มูลค่าใกล้เกณฑ์วิธีจัดหา ซึ่งกฎ R10 จับไว้แล้ว
-          ข้อนี้เพิ่มมุมของ "รายผู้รับจ้าง" ให้เห็นว่าเป็นรูปแบบประจำหรือครั้งเดียว</p>
-      </div>` : ''}
-
-      <details class="ma-how mt-2"><summary>ข้อจำกัดของช่วงเวลาในชุดนี้</summary>
-        ชุดข้อมูลครอบคลุม<b>ปีงบ ${cal.years.map(y => U.num(y)).join(', ')} เพียงปีเดียว</b> และมีข้อมูล ${U.num(cal.slots.filter(s => s.inData).length)} จาก ${U.num(cal.slots.length)} เดือน
-        ${missing.length ? `(ไม่มี ${missing.map(s => TH_MONTH_SHORT[s.month - 1]).join(' ')}) ` : ''}·
-        จึง<b>สรุปไม่ได้ว่ามีการเร่งเซ็นสัญญาปลายปีงบหรือไม่</b> เพราะเดือนท้ายปีงบยังไม่อยู่ในข้อมูล ·
-        "ประกาศถึงทำสัญญา" มีเฉพาะงานที่ประกาศเชิญชวน (ทั้งชุดมี ${U.num(gapCover.n)} จาก ${U.num(gapCover.total)} ฉบับ = ${U.pct(gapCover.share, 1)})
-        งานเฉพาะเจาะจงไม่มีวันประกาศในต้นทาง จึงเทียบข้ามวิธีจัดหาไม่ได้
-      </details>`);
-  }
-
-  /* ---------- ใบสรุปผู้รับจ้าง 1 หน้า ---------- */
-
-  // เก็บผลคำนวณของรายที่เลือกล่าสุดไว้ ใบสรุปจะได้ใช้ตัวเลขชุดเดียวกับที่ผู้ใช้เห็นบนหน้าจอเป๊ะ
-  let lastSheet = null;
-
-  /** สิ่งที่ต้องอยู่บนกระดาษเสมอ: ข้อมูลมาจากชุดไหน กรองอะไรไว้ พิมพ์เมื่อไร
-   *  ใบสรุปที่อ้างที่มาไม่ได้ ใช้แนบสำนวนไม่ได้ */
-  function sheetProvenance() {
-    const f = activeFilterSummary();
-    return {
-      dataset: state.dataset.name,
-      records: state.records.length,
-      filtered: state.filtered.length,
-      filters: f.length ? f.join(' · ') : 'ไม่ได้กรอง (ใช้ข้อมูลทั้งชุด)',
-      printedAt: new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'short' }),
-    };
-  }
-
-  /** ข้อความสรุปตัวกรองที่เปิดอยู่ — ที่เดียวที่นิยามไว้ ใบสรุปกับชิปในแท็บ AI ใช้ตัวเดียวกัน */
-  function activeFilterSummary(f = state.filters) {
-    return [
-      f.q && `ค้นหา "${f.q}"`, f.province, f.method, f.type,
-      f.workGroup && `กลุ่มงาน ${workGroupLabel(f.workGroup)}`,
-      f.band && `ระดับ ${f.band === 'priority' ? 'ควรตรวจสอบก่อน' : bandLabel(f.band)}`,
-      f.rule && `กฎ ${f.rule}`,
-      f.flagged && 'เฉพาะที่มีสัญญาณ',
-      f.minValue && `มูลค่า ≥ ${U.money(f.minValue)}`,
-    ].filter(Boolean);
-  }
-
-  function buildPrintSheet() {
-    if (!lastSheet) return false;
-    const { p, behaviour: b, timing: t } = lastSheet;
-    const pv = sheetProvenance();
-    const m = contractorMarket();
-    const cases = [...p.rows].sort((a, c) => (c.risk_score || 0) - (a.risk_score || 0)).slice(0, 7);
-    const dims = [['เครือข่าย', p.risk.network], ['ราคา', p.risk.price], ['การแข่งขัน', p.risk.competition],
-      ['สัญญา', p.risk.contract], ['การกระจุกตัว', p.risk.concentration]];
-    const specificShare = (b.methods.find(x => x.key === 'เฉพาะเจาะจง') || { share: 0 }).share;
-
-    U.setHTML('printSheet', `
-      <div class="ps-head">
-        <div>
-          <div class="ps-title">ใบสรุปผู้รับจ้าง</div>
-          <div class="ps-name">${U.esc(p.winner_name)}</div>
-          <div class="ps-sub">เลขผู้เสียภาษี ${U.esc(p.winner_tin || '-')}${p.tin_is_masked ? ' (ถูกปิดบังในต้นทาง)' : ''}</div>
-        </div>
-        <div class="ps-score">
-          <div class="ps-score-n">${p.risk.final.toFixed(0)}</div>
-          <div class="ps-score-l">คะแนนจัดลำดับ<br>เต็ม 100</div>
-        </div>
-      </div>
-
-      <div class="ps-prov">
-        <b>ที่มาของตัวเลข</b> · ชุดข้อมูล: ${U.esc(pv.dataset)} (${U.num(pv.records)} สัญญา) ·
-        ขอบเขตที่ใช้คำนวณ: ${U.esc(pv.filters)} (${U.num(pv.filtered)} สัญญา) · พิมพ์เมื่อ ${U.esc(pv.printedAt)}
-      </div>
-
-      <div class="ps-grid">
-        <div><span>สัญญา</span><b>${U.num(p.n_contracts)}</b></div>
-        <div><span>มูลค่ารวม</span><b>${U.money(p.total_value)}</b></div>
-        <div><span>หน่วยงานที่จ้าง</span><b>${U.num(p.n_agencies)}</b></div>
-        <div><span>สัญญาที่มีสัญญาณ</span><b>${U.num(p.n_flagged)}</b></div>
-        <div><span>คะแนนสัญญาสูงสุด</span><b>${U.num(p.max_risk)}</b></div>
-        <div><span>คู่แข่งในสนามเดียวกัน</span><b>${U.num(b.rivals)}</b></div>
-      </div>
-
-      <div class="ps-cols">
-        <section>
-          <h3>องค์ประกอบคะแนน 5 มิติ</h3>
-          ${dims.map(([label, v]) => `<div class="ps-dim"><span>${label}</span>
-            <i><u style="width:${Math.max(0, Math.min(100, v)).toFixed(0)}%"></u></i><b>${v.toFixed(1)}</b></div>`).join('')}
-          <p class="ps-note">ทุกมิติอยู่บนสเกล 0-100 เท่ากัน คะแนนรวมเป็นค่าถ่วงน้ำหนัก ใช้จัดลำดับการตรวจ ไม่ใช่ข้อสรุปว่าผิด</p>
-        </section>
-        <section>
-          <h3>ประเภทงานและความถนัด</h3>
-          <p class="ps-line">กลุ่มงานหลัก <b>${U.esc(truncate(b.specLabel, 28))}</b> ${U.pct(b.spec, 0)} ของ ${U.num(b.n)} สัญญา ·
-            ทั้งหมด ${U.num(b.groups.length)} กลุ่มงาน ${U.num(b.types.length)} ประเภท</p>
-          <table class="ps-table"><thead><tr><th>ประเภทโครงการ</th><th>สัญญา</th><th>มูลค่า</th><th>ส่วนลด</th><th>เทียบสนาม</th></tr></thead>
-            <tbody>${b.types.slice(0, 4).map(x => `<tr><td>${U.esc(truncate(x.label, 20))}</td>
-              <td class="n">${U.num(x.n)}</td><td class="n">${U.money(x.value)}</td>
-              <td class="n">${discPct(x.medDisc)}</td><td class="n">${x.relDisc === null ? '-' : signedPct(x.relDisc)}</td></tr>`).join('')}</tbody></table>
-          ${b.offSpec.length ? `<p class="ps-note">งานนอกกลุ่มถนัด (ต่ำกว่า 10% ของงานรายนี้): ${U.num(b.offSpecN)} สัญญา ใน ${U.num(b.offSpec.length)} กลุ่ม</p>` : ''}
-        </section>
-      </div>
-
-      <div class="ps-cols">
-        <section>
-          <h3>สัญญาณการแข่งขัน</h3>
-          <p class="ps-warn">ชุดข้อมูลไม่มีจำนวนผู้เสนอราคาและรายชื่อผู้ยื่นซอง (e-GP เปิดเผยเฉพาะผู้ชนะ)
-            ตัวเลขด้านล่างเป็นสัญญาณทางอ้อมที่วัดได้จากข้อมูลที่มี ไม่ใช่จำนวนผู้แข่งขันจริง</p>
-          <p class="ps-line">วิธีจัดหาหลัก <b>${U.esc(truncate(b.methods[0] ? b.methods[0].label : '-', 30))}</b>
-            ${b.methods[0] ? U.pct(b.methods[0].share, 0) : ''}${specificShare > 0.8 ? ' — เกือบทั้งหมดเป็นวิธีที่ไม่มีการแข่งขันโดยสภาพ' : ''}</p>
-          <p class="ps-line">ส่วนลดจากราคากลาง <b>${discPct(b.medDisc)}</b> · ไม่ลดเลย ${b.zeroShare === null ? '-' : U.pct(b.zeroShare, 0)} ·
-            เทียบสนามเดียวกัน <b>${signedPct(b.relDisc)}</b>${b.relN ? ` (จาก ${U.num(b.relN)} ฉบับ)` : ''}</p>
-          ${m.baselines.method.get('ประกวดราคาอิเล็กทรอนิกส์ (e-bidding)') && m.baselines.method.get('เฉพาะเจาะจง')
-            ? `<p class="ps-note">ฐานเทียบทั้งชุด: e-bidding ลด ${discPct(m.baselines.method.get('ประกวดราคาอิเล็กทรอนิกส์ (e-bidding)').med)} ·
-               เฉพาะเจาะจง ลด ${discPct(m.baselines.method.get('เฉพาะเจาะจง').med)}</p>` : ''}
-        </section>
-        <section>
-          <h3>จังหวะเวลา</h3>
-          <p class="ps-line">เดือนที่กระจุกที่สุด <b>${t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-'}</b>
-            ${t.peak ? `${U.num(t.peak.mine)} สัญญา (${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)})` : ''}</p>
-          <p class="ps-line">เซ็นวันเดียวมากสุด <b>${t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-'}</b>
-            ${t.bursts[0] ? `เมื่อ ${U.thaiDate(t.bursts[0].date)}` : ''}</p>
-          <p class="ps-line">ประกาศถึงทำสัญญา ${t.gapMedian === null ? '-' : `<b>${U.num(t.gapMedian)} วัน</b> (มีข้อมูล ${U.num(t.gapN)} ฉบับ)`} ·
-            ระยะเวลาสัญญา ${t.durMedian === null ? '-' : `<b>${U.num(t.durMedian)} วัน</b>`}</p>
-          <h3 class="mt">หน่วยงานที่ทำสัญญาด้วย</h3>
-          <table class="ps-table"><tbody>${p.pairs.slice(0, 4).map(x => `<tr>
-            <td>${U.esc(truncate(x.source, 30))}</td><td class="n">${U.num(x.n)}</td>
-            <td class="n">${U.money(x.value)}</td>
-            <td class="n">${U.pct(p.total_value ? x.value / p.total_value : 0, 0)}</td></tr>`).join('')}</tbody></table>
-        </section>
-      </div>
-
-      <section>
-        <h3>สัญญาที่ควรตรวจก่อน (เรียงตามคะแนน)</h3>
-        <table class="ps-table"><thead><tr><th>โครงการ</th><th>หน่วยงาน</th><th>วันทำสัญญา</th><th>มูลค่า</th><th>คะแนน</th><th>สัญญาณที่พบ</th></tr></thead>
-          <tbody>${cases.map(r => `<tr>
-            <td>${U.esc(truncate(r.project_name, 34))}<div class="ps-dim-id">${U.esc(r.project_id)}</div></td>
-            <td>${U.esc(truncate(r.dept_name || '-', 18))}</td>
-            <td class="n">${r.contract_date ? U.thaiDate(r.contract_date) : '-'}</td>
-            <td class="n">${U.money(r.contract_price_agree)}</td>
-            <td class="n">${U.num(r.risk_score)}</td>
-            <td>${U.esc((r.rule_hits || []).map(h => h.rule_id).join(' ') || '-')}</td></tr>`).join('') || '<tr><td colspan="6">ไม่มีสัญญา</td></tr>'}</tbody></table>
-      </section>
-
-      <div class="ps-foot">
-        สร้างจากข้อมูลเปิดของภาครัฐ · <b>ไม่ใช่เอกสารราชการ และคะแนนไม่ใช่ข้อสรุปว่ามีการกระทำผิด</b>
-        ใช้จัดลำดับความสำคัญในการตรวจสอบ · ตัวเลขตรวจย้อนได้จากชุดข้อมูลและขอบเขตที่ระบุด้านบน
-      </div>`);
-    return true;
-  }
-
-  function printContractorSheet() {
-    if (!buildPrintSheet()) return;
-    document.body.classList.add('is-printing');
-    const done = () => {
-      document.body.classList.remove('is-printing');
-      window.removeEventListener('afterprint', done);
-    };
-    window.addEventListener('afterprint', done);
-    // เบราว์เซอร์บางตัวไม่ยิง afterprint ถ้าผู้ใช้ยกเลิก จึงกันไว้อีกชั้น
-    setTimeout(done, 60000);
-    window.print();
-  }
-
   function showContractor(p) {
     state.contractor.selected = p;
     if (!p) {
@@ -5999,16 +4182,8 @@ ${placemarks.join('\n')}
       U.setHTML('contractorPairBody', U.emptyRow(4));
       U.setHTML('contractorCaseBody', U.emptyRow(3));
       Charts.draw('contractorRiskChart', [], {}, 'ยังไม่ได้เลือกผู้รับจ้าง');
-      renderContractorTypes(null);
-      renderContractorBids(null);
-      renderContractorTiming(null);
       return;
     }
-
-    const m = contractorMarket();
-    const behaviour = Analytics.contractorBehaviour(p.rows, {
-      baselines: m.baselines, players: m.players, lots: m.lots, groupLabel: workGroupLabel,
-    });
 
     const metric = (label, value) =>
       `<div class="col-6 col-xl-4"><div class="profile-metric">
@@ -6017,19 +4192,11 @@ ${placemarks.join('\n')}
     U.setHTML('contractorProfile', `
       <div class="mb-2 d-flex justify-content-between align-items-start gap-2">
         <strong>${U.esc(p.winner_name)}</strong>
-        <span class="d-flex gap-1 flex-shrink-0">
-          ${entityCartBtn('contractor', p.rows[0].winner_key, p.winner_name)}
-          <button class="btn btn-sm btn-outline-secondary" data-dbd-link data-name="${U.esc(p.winner_name)}"
-                  title="คัดลอกชื่อบริษัทแล้วเปิด DBD DataWarehouse ให้ค้นเอง (เว็บเขาไม่รองรับลิงก์ที่พิมพ์ชื่อไว้ล่วงหน้า)">🔗 ค้นใน DBD</button>
-          <button class="btn btn-sm btn-outline-secondary" data-con-print
-                  title="สร้างใบสรุป 1 หน้าแล้วเปิดหน้าต่างพิมพ์ เลือก 'บันทึกเป็น PDF' ได้">🖨 ใบสรุป</button>
-          <button class="btn btn-sm btn-outline-primary detail-clickable"
-                  data-type="contractor" data-id="${U.esc(p.winner_name)}">ดูแบบเต็ม</button>
-        </span>
+        <button class="btn btn-sm btn-outline-primary flex-shrink-0 detail-clickable"
+                data-type="contractor" data-id="${U.esc(p.winner_name)}">ดูแบบเต็ม</button>
       </div>
       <div class="small-muted mb-2">เลขผู้เสียภาษี ${U.esc(p.winner_tin)}
         ${p.tin_is_masked ? '<span class="badge badge-none">ถูกปิดบัง</span>' : ''}</div>
-      <div id="contractorDirectors" class="mb-2"></div>
       <div class="row g-2">
         ${metric('คะแนนรวม', p.risk.final.toFixed(1))}
         ${metric('จำนวนสัญญา', U.num(p.n_contracts))}
@@ -6058,120 +4225,6 @@ ${placemarks.join('\n')}
         ${moneyBarTd(r.contract_price_agree, Math.max(...cases.map(x => x.contract_price_agree || 0)))}
         ${scoreBarTd(r.risk_score)}
       </tr>`).join('') || U.emptyRow(3));
-
-    renderContractorTypes(p, behaviour);
-    renderContractorBids(p, behaviour);
-    const timing = Analytics.contractTiming(p.rows, fiscalCalendar());
-    renderContractorTiming(p, timing);
-    renderContractorDirectors(p);
-    lastSheet = { p, behaviour, timing };
-  }
-
-  /** กรรมการที่บันทึกไว้แล้วสำหรับผู้รับจ้างรายนี้ (คีย์ด้วยเลขผู้เสียภาษี) + ฟอร์มเพิ่มรายการใหม่
-   *  ข้อมูลนี้ผู้ใช้พิมพ์เอง (ดู js/directors.js) ไม่ใช่ข้อมูลที่แอปดึงมา
-   *  ถ้าเลขผู้เสียภาษีถูกปิดบัง (มี x ปน) ห้ามบันทึก เพราะไม่ใช่เลขจริง จะจับคู่ผิดบริษัทได้ */
-  function renderContractorDirectors(p) {
-    const box = U.$('contractorDirectors');
-    if (!box) return;
-    if (p.tin_is_masked) {
-      U.setHTML('contractorDirectors',
-        '<p class="small-muted mb-0">เลขผู้เสียภาษีของรายนี้ถูกปิดบัง จึงบันทึกกรรมการอิงเลขนี้ไม่ได้ (จะจับคู่ผิดบริษัท)</p>');
-      return;
-    }
-    const rows = Directors.list().filter(d => d.tax_id === p.winner_tin);
-    U.setHTML('contractorDirectors', `
-      <div class="small-muted mb-1">กรรมการที่บันทึกไว้ (${U.num(rows.length)})</div>
-      <div class="con-row-tags">${rows.map(d => `<span class="con-tag">${U.esc(d.person_name)} · ${U.esc(d.role)}
-        <button type="button" class="dir-x" data-dir-del="${U.esc(d.id)}" aria-label="ลบ ${U.esc(d.person_name)}">×</button></span>`).join('')}</div>
-      <div class="dir-add mt-1">
-        <input class="form-control form-control-sm" id="dirNewName" placeholder="ชื่อ-นามสกุลกรรมการ (ตามที่เห็นใน DBD)" aria-label="ชื่อกรรมการ">
-        <select class="form-select form-select-sm" id="dirNewRole" aria-label="บทบาท">
-          <option>กรรมการ</option><option>กรรมการผู้มีอำนาจ</option><option>อื่นๆ</option>
-        </select>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-dir-save="${U.esc(p.winner_tin)}"
-                data-company="${U.esc(p.winner_name)}">บันทึก</button>
-      </div>
-      <div class="small dir-msg" aria-live="polite"></div>`);
-  }
-
-  /** ข้อมูลกรรมการเปลี่ยน — ทุกที่ที่แสดงข้อมูลนี้ต้องวาดใหม่ให้ตรงกัน:
-   *  โปรไฟล์ผู้รับจ้างที่เปิดอยู่ · การ์ดจัดการในแท็บนำเข้าข้อมูล · การ์ดกรรมการซ้ำในแท็บเครือข่าย */
-  function directorsChanged() {
-    if (state.contractor.selected) renderContractorDirectors(state.contractor.selected);
-    renderDirectorsPanel();
-    state.dirty.add('tab-network');
-    renderActiveTab();
-  }
-
-  /** การ์ดจัดการข้อมูลกรรมการทั้งหมดในแท็บนำเข้าข้อมูล — ไม่ขึ้นกับ state.records จึงวาดครั้งเดียวตอนเปิดแอปได้ */
-  function renderDirectorsPanel() {
-    const rows = Directors.list().sort((a, b) => a.company_name.localeCompare(b.company_name, 'th'));
-    U.setHTML('directorsCard', `
-      <div class="card-title-row"><h2 class="h6 mb-0">ข้อมูลกรรมการที่กรอกเอง</h2>
-        <span class="badge badge-derived">${U.num(rows.length)} รายการ</span></div>
-      <p class="small-muted mb-2">คัดลอกชื่อกรรมการจาก DBD DataWarehouse (ส่วนกรรมการเปิดดูฟรี ไม่ต้องล็อกอิน)
-        แล้ววางทีละหลายแถว บรรทัดละคน คั่นด้วยจุลภาคหรือแท็บ:
-        <code>เลขผู้เสียภาษี,ชื่อบริษัท,ชื่อบุคคล,บทบาท</code> (บทบาทเว้นว่างได้ ถือเป็นกรรมการ)
-        · หรือกดปุ่ม "ค้นใน DBD" ที่โปรไฟล์ผู้รับจ้างแล้วบันทึกทีละคนตรงนั้นก็ได้</p>
-      <textarea class="form-control form-control-sm mb-2" id="dirBulkPaste" rows="4"
-                aria-label="วางรายชื่อกรรมการหลายแถว"
-                placeholder="0105519003571,บริษัท ... จำกัด,นายสมชาย ใจดี,กรรมการ"></textarea>
-      <div class="d-flex flex-wrap gap-2 mb-2">
-        <button type="button" class="btn btn-sm btn-outline-primary" id="dirBulkAdd">เพิ่มจากที่วาง</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="dirExport">ส่งออก CSV</button>
-        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" id="dirClearAll">ล้างทั้งหมด</button>
-      </div>
-      <div id="dirBulkResult" class="small-muted mb-2" aria-live="polite"></div>
-      <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">กรรมการที่บันทึกไว้</caption>
-        <thead><tr><th scope="col">บริษัท</th><th scope="col">ชื่อบุคคล</th><th scope="col">บทบาท</th><th scope="col"></th></tr></thead>
-        <tbody>${rows.map(d => `<tr><td>${U.esc(truncate(d.company_name || d.tax_id, 30))}</td>
-          <td>${U.esc(d.person_name)}</td><td>${U.esc(d.role)}</td>
-          <td><button type="button" class="btn btn-sm btn-link p-0" data-dir-del="${U.esc(d.id)}">ลบ</button></td></tr>`).join('')
-          || U.emptyRow(4, 'ยังไม่มีข้อมูลกรรมการ')}</tbody></table></div>`);
-  }
-
-  function wireDirectorsPanel() {
-    const card = U.$('directorsCard');
-    if (!card) return;
-    card.addEventListener('click', e => {
-      if (e.target.id === 'dirBulkAdd') {
-        const { addedCount, bad } = Directors.parseBulk(U.$('dirBulkPaste').value);
-        directorsChanged();   // วาดการ์ดใหม่ทั้งใบ กล่องวางจึงว่างเองด้วย
-        U.setHTML('dirBulkResult', `เพิ่ม ${U.num(addedCount)} รายการ` +
-          (bad.length ? ` · ข้าม ${U.num(bad.length)} บรรทัดที่ข้อมูลไม่ครบหรือซ้ำกับที่มีอยู่` : ''));
-      } else if (e.target.id === 'dirExport') {
-        U.downloadCSV('กรรมการ.csv', ['เลขผู้เสียภาษี', 'ชื่อบริษัท', 'ชื่อบุคคล', 'บทบาท'],
-          Directors.list().map(d => [d.tax_id, d.company_name, d.person_name, d.role]));
-      } else if (e.target.id === 'dirClearAll') {
-        if (!confirm('ลบข้อมูลกรรมการที่กรอกไว้ทั้งหมด ยืนยันหรือไม่?')) return;
-        Directors.clear();
-        directorsChanged();
-      } else if (e.target.closest('[data-dir-del]')) {
-        Directors.remove(e.target.closest('[data-dir-del]').dataset.dirDel);
-        directorsChanged();
-      }
-    });
-  }
-
-  /** การ์ดในแท็บเครือข่าย: กรรมการที่โยงผู้ชนะงาน ≥2 รายที่ต่างกัน (คำนวณจาก state.filtered ตามตัวกรอง) */
-  function renderNetDirectors() {
-    if (!U.$('netDirectorList')) return;
-    const groups = Analytics.sharedDirectors(Directors.list(), state.filtered);
-    U.setHTML('netDirectorList', groups.map(g => `
-      <div class="item" role="listitem">
-        <div class="d-flex justify-content-between align-items-start gap-2">
-          <span class="small"><strong>${U.esc(g.person_name)}</strong>
-            <span class="small-muted"> — เป็นกรรมการ ${U.num(g.matchedCount)} บริษัทที่ชนะงานในชุดข้อมูลนี้</span></span>
-          ${g.sameProject ? '<span class="con-tag is-warn flex-shrink-0">เคยได้งานโครงการเดียวกัน</span>' : ''}
-        </div>
-        <div class="con-row-tags">
-          ${g.companies.filter(c => c.matched).map(c => `<span class="con-tag">
-            ${clickable('contractor', c.winner_key, truncate(c.winner_name, 26))}
-            · ${U.num(c.n_contracts)} สัญญา · ${U.money(c.total_value)}</span>`).join('')}
-        </div>
-      </div>`).join('') ||
-      U.emptyState('ยังไม่มีกรรมการที่โยงผู้ชนะงาน ≥2 รายที่ต่างกันในชุดข้อมูลนี้ — เพิ่มได้จากโปรไฟล์ผู้รับจ้าง (ปุ่ม "ค้นใน DBD") หรือแท็บนำเข้าข้อมูล'));
   }
 
   /* =========================================================
@@ -6489,7 +4542,6 @@ ${placemarks.join('\n')}
     state.filtered.sort((a, b) => b.risk_score - a.risk_score);
     state.summary = Rules.summarize(state.filtered);
     state.profiles = null;
-    state.agencyProfiles = null; state.agencyProfilesLevel = null;
     renderKPIs();
     renderQuickFilters();
     renderFilterSummary();
@@ -6973,65 +5025,18 @@ ${placemarks.join('\n')}
   const cartStorageKey = () => datasetScopedKey(CART_STORAGE_BASE);
   const cartKey = r => [r.project_id, r.contract_no, r.winner_tin, r.contract_price_agree, r.contract_date].join('|');
 
-  const cart = { items: [], byKey: null, lastTrigger: null, confirmClear: false, tab: 'all' };
+  const cart = { items: [], byKey: null, lastTrigger: null, confirmClear: false };
 
   function recordByCartKey(key) {
     if (!cart.byKey) cart.byKey = new Map(state.records.map(r => [cartKey(r), r]));
     return cart.byKey.get(key) || null;
   }
 
-  /** ตะกร้าเดิมเก็บได้แค่ "สัญญา" รายฉบับ แต่ผู้ตรวจมักอยากรวบรวมเป็นชุด ๆ ตามหน่วยที่กำลังพิจารณาอยู่ด้วย —
-   *  บางทีก็คือทั้งโครงการ (หลายสัญญารวมกัน) บางทีก็คือผู้รับจ้างหรือหน่วยงานที่น่าสงสัยทั้งราย
-   *  จึงเพิ่ม "ตะกร้าย่อย" อีก 3 ประเภทให้เลือกเก็บได้ตามหน่วยที่กำลังดู โดยตะกร้าสัญญาเดิมทำงานเหมือนเดิมทุกอย่าง
-   *  แต่ละรายการมี type กำกับ (ไม่มี type = สัญญา เพื่อให้ข้อมูลเก่าที่เคยบันทึกไว้ก่อนหน้านี้ยังใช้ได้ทันที) */
-  function cartProjectSummary(id) {
-    const rows = state.records.filter(r => r.project_id === id);
-    if (!rows.length) return null;
-    return {
-      type: 'project', key: id, name: rows[0].project_name, sub: rows[0].dept_name,
-      n: rows.length, stat2: new Set(rows.map(r => r.winner_key)).size, stat2Label: 'ผู้รับจ้าง',
-      value: U.sum(rows.map(r => r.contract_price_agree)), rows,
-    };
-  }
-  /** ผู้รับจ้างบางจุดในแอปอ้างด้วย winner_key (ชื่อปรับมาตรฐานแล้ว) บางจุดอ้างด้วย winner_name (ชื่อดิบ)
-   *  ทั้งสองอาจไม่เท่ากัน (ตัดคำนำหน้านิติบุคคลซ้ำ/ยุบช่องว่าง) จึงรับทั้งสองแบบ เหมือนที่ renderContractorModal ทำอยู่แล้ว */
-  function cartContractorSummary(key) {
-    const rows = state.records.filter(r => r.winner_key === key || r.winner_name === key);
-    if (!rows.length) return null;
-    return {
-      type: 'contractor', key, name: rows[0].winner_name, sub: `เลขผู้เสียภาษี ${rows[0].winner_tin || '-'}`,
-      n: rows.length, stat2: new Set(rows.map(r => r.dept_key)).size, stat2Label: 'หน่วยงาน',
-      value: U.sum(rows.map(r => r.contract_price_agree)), rows,
-    };
-  }
-  function cartAgencySummary(key) {
-    const rows = state.records.filter(r => r.dept_key === key || r.dept_name === key);
-    if (!rows.length) return null;
-    return {
-      type: 'agency', key, name: rows[0].dept_name, sub: rows[0].dept_sub_name || '',
-      n: rows.length, stat2: new Set(rows.map(r => r.winner_key)).size, stat2Label: 'ผู้รับจ้าง',
-      value: U.sum(rows.map(r => r.contract_price_agree)), rows,
-    };
-  }
-
-  /** นิยามของตะกร้าแต่ละประเภทไว้ที่เดียว — เพิ่มประเภทใหม่ในอนาคตแก้ตรงนี้จุดเดียวพอ */
-  const CART_TYPES = {
-    contract: { label: 'สัญญา', icon: '📄', detailType: 'project', summarize: recordByCartKey },
-    project: { label: 'โครงการ', icon: '🏗️', detailType: 'project', summarize: cartProjectSummary },
-    contractor: { label: 'ผู้รับจ้าง', icon: '👷', detailType: 'contractor', summarize: cartContractorSummary },
-    agency: { label: 'หน่วยงาน', icon: '🏛️', detailType: 'agency', summarize: cartAgencySummary },
-  };
-  const cartTypeOf = it => it.type || 'contract';
-
   function loadCart() {
     try {
       const raw = JSON.parse(localStorage.getItem(cartStorageKey()) || '[]');
-      // ถ้าข้อมูลต้นทางถูกสร้างใหม่แล้วรายการบางอย่างหายไป (สัญญา/โครงการ/ผู้รับจ้าง/หน่วยงาน) ให้ตัดทิ้งเงียบ ๆ ไม่ให้ตะกร้าพัง
-      cart.items = (Array.isArray(raw) ? raw : []).filter(it => {
-        if (!it || !it.key) return false;
-        const cfg = CART_TYPES[cartTypeOf(it)];
-        return !!(cfg && cfg.summarize(it.key));
-      });
+      // ถ้าข้อมูลต้นทางถูกสร้างใหม่แล้วสัญญาบางฉบับหายไป ให้ตัดทิ้งเงียบ ๆ ไม่ให้ตะกร้าพัง
+      cart.items = (Array.isArray(raw) ? raw : []).filter(it => it && recordByCartKey(it.key));
     } catch (e) {
       cart.items = [];
     }
@@ -7042,42 +5047,10 @@ ${placemarks.join('\n')}
     catch (e) { /* โหมดส่วนตัวหรือพื้นที่เต็ม ตะกร้ายังใช้ได้ในรอบนี้ */ }
   }
 
-  const inCart = key => cart.items.some(it => it.key === key && cartTypeOf(it) === 'contract');
-  const inCartType = (type, key) => cart.items.some(it => it.key === key && cartTypeOf(it) === type);
-  const cartCountOf = type => cart.items.filter(it => cartTypeOf(it) === type).length;
+  const inCart = key => cart.items.some(it => it.key === key);
 
   const CART_ICON = `<svg class="cart-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
     <path fill="currentColor" d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42a.25.25 0 0 1-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>`;
-
-  /** ปุ่มเพิ่ม "โครงการ/ผู้รับจ้าง/หน่วยงาน" (ทั้งหน่วย ไม่ใช่สัญญาฉบับเดียว) ลงตะกร้าย่อยของประเภทนั้น
-   *  ใช้คู่กับ cartBtn(r) เดิม — cartBtn ยังคงเก็บ "สัญญาฉบับนี้ฉบับเดียว" เหมือนเดิมทุกที่ที่ใช้อยู่ */
-  function entityCartBtn(type, key, name) {
-    if (!key) return '';
-    const cfg = CART_TYPES[type];
-    if (!cfg) return '';
-    const on = inCartType(type, key);
-    const label = U.esc(truncate(name || key, 60));
-    return `<button type="button" class="cart-btn cart-btn-entity${on ? ' is-in' : ''}"
-      data-cart-entity="${type}" data-cart-entity-key="${U.esc(key)}" aria-pressed="${on}"
-      title="${on ? `นำ${cfg.label}นี้ออกจากตะกร้า` : `เก็บ${cfg.label}นี้ทั้งราย (${cfg.label}) ไว้ในตะกร้าย่อย`}"
-      aria-label="${on ? 'นำออกจากตะกร้า' : 'เพิ่มลงตะกร้า'}${cfg.label}: ${label}">${cfg.icon}<span class="cart-btn-mark" aria-hidden="true">${on ? '✓' : '+'}</span></button>`;
-  }
-
-  function toggleCartEntity(type, key) {
-    const cfg = CART_TYPES[type];
-    if (!cfg) return;
-    const summary = cfg.summarize(key);
-    if (!summary) return;
-    const name = summary.name || summary.project_name || summary.winner_name || summary.dept_name || key;
-    if (inCartType(type, key)) {
-      cart.items = cart.items.filter(it => !(it.key === key && cartTypeOf(it) === type));
-      cartChanged({ announce: `นำ${cfg.label} "${truncate(name, 40)}" ออกจากตะกร้าแล้ว · เหลือ ${U.num(cartCountOf(type))} ${cfg.label}` });
-    } else {
-      cart.items.push({ key, type, note: '', added: new Date().toISOString() });
-      cartChanged({ announce: `เพิ่ม${cfg.label} "${truncate(name, 40)}" ลงตะกร้าแล้ว · รวม ${U.num(cartCountOf(type))} ${cfg.label}` });
-      bumpCartBadge();
-    }
-  }
 
   /** ปุ่มเพิ่มลงตะกร้า — วางได้ทุกที่ที่มีระเบียนสัญญา การคลิกถูกจับด้วย event delegation จุดเดียว */
   function cartBtn(r, { label = false } = {}) {
@@ -7105,16 +5078,6 @@ ${placemarks.join('\n')}
       if (text) text.textContent = on ? 'อยู่ในตะกร้า' : 'เพิ่มลงตะกร้า';
       const aria = btn.getAttribute('aria-label') || '';
       btn.setAttribute('aria-label', aria.replace(/^[^:]+:/, (on ? 'นำออกจากตะกร้า' : 'เพิ่มลงตะกร้า') + ':'));
-    });
-    root.querySelectorAll('.cart-btn[data-cart-entity]').forEach(btn => {
-      const type = btn.dataset.cartEntity;
-      const on = inCartType(type, btn.dataset.cartEntityKey);
-      const cfg = CART_TYPES[type];
-      btn.classList.toggle('is-in', on);
-      btn.setAttribute('aria-pressed', String(on));
-      btn.title = on ? `นำ${cfg.label}นี้ออกจากตะกร้า` : `เก็บ${cfg.label}นี้ทั้งราย (${cfg.label}) ไว้ในตะกร้าย่อย`;
-      const mark = btn.querySelector('.cart-btn-mark');
-      if (mark) mark.textContent = on ? '✓' : '+';
     });
   }
 
@@ -7199,9 +5162,20 @@ ${placemarks.join('\n')}
     if (cart.lastTrigger && document.contains(cart.lastTrigger)) cart.lastTrigger.focus();
   }
 
-  /** แถวของ "สัญญา" ฉบับเดียว — เทมเพลตเดิมทุกตัวอักษร ไม่แตะ เพื่อไม่ให้ของเดิมที่ใช้กันมานานเพี้ยน */
-  function cartContractRowHTML(it, r, i) {
-    return `
+  function renderCartDrawer() {
+    const rows = cart.items.map(it => ({ it, r: recordByCartKey(it.key) })).filter(x => x.r);
+    const total = U.sum(rows.map(x => x.r.contract_price_agree));
+    const priority = rows.filter(x => x.r.risk_band === 'critical' || x.r.risk_band === 'high').length;
+    const projects = new Set(rows.map(x => x.r.project_id)).size;
+
+    U.setHTML('cartSummary', rows.length
+      ? `<div class="cart-stat"><strong>${U.num(rows.length)}</strong><span>สัญญา</span></div>
+         <div class="cart-stat"><strong>${U.num(projects)}</strong><span>โครงการ</span></div>
+         <div class="cart-stat"><strong>${U.money(total)}</strong><span>บาท</span></div>
+         <div class="cart-stat"><strong>${U.num(priority)}</strong><span>ควรตรวจก่อน</span></div>`
+      : '');
+
+    U.setHTML('cartList', rows.map(({ it, r }, i) => `
       <li class="cart-item band-${U.esc(r.risk_band)}" data-cart-item="${U.esc(it.key)}">
         <div class="cart-item-head">
           <span class="cart-item-no" aria-hidden="true">${i + 1}</span>
@@ -7224,116 +5198,22 @@ ${placemarks.join('\n')}
         <label class="visually-hidden" for="cartNote${i}">หมายเหตุสำหรับสัญญาลำดับที่ ${i + 1}</label>
         <textarea id="cartNote${i}" class="cart-note" rows="1" data-cart-note="${U.esc(it.key)}"
                   placeholder="หมายเหตุ เช่น เอกสารที่จะขอ หรือเหตุผลที่เลือก">${U.esc(it.note || '')}</textarea>
-      </li>`;
-  }
+      </li>`).join(''));
 
-  /** แถวของ "โครงการ/ผู้รับจ้าง/หน่วยงาน" ทั้งราย — เบากว่าแถวสัญญา เพราะเป็นภาพรวมไม่ใช่สัญญาฉบับเดียว */
-  function cartEntityRowHTML(it, s, i) {
-    const cfg = CART_TYPES[s.type];
-    return `
-      <li class="cart-item cart-item-entity" data-cart-item="${U.esc(it.key)}" data-cart-item-type="${s.type}">
-        <div class="cart-item-head">
-          <span class="cart-item-no" aria-hidden="true">${cfg.icon}</span>
-          <div class="cart-item-title">
-            ${clickable(cfg.detailType, s.key, truncate(s.name, 90))}
-            ${s.sub ? `<div class="small-muted">${U.esc(truncate(s.sub, 60))}</div>` : ''}
-          </div>
-          <button type="button" class="cart-remove" data-cart-remove-entity="${s.type}:${U.esc(it.key)}"
-                  title="นำออกจากตะกร้า" aria-label="นำออกจากตะกร้า: ${U.esc(truncate(s.name, 50))}">✕</button>
-        </div>
-        <div class="cart-item-meta">
-          <span class="metric">${U.money(s.value)} บาท</span>
-          <span class="field-chip">${U.num(s.n)} สัญญา</span>
-          <span class="field-chip">${U.num(s.stat2)} ${U.esc(s.stat2Label)}</span>
-        </div>
-        <label class="visually-hidden" for="cartNote${i}">หมายเหตุสำหรับ${cfg.label}ลำดับที่ ${i + 1}</label>
-        <textarea id="cartNote${i}" class="cart-note" rows="1" data-cart-note-entity="${s.type}:${U.esc(it.key)}"
-                  placeholder="หมายเหตุ เช่น เหตุผลที่เก็บ${cfg.label}นี้ไว้ตรวจต่อ">${U.esc(it.note || '')}</textarea>
-      </li>`;
-  }
-
-  function renderCartDrawer() {
-    // สรุปยอดของทุกประเภทไว้ก่อน ใช้ทำตัวเลขบนแท็บและตัดสินว่าจะโชว์อะไรตอน "ทั้งหมด"
-    const byType = { contract: [], project: [], contractor: [], agency: [] };
-    for (const it of cart.items) {
-      const type = cartTypeOf(it);
-      const s = CART_TYPES[type].summarize(it.key);
-      if (s) byType[type].push({ it, s });
-    }
-
-    document.querySelectorAll('#cartTabs .cart-tab').forEach(b => {
-      const type = b.dataset.cartTab;
-      const on = cart.tab === type;
-      b.classList.toggle('is-on', on);
-      b.setAttribute('aria-selected', String(on));
-      const n = type === 'all' ? cart.items.length : byType[type].length;
-      const existing = b.querySelector('.cart-tab-n');
-      if (existing) existing.remove();
-      if (n > 0) b.insertAdjacentHTML('beforeend', ` <b class="cart-tab-n">${U.num(n)}</b>`);
-    });
-
-    // "ทั้งหมด" แสดงทุกประเภทเรียงตามลำดับที่เพิ่ม ส่วนแท็บเจาะจงกรองเหลือประเภทเดียว
-    const visibleTab = cart.tab === 'all' ? null : cart.tab;
-    const visible = cart.items
-      .map(it => { const type = cartTypeOf(it); return { it, type, s: CART_TYPES[type].summarize(it.key) }; })
-      .filter(x => x.s && (!visibleTab || x.type === visibleTab));
-
-    const total = U.sum(visible.map(x => x.s.value ?? x.s.contract_price_agree));
-    const contractsN = visible.reduce((n, x) => n + (x.type === 'contract' ? 1 : x.s.n), 0);
-    const priority = byType.contract.filter(x => x.s.risk_band === 'critical' || x.s.risk_band === 'high').length;
-
-    // "ทั้งหมด" โชว์สรุปแบบสัญญาก็ต่อเมื่อมีสัญญาอยู่จริง ไม่งั้นจะเห็นเลข 0 ทั้งแถวทั้งที่ตะกร้ามีของอยู่
-    const showContractSummary = visibleTab === 'contract' || (visibleTab === null && byType.contract.length > 0);
-    U.setHTML('cartSummary', visible.length
-      ? (showContractSummary
-        ? `<div class="cart-stat"><strong>${U.num(byType.contract.length)}</strong><span>สัญญา</span></div>
-           <div class="cart-stat"><strong>${U.num(new Set(byType.contract.map(x => x.s.project_id)).size)}</strong><span>โครงการ</span></div>
-           <div class="cart-stat"><strong>${U.money(U.sum(byType.contract.map(x => x.s.contract_price_agree)))}</strong><span>บาท</span></div>
-           <div class="cart-stat"><strong>${U.num(priority)}</strong><span>ควรตรวจก่อน</span></div>`
-        : `<div class="cart-stat"><strong>${U.num(visible.length)}</strong><span>${visibleTab ? CART_TYPES[visibleTab].label : 'รายการ'}</span></div>
-           <div class="cart-stat"><strong>${U.num(contractsN)}</strong><span>สัญญารวมกัน</span></div>
-           <div class="cart-stat"><strong>${U.money(total)}</strong><span>บาท</span></div>`)
-      : '');
-
-    U.setHTML('cartList', visible.map(({ it, type, s }, i) =>
-      type === 'contract' ? cartContractRowHTML(it, s, i) : cartEntityRowHTML(it, s, i)).join(''));
-
-    const empty = !visible.length;
+    const empty = !rows.length;
     U.$('cartEmpty').hidden = !empty;
-    if (empty) {
-      // ตะกร้าสัญญาใช้ไอคอนรูปตะกร้า (คนละอันกับ entityCartBtn ของอีก 3 ประเภท) ข้อความจึงต้องแยกกัน ไม่งั้นจะบอกให้หาไอคอนผิดอัน
-      U.$('cartEmptyTitle').textContent = (visibleTab && visibleTab !== 'contract') ? `ยังไม่มี${CART_TYPES[visibleTab].label}ในตะกร้านี้` : 'ยังไม่มีสัญญาในตะกร้า';
-      U.$('cartEmptyHint').textContent = (visibleTab && visibleTab !== 'contract')
-        ? `กดปุ่ม ${CART_TYPES[visibleTab].icon} ที่หน้ารายละเอียดของ${CART_TYPES[visibleTab].label}เพื่อเก็บทั้งรายไว้ตรวจต่อ`
-        : 'กดปุ่มรูปตะกร้าหน้าชื่อโครงการในตาราง รายการ แผนที่ หรือหน้าต่างรายละเอียด';
-    }
     U.$('cartExportBtn').disabled = empty;
-    U.$('cartClearBtn').disabled = !cart.items.length;
-    U.$('cartClearBtn').textContent = cart.confirmClear
-      ? 'กดอีกครั้งเพื่อยืนยัน'
-      : (visibleTab ? `ล้าง${CART_TYPES[visibleTab].label}ในตะกร้า` : 'ล้างตะกร้า');
+    U.$('cartClearBtn').disabled = empty;
+    U.$('cartClearBtn').textContent = cart.confirmClear ? 'กดอีกครั้งเพื่อยืนยัน' : 'ล้างตะกร้า';
     U.$('cartClearBtn').classList.toggle('is-confirm', cart.confirmClear);
-    // แท็บสัญญาเดิมเชื่อมกับ AI ร่างบันทึกอยู่แล้ว ประเภทอื่นยังไม่มีเนื้อหาที่ AI ใช้ต่อได้เหมือนกัน จึงจำกัดไว้ก่อน
-    U.$('cartAiBtn').hidden = !!visibleTab && visibleTab !== 'contract';
   }
 
   /* ---------- ส่งออก CSV ---------- */
 
-  /** ปุ่ม "ส่งออก CSV" ในลิ้นชัก — ส่งออกตามแท็บย่อยที่กำลังเปิดดูอยู่
-   *  สัญญาได้ไฟล์รายละเอียดครบทุกคอลัมน์แบบเดิม ส่วนโครงการ/ผู้รับจ้าง/หน่วยงานได้ไฟล์สรุปที่เบากว่า */
-  function exportCart() {
-    if (cart.tab === 'project' || cart.tab === 'contractor' || cart.tab === 'agency') {
-      exportCartEntities(cart.tab);
-    } else {
-      exportCartContracts();
-    }
-  }
-
   /** ทุกฟิลด์ของสัญญาที่ระบบมี: ข้อมูลต้นทาง · ค่าที่คำนวณ · ผลของกฎ · ผลของโมเดล · หมายเหตุของผู้คัดเลือก
    *  ตั้งใจให้ไฟล์เดียวพอสำหรับทำกระดาษทำการ ไม่ต้องกลับมาเปิดระบบเพื่อดูว่าทำไมสัญญานี้ถูกเลือก */
-  function exportCartContracts() {
-    const rows = cart.items.filter(it => cartTypeOf(it) === 'contract')
-      .map(it => ({ it, r: recordByCartKey(it.key) })).filter(x => x.r);
+  function exportCart() {
+    const rows = cart.items.map(it => ({ it, r: recordByCartKey(it.key) })).filter(x => x.r);
     if (!rows.length) return;
     const sc = state.payload.models?.scope;
     const num = v => (v === null || v === undefined || Number.isNaN(v) ? '' : v);
@@ -7419,32 +5299,6 @@ ${placemarks.join('\n')}
     cartToast(`ส่งออก ${U.num(rows.length)} สัญญา ${headers.length} คอลัมน์แล้ว`);
   }
 
-  /** ส่งออกตะกร้าย่อยของโครงการ/ผู้รับจ้าง/หน่วยงาน — สรุปภาพรวมของแต่ละราย ไม่ใช่รายสัญญา
-   *  (อยากได้รายละเอียดระดับสัญญาของรายนั้น ให้เปิดจากหน้ารายละเอียดแล้วส่งออกจากที่นั่นแทน) */
-  function exportCartEntities(type) {
-    const cfg = CART_TYPES[type];
-    const rows = cart.items.filter(it => cartTypeOf(it) === type)
-      .map(it => ({ it, s: cfg.summarize(it.key) })).filter(x => x.s);
-    if (!rows.length) return;
-
-    const columns = [
-      ['ลำดับ', (x, i) => i + 1],
-      ['วันเวลาที่เพิ่มลงตะกร้า', x => x.it.added ? new Date(x.it.added).toLocaleString('th-TH') : ''],
-      ['หมายเหตุ', x => x.it.note || ''],
-      [cfg.label, x => x.s.name],
-      ['รายละเอียดเพิ่มเติม', x => x.s.sub || ''],
-      ['จำนวนสัญญา', x => x.s.n],
-      [rows[0].s.stat2Label, x => x.s.stat2],
-      ['มูลค่ารวม (บาท)', x => x.s.value],
-      ['แหล่งข้อมูล', () => 'ระบบข้อมูลการใช้จ่ายภาครัฐ (ภาษีไปไหน) govspending.data.go.th'],
-    ];
-    const headers = columns.map(c => c[0]);
-    const data = rows.map((x, i) => columns.map(c => c[1](x, i)));
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    U.downloadCSV(`ตะกร้า${cfg.label}-${rows.length}รายการ-${stamp}.csv`, headers, data);
-    cartToast(`ส่งออก ${U.num(rows.length)} ${cfg.label} แล้ว`);
-  }
-
   /* ---------- การผูกเหตุการณ์ ---------- */
 
   function wireCart() {
@@ -7458,15 +5312,6 @@ ${placemarks.join('\n')}
       e.preventDefault();
       e.stopPropagation();
       toggleCart(btn.dataset.cartKey);
-    }, true);
-
-    // ปุ่ม "เก็บทั้งโครงการ/ผู้รับจ้าง/หน่วยงาน" ลงตะกร้าย่อย — จุดเดียวรองรับทุกที่ที่ใช้ entityCartBtn()
-    document.addEventListener('click', e => {
-      const btn = e.target.closest('.cart-btn[data-cart-entity]');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      toggleCartEntity(btn.dataset.cartEntity, btn.dataset.cartEntityKey);
     }, true);
 
     document.addEventListener('click', e => {
@@ -7483,16 +5328,6 @@ ${placemarks.join('\n')}
         cartChanged({ announce: `นำออกแล้ว · เหลือ ${U.num(cart.items.length)} รายการ` });
         return;
       }
-      const rmEntity = e.target.closest('[data-cart-remove-entity]');
-      if (rmEntity) {
-        const [type, key] = rmEntity.dataset.cartRemoveEntity.split(/:(.*)/s);
-        cart.items = cart.items.filter(it => !(it.key === key && cartTypeOf(it) === type));
-        cart.confirmClear = false;
-        cartChanged({ announce: `นำออกแล้ว · เหลือ ${U.num(cartCountOf(type))} ${CART_TYPES[type].label}` });
-        return;
-      }
-      const tab = e.target.closest('[data-cart-tab]');
-      if (tab) { cart.tab = tab.dataset.cartTab; renderCartDrawer(); return; }
       // เปิดรายละเอียดโครงการจากในลิ้นชัก: ปิดลิ้นชักก่อน ไม่ให้ modal ซ้อนใต้ลิ้นชัก
       if (e.target.closest('#cartDrawer .detail-clickable')) closeCart();
     });
@@ -7509,27 +5344,16 @@ ${placemarks.join('\n')}
         setTimeout(() => { if (cart.confirmClear) { cart.confirmClear = false; if (!U.$('cartDrawer').hidden) renderCartDrawer(); } }, 4000);
         return;
       }
-      // อยู่ที่แท็บย่อยใดอยู่ ล้างเฉพาะประเภทนั้น เพื่อไม่ให้ผู้ใช้ที่แค่อยากล้างตะกร้าผู้รับจ้างเผลอล้างสัญญาที่เก็บไว้ด้วย
-      if (cart.tab === 'all') {
-        cart.items = [];
-        cartChanged({ announce: 'ล้างตะกร้าแล้ว' });
-      } else {
-        const label = CART_TYPES[cart.tab].label;
-        cart.items = cart.items.filter(it => cartTypeOf(it) !== cart.tab);
-        cartChanged({ announce: `ล้าง${label}ในตะกร้าแล้ว` });
-      }
+      cart.items = [];
       cart.confirmClear = false;
+      cartChanged({ announce: 'ล้างตะกร้าแล้ว' });
     });
 
     U.$('cartList').addEventListener('input', U.debounce(e => {
       const ta = e.target.closest('[data-cart-note]');
-      if (ta) { const it = cart.items.find(x => x.key === ta.dataset.cartNote && cartTypeOf(x) === 'contract'); if (it) { it.note = ta.value; saveCart(); } return; }
-      const taE = e.target.closest('[data-cart-note-entity]');
-      if (taE) {
-        const [type, key] = taE.dataset.cartNoteEntity.split(/:(.*)/s);
-        const it = cart.items.find(x => x.key === key && cartTypeOf(x) === type);
-        if (it) { it.note = taE.value; saveCart(); }
-      }
+      if (!ta) return;
+      const it = cart.items.find(x => x.key === ta.dataset.cartNote);
+      if (it) { it.note = ta.value; saveCart(); }
     }, 250));
 
     document.addEventListener('keydown', e => {
@@ -7913,907 +5737,6 @@ ${placemarks.join('\n')}
     U.$('ccSelectB').addEventListener('change', e => { state.contractorCompare.b = e.target.value; renderContractorCompareInline(); });
   }
 
-  /* =========================================================
-     แท็บหน่วยงาน
-     ========================================================= */
-
-  /** แคชโปรไฟล์หน่วยงานตามระดับที่เลือกอยู่ (กรม/สาขา) — คำนวณใหม่เมื่อตัวกรองเปลี่ยนหรือสลับระดับ
-   *  รูปแบบเดียวกับ profiles() ของแท็บผู้รับจ้างด้านบน */
-  function agencyProfilesCached() {
-    const level = state.agency.level;
-    if (!state.agencyProfiles || state.agencyProfilesLevel !== level) {
-      state.agencyProfiles = Analytics.agencyProfiles(state.filtered, { level });
-      state.agencyProfilesLevel = level;
-    }
-    return state.agencyProfiles;
-  }
-
-  /** ป้าย HHI ตามเกณฑ์มาตรฐาน (ใช้เกณฑ์เดียวกับที่ renderAgencyModal ใช้อยู่แล้ว: >2500 = กระจุกตัวสูง
-   *  ส่วน 1500-2500 = กระจุกตัวปานกลาง เป็นเกณฑ์สากลของดัชนี HHI ไม่ใช่ตัวเลขที่ตั้งขึ้นเอง)
-   *  หน่วยงานที่มีสัญญาน้อยกว่า 5 ฉบับจะได้ HHI สูงโดยธรรมชาติ (1 สัญญา = ผู้ชนะรายเดียว 100% = HHI 10,000 เสมอ)
-   *  ไม่ใช่สัญญาณการกระจุกตัวจริง จึงไม่ไล่สีตามเกณฑ์เดียวกับหน่วยงานที่มีข้อมูลพอจะตีความ (เกณฑ์ minContracts=5
-   *  เดียวกับที่ Analytics.hhi/screening ใช้เป็นค่าเริ่มต้นอยู่แล้ว) */
-  function hhiBadge(a) {
-    const h = a.hhi;
-    if (h === null || h === undefined) return '<span class="badge badge-none">HHI -</span>';
-    if (a.n_contracts < 5) {
-      return `<span class="badge badge-none" title="สัญญาน้อยกว่า 5 ฉบับ ตัวเลข HHI ยังไม่นิ่งพอจะตีความ">${U.num(Math.round(h))}</span>`;
-    }
-    const cls = h > 2500 ? 'badge-critical' : h > 1500 ? 'badge-medium' : 'badge-low';
-    return `<span class="badge ${cls}" title="ดัชนีกระจุกตัวตลาด (HHI)">${U.num(Math.round(h))}</span>`;
-  }
-
-  /** ชื่อที่แสดงในรายการ/โปรไฟล์ — ระดับสาขาต้องโชว์ทั้งชื่อสาขาและกรมต้นสังกัด ไม่งั้นแยกไม่ออกว่าอยู่กรมไหน */
-  function agencyDisplayName(a) {
-    return a.level === 'sub' && a.dept_sub_name ? `${a.dept_name} — ${a.parent_dept_name}` : a.dept_name;
-  }
-
-  /** ป้ายสรุปหนึ่งบรรทัดในรายการซ้าย คู่กับ conRowTags ของแท็บผู้รับจ้าง */
-  function agRowTags(a) {
-    const tags = [];
-    if (a.types.length) {
-      tags.push(`<span class="con-tag">${U.esc(truncate(workGroupLabel(a.types[0].label), 22))}${a.types.length > 1 ? ` +${a.types.length - 1}` : ''}</span>`);
-    }
-    if (a.methods.length) {
-      const top = a.methods[0];
-      const short = top.label.includes('e-bidding') ? 'e-bidding' : truncate(top.label, 14);
-      tags.push(`<span class="con-tag${top.share >= 0.8 ? ' is-warn' : ''}">${U.esc(short)} ${U.pct(top.share, 0)}</span>`);
-    }
-    if (a.n_contractors === 1 && a.n_contracts >= 5) tags.push('<span class="con-tag is-warn">ผู้รับจ้างรายเดียว</span>');
-    if (a.loyalty.share !== null && a.loyalty.share < 0.2 && a.n_contracts >= 5) tags.push('<span class="con-tag is-warn">แทบไม่มีรายใหม่</span>');
-    return tags.join('');
-  }
-
-  function renderAgency() {
-    const all = agencyProfilesCached();
-    const c = state.agency;
-    const list = all.filter(a =>
-      a.n_contracts >= c.contractMin &&
-      (c.hhiMin === 0 || (a.hhi !== null && a.hhi >= c.hhiMin)) &&
-      (!c.q || a.dept_name.toLowerCase().includes(c.q)));
-
-    U.setHTML('agencyKpis', [
-      ['หน่วยงานทั้งหมด', U.num(all.length)],
-      // นับเฉพาะหน่วยงานที่มี ≥5 สัญญา (เกณฑ์เดียวกับ Analytics.hhi/screening) หน่วยงานสัญญาน้อยกว่านั้น
-      // จะได้ HHI/ส่วนแบ่งผู้ชนะสูงโดยธรรมชาติ (เช่น 1 สัญญา = ผู้ชนะรายเดียว 100% เสมอ) ไม่ใช่การกระจุกตัวจริง
-      ['HHI > 2500 (≥5 สัญญา)', U.num(all.filter(a => a.n_contracts >= 5 && a.hhi !== null && a.hhi > 2500).length)],
-      ['ให้ผู้ชนะรายเดียว ≥ 50% (≥5 สัญญา)', U.num(all.filter(a => a.n_contracts >= 5 && a.top_winner_share >= 0.5).length)],
-      ['มูลค่ารวมสูงสุด', U.money(Math.max(0, ...all.map(a => a.total_value)))],
-    ].map(i => `<div class="col-6 col-lg-3"><div class="cardx kpi">
-        <div class="small-muted">${i[0]}</div><div class="v">${i[1]}</div></div></div>`).join(''));
-
-    const shown = list.slice(0, 200);
-    U.$('agencyCount').textContent = list.length > shown.length
-      ? `แสดง ${U.num(shown.length)} จาก ${U.num(list.length)}` : `${U.num(list.length)} ราย`;
-
-    U.setHTML('agencyRankList', shown.map((a, i) => `
-      <div class="item" data-idx="${i}">
-        <div class="d-flex justify-content-between gap-2">
-          <span class="small"><span class="rank-badge">${i + 1}</span> ${U.esc(truncate(agencyDisplayName(a), 38))}</span>
-          <span class="d-flex align-items-center gap-1 flex-shrink-0">
-            ${entityCartBtn('agency', a.dept_key, a.parent_dept_name)}
-            ${hhiBadge(a)}
-          </span>
-        </div>
-        <div class="small-muted">${a.n_contracts} สัญญา · ${a.n_contractors} ผู้รับจ้าง · ${U.money(a.total_value)}</div>
-        <div class="con-row-tags">${agRowTags(a)}</div>
-      </div>`).join('') || U.emptyState('ไม่พบหน่วยงานตามเงื่อนไข'));
-
-    U.$('agencyRankList').querySelectorAll('.item').forEach(el => {
-      el.addEventListener('click', () => {
-        U.$('agencyRankList').querySelectorAll('.item').forEach(x => x.classList.remove('active'));
-        el.classList.add('active');
-        showAgency(shown[Number(el.dataset.idx)]);
-      });
-    });
-
-    showAgency(state.agency.selected || shown[0] || null);
-    renderAgencyCompareInline();
-  }
-
-  function showAgency(a) {
-    state.agency.selected = a;
-    if (!a) {
-      U.setHTML('agencyProfile', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย'));
-      U.setHTML('agencyContractors', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย'));
-      renderAgencyMethods(null);
-      renderAgencyTypes(null);
-      renderAgencyTiming(null);
-      renderAgencyLoyalty(null);
-      return;
-    }
-
-    const metric = (label, value) =>
-      `<div class="col-6 col-xl-4"><div class="profile-metric">
-        <div class="label">${label}</div><div class="value">${value}</div></div></div>`;
-
-    U.setHTML('agencyProfile', `
-      <div class="mb-2 d-flex justify-content-between align-items-start gap-2">
-        <strong>${U.esc(agencyDisplayName(a))}</strong>
-        <span class="d-flex gap-1 flex-shrink-0">
-          ${entityCartBtn('agency', a.dept_key, a.parent_dept_name)}
-          <button class="btn btn-sm btn-outline-secondary" data-ag-print
-                  title="สร้างใบสรุป 1 หน้าแล้วเปิดหน้าต่างพิมพ์ เลือก 'บันทึกเป็น PDF' ได้">🖨 ใบสรุป</button>
-          <button class="btn btn-sm btn-outline-primary detail-clickable"
-                  data-type="agency" data-id="${U.esc(a.dept_key)}">ดูป๊อปอัป</button>
-        </span>
-      </div>
-      <div class="row g-2">
-        ${metric('จำนวนสัญญา', U.num(a.n_contracts))}
-        ${metric('จำนวนโครงการ', U.num(a.n_projects))}
-        ${metric('มูลค่ารวม', U.money(a.total_value))}
-        ${metric('จำนวนผู้รับจ้าง', U.num(a.n_contractors))}
-        ${metric('ดัชนีกระจุกตัว (HHI)', a.hhi === null ? '-' : U.num(Math.round(a.hhi)))}
-        ${metric('ส่วนแบ่งผู้ชนะรายใหญ่สุด', U.pct(a.top_winner_share))}
-        ${metric('จังหวัดที่มีงาน', U.num(a.n_provinces))}
-        ${metric('สัญญาที่มีสัญญาณ', U.num(a.n_flagged))}
-      </div>
-      ${a.top_winner ? `<div class="small-muted mt-2">ผู้ชนะรายใหญ่สุด: ${clickable('contractor', a.top_winner, truncate(a.top_winner, 40))} (${U.pct(a.top_winner_share)})</div>` : ''}
-      ${a.n_contracts < 5 ? '<p class="small-muted mt-1">หน่วยงานนี้มีสัญญาน้อยกว่า 5 ฉบับ ตัวเลข HHI และส่วนแบ่งผู้ชนะรายใหญ่สุดจึงสูงโดยธรรมชาติ ไม่ควรตีความว่ากระจุกตัวจริง</p>' : ''}
-    `);
-
-    renderAgencyContractorsTable(a);
-    renderAgencyMethods(a);
-    renderAgencyTypes(a);
-    const timing = Analytics.contractTiming(a.rows, fiscalCalendar());
-    renderAgencyTiming(a, timing);
-    renderAgencyLoyalty(a);
-    lastAgencySheet = { a, timing };
-    // แท็บย่อยวิเคราะห์วิธีจัดหาอิงหน่วยงานที่เลือกอยู่ ต้องคำนวณใหม่เมื่อเปลี่ยนหน่วยงานหรือเปลี่ยนตัวกรอง
-    if (state.agency.view === 'method') renderAgencyMethod();
-  }
-
-  function renderAgencyContractorsTable(a) {
-    const box = U.$('agencyContractors');
-    if (!box) return;
-    if (!a) { U.setHTML('agencyContractors', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย')); return; }
-    const total = a.total_value;
-    U.setHTML('agencyContractors', `
-      <p class="small-muted mb-2">แสดงผู้รับจ้างสูงสุด 20 ราย จากทั้งหมด ${U.num(a.contractors.length)} ราย เรียงตามมูลค่า</p>
-      <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">ผู้รับจ้างที่ได้งานจากหน่วยงานนี้</caption>
-        <thead><tr><th scope="col">ผู้รับจ้าง</th><th scope="col" class="text-end">สัญญา</th>
-          <th scope="col" class="text-end">มูลค่า</th><th scope="col" class="text-end">ส่วนแบ่ง</th></tr></thead>
-        <tbody>${a.contractors.slice(0, 20).map(cn => `<tr>
-          <td>${clickable('contractor', cn.winner_name, truncate(cn.winner_name, 40))}</td>
-          ${numTd(cn.n_contracts)}
-          ${moneyTd(cn.total_value)}
-          ${pctTd(total ? cn.total_value / total : 0)}</tr>`).join('')}</tbody>
-      </table></div>`);
-  }
-
-  function renderAgencyMethods(a) {
-    const box = U.$('agencyMethods');
-    if (!box) return;
-    if (!a) { U.setHTML('agencyMethods', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย')); return; }
-    const items = a.methods.map(m => ({ label: m.label, n: m.n }));
-    const rows = a.methods.slice(0, 5).map(m => `<div class="ma-li">
-      <span>${U.esc(truncate(m.label, 30))}</span>
-      <b>${U.pct(m.share, 0)} <span class="small-muted">(ทั้งชุด ${U.pct(m.baseShare, 0)})</span></b></div>`).join('');
-    U.setHTML('agencyMethods', `
-      ${conMixBar(items, a.n_contracts)}
-      <div class="ma-list mt-2">${rows}</div>
-      <p class="small-muted mt-1">"ทั้งชุด" คือสัดส่วนของวิธีนั้นในข้อมูลทั้งหมด ใช้เทียบว่าหน่วยงานนี้เบี่ยงจากภาพรวมแค่ไหน</p>`);
-  }
-
-  function renderAgencyTypes(a) {
-    const box = U.$('agencyTypes');
-    if (!box) return;
-    if (!a) { U.setHTML('agencyTypes', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย')); return; }
-    const items = a.types.map(t => ({ label: workGroupLabel(t.label), n: t.n }));
-    U.setHTML('agencyTypes', conMixBar(items, a.n_contracts));
-  }
-
-  /** จังหวะเวลาของหน่วยงาน — โครงเดียวกับ renderContractorTiming แต่เปลี่ยนแหล่งข้อมูลเป็นฝั่งหน่วยงาน
-   *  ข้อแตกต่างจุดเดียว: contractTiming().bursts[].depts จะเป็นชื่อหน่วยงานนี้เองเสมอ (ไม่มีประโยชน์)
-   *  จึงคำนวณรายชื่อผู้รับจ้างในวันนั้นจาก b.rows เองแทนที่จะใช้ b.depts ที่ได้มา */
-  function renderAgencyTiming(a, t) {
-    const box = U.$('agencyTiming');
-    if (!box) return;
-    if (!a) { U.setHTML('agencyTiming', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย')); return; }
-    const cal = fiscalCalendar();
-    const maxShare = Math.max(0.0001, ...t.slots.map(s => Math.max(s.myShare, s.baseShare)));
-    const missing = t.slots.filter(s => !s.inData);
-    const gapCover = announceCoverage();
-
-    const bars = t.slots.map(s => {
-      const h = (s.myShare / maxShare * 100).toFixed(0);
-      const ref = (s.baseShare / maxShare * 100).toFixed(0);
-      const cls = !s.inData ? 'is-nodata' : s.mine === 0 ? 'is-zero' : '';
-      const title = !s.inData
-        ? `${TH_MONTH_SHORT[s.month - 1]} — ชุดข้อมูลไม่มีเดือนนี้`
-        : `${TH_MONTH_SHORT[s.month - 1]} · หน่วยงานนี้ ${U.num(s.mine)} สัญญา (${U.pct(s.myShare, 0)}) · ทั้งชุด ${U.pct(s.baseShare, 0)}`;
-      return `<div class="ft-col ${cls}" title="${U.esc(title)}">
-        <div class="ft-bar"><i style="height:${h}%"></i><span class="ft-ref" style="bottom:${ref}%"></span></div>
-        <div class="ft-lab">${TH_MONTH_SHORT[s.month - 1]}</div>
-        <div class="ft-n">${s.inData ? (s.mine || '') : '–'}</div>
-      </div>`;
-    }).join('');
-
-    const peakOdd = t.peak && t.peak.baseShare > 0 && t.peak.myShare > t.peak.baseShare * 2.5 && t.myTotal >= 5;
-    const bigBurst = t.bursts[0] && t.bursts[0].n >= 5;
-
-    U.setHTML('agencyTiming', `
-      <p class="small-muted mb-2">แกนนอนเรียงตามปีงบประมาณไทย (ต.ค. ถึง ก.ย.) แท่งคือสัญญาของหน่วยงานนี้
-        เส้นขีดคือสัดส่วนของทั้งชุดข้อมูลในเดือนเดียวกัน ใช้ดูว่าหน่วยงานนี้เซ็นผิดจังหวะจากภาพรวมหรือไม่</p>
-      <div class="ft-chart" role="img" aria-label="สัญญารายเดือนตามปีงบประมาณ">${bars}</div>
-      <div class="ft-legend">
-        <span><i class="ft-key-bar"></i>สัญญาของหน่วยงานนี้</span>
-        <span><i class="ft-key-ref"></i>สัดส่วนของทั้งชุด</span>
-        <span><i class="ft-key-no"></i>ชุดข้อมูลไม่มีเดือนนี้</span>
-      </div>
-
-      <div class="ma-kpis con-kpis mt-2">
-        <div class="${peakOdd ? 'is-warn' : ''}"><span>เดือนที่กระจุกที่สุด</span>
-          <b>${t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-'}</b>
-          <em>${t.peak ? `${U.num(t.peak.mine)} สัญญา ${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)}` : 'ไม่มีวันทำสัญญา'}</em></div>
-        <div class="${bigBurst ? 'is-warn' : ''}"><span>เซ็นวันเดียวมากสุด</span>
-          <b>${t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-'}</b>
-          <em>${t.bursts[0] ? U.thaiDate(t.bursts[0].date) : 'ไม่มีวันที่ซ้ำกันตั้งแต่ 3 ฉบับ'}</em></div>
-        <div><span>ประกาศถึงทำสัญญา</span><b>${t.gapMedian === null ? '-' : `${U.num(t.gapMedian)} วัน`}</b>
-          <em>${t.gapN ? `มีข้อมูล ${U.num(t.gapN)} จาก ${U.num(t.dated)} ฉบับ` : 'ชุดนี้ไม่มีวันประกาศ'}</em></div>
-        <div><span>ระยะเวลาสัญญา</span><b>${t.durMedian === null ? '-' : `${U.num(t.durMedian)} วัน`}</b>
-          <em>${t.durN ? `จาก ${U.num(t.durN)} ฉบับ` : '-'}</em></div>
-      </div>
-
-      ${t.bursts.length ? `<div class="ma-list mt-2">
-        <div class="ma-list-title">วันที่เซ็นหลายฉบับพร้อมกัน (ตั้งแต่ 3 ฉบับ) · รวม ${U.num(t.burstRows)} สัญญา</div>
-        ${t.bursts.slice(0, 5).map(b => {
-          const winners = [...new Set(b.rows.map(r => r.winner_name))];
-          return `<div class="ma-li">
-          <span>${U.thaiDate(b.date)}${b.firstOfFiscalYear ? ' <span class="jv-flag">วันแรกของปีงบ</span>' : ''} ·
-            ${U.esc(truncate(winners[0], 26))}${winners.length > 1 ? ` +${winners.length - 1}` : ''}</span>
-          <b>${U.num(b.n)} ฉบับ · ${U.money(b.value)}</b></div>`;
-        }).join('')}
-        <p class="ma-note">เซ็นพร้อมกันหลายฉบับไม่ใช่ความผิดในตัวเอง งบที่อนุมัติพร้อมกันมักทำสัญญาพร้อมกัน ·
-          ที่ควรดูคือหลายฉบับที่ตกไปอยู่กับ<b>ผู้รับจ้างรายเดียวกัน</b>ในวันเดียว ซึ่งอาจเป็นสัญญาณของการแบ่งงาน</p>
-      </div>` : ''}
-
-      <details class="ma-how mt-2"><summary>ข้อจำกัดของช่วงเวลาในชุดนี้</summary>
-        ชุดข้อมูลครอบคลุม<b>ปีงบ ${cal.years.map(y => U.num(y)).join(', ')} เพียงปีเดียว</b> และมีข้อมูล ${U.num(cal.slots.filter(s => s.inData).length)} จาก ${U.num(cal.slots.length)} เดือน
-        ${missing.length ? `(ไม่มี ${missing.map(s => TH_MONTH_SHORT[s.month - 1]).join(' ')}) ` : ''}·
-        จึง<b>สรุปไม่ได้ว่ามีการเร่งเซ็นสัญญาปลายปีงบหรือไม่</b> เพราะเดือนท้ายปีงบยังไม่อยู่ในข้อมูล ·
-        "ประกาศถึงทำสัญญา" มีเฉพาะงานที่ประกาศเชิญชวน (ทั้งชุดมี ${U.num(gapCover.n)} จาก ${U.num(gapCover.total)} ฉบับ = ${U.pct(gapCover.share, 1)})
-        งานเฉพาะเจาะจงไม่มีวันประกาศในต้นทาง จึงเทียบข้ามวิธีจัดหาไม่ได้
-      </details>`);
-  }
-
-  /** ผู้รับจ้างรายใหม่เทียบรายเดิม — ใช้ newSupplierShare ที่คำนวณไว้แล้วใน agencyProfiles
-   *  ต้องมี <details> อธิบายข้อจำกัดของตัวเลขนี้เสมอ เพราะชุดข้อมูลมีปีงบเดียว (ดูคอมเมนต์ที่ Analytics.newSupplierShare) */
-  function renderAgencyLoyalty(a) {
-    const box = U.$('agencyLoyalty');
-    if (!box) return;
-    if (!a) { U.setHTML('agencyLoyalty', U.emptyState('เลือกหน่วยงานจากรายการด้านซ้าย')); return; }
-    const l = a.loyalty;
-    if (!l.n) { U.setHTML('agencyLoyalty', U.emptyState('หน่วยงานนี้ไม่มีวันทำสัญญาที่ใช้คำนวณได้')); return; }
-    const seg = [
-      { label: 'รายใหม่ (ไม่เคยได้งานจากหน่วยงานนี้มาก่อนในข้อมูล)', n: l.newN, color: Charts.C.teal },
-      { label: 'รายเดิม', n: l.n - l.newN, color: 'var(--border-strong)' },
-    ];
-    U.setHTML('agencyLoyalty', `
-      <p class="small-muted mb-2">นับจากลำดับวันทำสัญญา — สัญญาที่ผู้ชนะยังไม่เคยได้งานจากหน่วยงานนี้มาก่อน (ในข้อมูลที่มี) ถือเป็น "รายใหม่"</p>
-      <div class="ma-bandbar" role="img" aria-label="สัดส่วนผู้รับจ้างรายใหม่เทียบรายเดิม">
-        ${seg.map(x => `<i style="width:${(x.n / l.n * 100).toFixed(1)}%;background:${x.color}" title="${U.esc(x.label)} ${U.num(x.n)} สัญญา"></i>`).join('')}
-      </div>
-      <div class="fp-mix-legend">
-        ${seg.map(x => `<span><i style="background:${x.color}"></i>${U.esc(x.label)} <b>${U.num(x.n)}</b> (${U.pct(x.n / l.n)})</span>`).join('')}
-      </div>
-      <p class="ma-note mt-2">ผู้รับจ้างที่ปรากฏแล้วสะสม ${U.num(l.distinctWinners)} ราย จาก ${U.num(l.n)} สัญญาที่มีวันที่
-        ${l.undated ? ` (อีก ${U.num(l.undated)} สัญญาไม่มีวันทำสัญญา ไม่ได้นำมานับ)` : ''}</p>
-      <details class="ma-how mt-2"><summary>ทำไม "รายใหม่" ถึงไม่ใช่รายใหม่จริงเสมอไป</summary>
-        ชุดข้อมูลนี้มีข้อมูลเพียงปีงบเดียว ตัวเลขนี้จึงวัดได้แค่ "ไม่เคยปรากฏภายในช่วงเวลาที่มีข้อมูล" เท่านั้น
-        ผู้ชนะสัญญาแรกสุดของหน่วยงานถูกนับเป็น "รายใหม่" เสมอเพราะไม่มีข้อมูลก่อนหน้าให้เทียบ
-        และรายที่เคยได้งานมาก่อนปีงบนี้แต่ไม่ปรากฏในชุดข้อมูลนี้จะถูกนับเป็น "รายใหม่" ไปด้วยอย่างคลาดเคลื่อน
-        ตัวเลขนี้จึงเหมาะกับการเทียบระหว่างหน่วยงานภายในชุดข้อมูลเดียวกัน ไม่ควรใช้เป็นตัวเลขสัมบูรณ์
-      </details>`);
-  }
-
-  function wireAgencyControls() {
-    U.$('agencySearch').addEventListener('input', U.debounce(e => {
-      state.agency.q = e.target.value.trim().toLowerCase();
-      state.dirty.add('tab-agency'); renderActiveTab();
-    }, 250));
-    U.$('agencyLevel').addEventListener('change', e => {
-      state.agency.level = e.target.value;
-      state.agency.selected = null;
-      U.$('agencyLevelNote').textContent = e.target.value === 'sub'
-        ? 'นับที่ระดับหน่วยงานย่อย/สาขา — หน่วยงานใหญ่ที่มีหลายสาขาจะถูกแยกเป็นหลายแถว'
-        : 'นับที่ระดับกรม (รวมทุกสาขาเข้าด้วยกัน) — สลับเป็นระดับสาขาได้จากตัวกรองด้านซ้าย';
-      state.dirty.add('tab-agency'); renderActiveTab();
-    });
-    bindRange('agencyContractMin', 'agencyContractMinLabel', v => {
-      state.agency.contractMin = v; state.dirty.add('tab-agency'); renderActiveTab();
-    });
-    bindRange('agencyHhiMin', 'agencyHhiMinLabel', v => {
-      state.agency.hhiMin = v; state.dirty.add('tab-agency'); renderActiveTab();
-    });
-
-    wireAgencyViews();
-    // ปุ่มสลับขอบเขตอยู่ในแถบที่วาดใหม่ทุกครั้ง จึงต้องดักที่ตัวครอบซึ่งอยู่ถาวร
-    U.$('agMethodScope')?.addEventListener('click', e => {
-      const btn = e.target.closest('[data-method-scope]');
-      if (!btn) return;
-      state.agency.methodScope = btn.dataset.methodScope;
-      renderAgencyMethod();
-    });
-  }
-
-  /* ---------- ใบสรุปหน่วยงาน 1 หน้า — ใช้ #printSheet และคลาส ps-* ชุดเดียวกับใบสรุปผู้รับจ้าง ---------- */
-
-  let lastAgencySheet = null;
-
-  function buildAgencyPrintSheet() {
-    if (!lastAgencySheet) return false;
-    const { a, timing: t } = lastAgencySheet;
-    const pv = sheetProvenance();
-    const cases = [...a.rows].sort((x, y) => (y.risk_score || 0) - (x.risk_score || 0)).slice(0, 7);
-
-    U.setHTML('printSheet', `
-      <div class="ps-head">
-        <div>
-          <div class="ps-title">ใบสรุปหน่วยงาน</div>
-          <div class="ps-name">${U.esc(agencyDisplayName(a))}</div>
-          <div class="ps-sub">${a.level === 'sub' ? 'นับที่ระดับหน่วยงานย่อย/สาขา' : 'นับที่ระดับกรม (รวมทุกสาขา)'}</div>
-        </div>
-        <div class="ps-score">
-          <div class="ps-score-n">${a.hhi === null ? '-' : U.num(Math.round(a.hhi))}</div>
-          <div class="ps-score-l">ดัชนีกระจุกตัว<br>(HHI)</div>
-        </div>
-      </div>
-
-      <div class="ps-prov">
-        <b>ที่มาของตัวเลข</b> · ชุดข้อมูล: ${U.esc(pv.dataset)} (${U.num(pv.records)} สัญญา) ·
-        ขอบเขตที่ใช้คำนวณ: ${U.esc(pv.filters)} (${U.num(pv.filtered)} สัญญา) · พิมพ์เมื่อ ${U.esc(pv.printedAt)}
-      </div>
-
-      <div class="ps-grid">
-        <div><span>สัญญา</span><b>${U.num(a.n_contracts)}</b></div>
-        <div><span>โครงการ</span><b>${U.num(a.n_projects)}</b></div>
-        <div><span>มูลค่ารวม</span><b>${U.money(a.total_value)}</b></div>
-        <div><span>ผู้รับจ้าง</span><b>${U.num(a.n_contractors)}</b></div>
-        <div><span>ส่วนแบ่งผู้ชนะรายใหญ่สุด</span><b>${U.pct(a.top_winner_share)}</b></div>
-        <div><span>สัญญาที่มีสัญญาณ</span><b>${U.num(a.n_flagged)}</b></div>
-      </div>
-
-      <div class="ps-cols">
-        <section>
-          <h3>ผู้รับจ้างรายใหญ่</h3>
-          <table class="ps-table"><thead><tr><th>ผู้รับจ้าง</th><th>สัญญา</th><th>มูลค่า</th><th>ส่วนแบ่ง</th></tr></thead>
-            <tbody>${a.contractors.slice(0, 6).map(cn => `<tr><td>${U.esc(truncate(cn.winner_name, 26))}</td>
-              <td class="n">${U.num(cn.n_contracts)}</td><td class="n">${U.money(cn.total_value)}</td>
-              <td class="n">${U.pct(a.total_value ? cn.total_value / a.total_value : 0, 0)}</td></tr>`).join('')}</tbody></table>
-        </section>
-        <section>
-          <h3>วิธีจัดหาที่ใช้</h3>
-          <table class="ps-table"><thead><tr><th>วิธีจัดหา</th><th>สัญญา</th><th>สัดส่วน</th><th>ทั้งชุด</th></tr></thead>
-            <tbody>${a.methods.slice(0, 5).map(m => `<tr><td>${U.esc(truncate(m.label, 26))}</td>
-              <td class="n">${U.num(m.n)}</td><td class="n">${U.pct(m.share, 0)}</td><td class="n">${U.pct(m.baseShare, 0)}</td></tr>`).join('')}</tbody></table>
-        </section>
-      </div>
-
-      <div class="ps-cols">
-        <section>
-          <h3>ผู้รับจ้างรายใหม่เทียบรายเดิม</h3>
-          <p class="ps-line">รายใหม่ <b>${a.loyalty.share === null ? '-' : U.pct(a.loyalty.share)}</b>
-            ${a.loyalty.n ? `(${U.num(a.loyalty.newN)} จาก ${U.num(a.loyalty.n)} สัญญาที่มีวันที่)` : ''}</p>
-          <p class="ps-warn">ชุดข้อมูลนี้มีข้อมูลปีงบเดียว "รายใหม่" จึงหมายถึงไม่เคยปรากฏภายในช่วงข้อมูลที่มีเท่านั้น</p>
-        </section>
-        <section>
-          <h3>จังหวะเวลา</h3>
-          <p class="ps-line">เดือนที่กระจุกที่สุด <b>${t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-'}</b>
-            ${t.peak ? `${U.num(t.peak.mine)} สัญญา (${U.pct(t.peak.myShare, 0)})` : ''}</p>
-          <p class="ps-line">เซ็นวันเดียวมากสุด <b>${t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-'}</b>
-            ${t.bursts[0] ? `เมื่อ ${U.thaiDate(t.bursts[0].date)}` : ''}</p>
-        </section>
-      </div>
-
-      <section>
-        <h3>สัญญาที่ควรตรวจก่อน (เรียงตามคะแนน)</h3>
-        <table class="ps-table"><thead><tr><th>โครงการ</th><th>ผู้รับจ้าง</th><th>วันทำสัญญา</th><th>มูลค่า</th><th>คะแนน</th></tr></thead>
-          <tbody>${cases.map(r => `<tr><td>${U.esc(truncate(r.project_name, 30))}</td>
-            <td>${U.esc(truncate(r.winner_name, 22))}</td><td>${U.thaiDate(r.contract_date)}</td>
-            <td class="n">${U.money(r.contract_price_agree)}</td><td class="n">${U.num(r.risk_score)}</td></tr>`).join('')}</tbody></table>
-      </section>`);
-    return true;
-  }
-
-  function printAgencySheet() {
-    if (!buildAgencyPrintSheet()) return;
-    document.body.classList.add('is-printing');
-    const done = () => {
-      document.body.classList.remove('is-printing');
-      window.removeEventListener('afterprint', done);
-    };
-    window.addEventListener('afterprint', done);
-    setTimeout(done, 60000);
-    window.print();
-  }
-
-  function wireAgencyExtras() {
-    const profile = U.$('agencyProfile');
-    if (profile) profile.addEventListener('click', e => {
-      if (e.target.closest('[data-ag-print]')) printAgencySheet();
-    });
-  }
-
-  /* =========================================================
-     แท็บย่อย: วิเคราะห์เชิงลึกวิธีจัดหา (3E + Integrity)
-     =========================================================
-
-     กรอบการวิเคราะห์ตามแนว INTOSAI GUID 5280 (Economy / Efficiency / Effectiveness + Integrity)
-     และหลักการแข่งขันของ OECD Recommendation on Public Procurement
-
-     ★ สามส่วนที่ชุดข้อมูลนี้รองรับไม่ครบ ต้องบอกผู้ใช้ตรง ๆ ทุกครั้ง ห้ามเติมตัวเลขแทน:
-       - จำนวนผู้เสนอราคา/single bidder/cover bidding — ไม่มีข้อมูลผู้ยื่นซองเลย (ส่วนที่ 4 ใช้ตัวแทนทางอ้อม)
-       - เวลาแต่ละขั้นตอน — ต้นทางมีแค่วันประกาศกับวันลงนาม และวันประกาศมีเฉพาะวิธีประกาศเชิญชวน
-       - ความล่าช้าจริง — ไม่มีวันส่งมอบจริง มีแต่ระยะเวลาตามสัญญา */
-
-  const AG_VIEW_KEY = 'pa_agency_view';
-
-  function setAgView(view) {
-    state.agency.view = view;
-    document.querySelectorAll('[data-ag-view]').forEach(b => {
-      const on = b.dataset.agView === view;
-      b.classList.toggle('is-on', on);
-      b.setAttribute('aria-pressed', String(on));
-    });
-    document.querySelectorAll('[data-ag-pane]').forEach(p => { p.hidden = p.dataset.agPane !== view; });
-    try { localStorage.setItem(AG_VIEW_KEY, view); } catch (e) { /* ไม่สำคัญ */ }
-    if (view === 'method') renderAgencyMethod();
-    // กราฟที่วาดตอนแพนถูกซ่อนอยู่จะได้ความกว้าง 0 ต้องวัดใหม่เมื่อกลับมาแสดง
-    const pane = document.querySelector(`[data-ag-pane="${view}"]`);
-    if (pane) requestAnimationFrame(() => Charts.resizeIn(pane));
-  }
-
-  function wireAgencyViews() {
-    document.querySelectorAll('[data-ag-view]').forEach(btn => {
-      btn.addEventListener('click', () => setAgView(btn.dataset.agView));
-    });
-    let saved = null;
-    try { saved = localStorage.getItem(AG_VIEW_KEY); } catch (e) { /* ไม่สำคัญ */ }
-    setAgView(saved === 'method' ? 'method' : 'overview');
-  }
-
-  /** ขอบเขตข้อมูลที่แท็บย่อยนี้วิเคราะห์
-   *  หน่วยงาน 3,014 แห่งมีเพียง 149 แห่งที่มี ≥5 สัญญาและใช้วิธีจัดหา ≥2 แบบ การบังคับให้ดูรายหน่วยงาน
-   *  อย่างเดียวจึงทำให้ส่วนใหญ่เห็นตารางว่าง — โหมดอัตโนมัติจึงตกกลับไปใช้ทั้งชุดเมื่อข้อมูลไม่พอ */
-  const METHOD_MIN_ROWS = 5;
-
-  function resolveMethodScope() {
-    const sel = state.agency.selected;
-    const mode = state.agency.methodScope || 'auto';
-    const enough = !!sel && sel.rows.length >= METHOD_MIN_ROWS;
-    if (mode === 'all' || !sel) return { rows: state.filtered, isAgency: false, mode };
-    if (mode === 'agency') return { rows: sel.rows, isAgency: true, name: agencyDisplayName(sel), thin: !enough, mode };
-    return enough
-      ? { rows: sel.rows, isAgency: true, name: agencyDisplayName(sel), auto: true, mode }
-      : { rows: state.filtered, isAgency: false, auto: true, fellBack: sel ? agencyDisplayName(sel) : '', mode };
-  }
-
-  /** ชื่อวิธีจัดหาในต้นทางยาวมาก ใช้ในกราฟไม่ไหว — ย่อแบบตรงตัวก่อน แล้วค่อยตัดคำที่เหลือ
-   *  เทียบแบบ === กับสองวิธีหลักก่อนเสมอ เพราะ "จ้างออกแบบ...โดยวิธีเฉพาะเจาะจง" มีคำว่าเฉพาะเจาะจงอยู่ด้วย
-   *  ถ้าใช้ includes จะถูกยุบรวมเป็นวิธีเดียวกันทั้งที่เป็นคนละวิธีตามระเบียบ */
-  function methodShort(m) {
-    if (m === Rules.SPECIFIC_METHOD) return 'เฉพาะเจาะจง';
-    if (m === 'คัดเลือก') return 'คัดเลือก';
-    if (m.includes('e-bidding')) return 'e-bidding';
-    return truncate(m.replace('จ้างออกแบบหรือควบคุมงานก่อสร้างโดยวิธี', 'ออกแบบ/คุมงาน-')
-      .replace('จ้างที่ปรึกษาโดยวิธี', 'ที่ปรึกษา-'), 20);
-  }
-
-  const methodCard = (id, num, title, question, body, open = false) => `
-    <div class="cardx p-3 mb-3" data-collapse-id="${id}" data-collapse-default="${open ? 'open' : 'closed'}">
-      <div class="card-title-row"><h2 class="h6 mb-0">${num}. ${U.esc(title)}</h2>
-        <span class="badge badge-derived">คำนวณ</span></div>
-      <p class="method-q">คำถามวิเคราะห์: ${question}</p>
-      ${body}
-    </div>`;
-
-  const kpiTile = (label, value, sub, warn = false) =>
-    `<div class="${warn ? 'is-warn' : ''}"><span>${label}</span><b>${value}</b><em>${sub}</em></div>`;
-
-  function renderAgencyMethod() {
-    const scope = resolveMethodScope();
-    const rows = scope.rows;
-    const all = state.filtered;                       // ค่าฐานเทียบใช้ทั้งชุดที่กรองอยู่เสมอ
-    const bd = Analytics.methodBreakdown(rows);
-    const bdAll = Analytics.methodBreakdown(all);
-    const baseByMethod = new Map(bdAll.map(m => [m.method, m]));
-    const ev = Analytics.thresholdEvasion(rows);
-    const fit = Analytics.methodStrategicFit(rows);
-    const pilot = Analytics.unitPricePilot(rows);
-
-    renderMethodScopeBar(scope, rows);
-
-    U.setHTML('agMethodBody', [
-      methodSectionOverview(bd, rows, baseByMethod),
-      methodSectionEfficiency(bd, rows),
-      methodSectionEconomy(bd, rows, pilot),
-      methodSectionIntegrity(bd, rows),
-      methodSectionStrategic(fit),
-      methodSectionCompliance(ev),
-      methodSectionSummary({ bd, rows, ev, fit, scope }),
-    ].join(''));
-
-    wireCollapsibleCards();     // การ์ดชุดนี้สร้างหลัง boot — ตัวเดิมมี guard กันผูกซ้ำอยู่แล้ว
-    drawMethodCharts(bd, fit);
-  }
-
-  function renderMethodScopeBar(scope, rows) {
-    const value = U.sum(rows.map(r => r.contract_price_agree));
-    const what = scope.isAgency
-      ? `<b>${U.esc(truncate(scope.name, 46))}</b>`
-      : '<b>ทั้งชุดข้อมูลที่กรองอยู่</b>';
-    const why = scope.fellBack
-      ? ` · เลือก <b>${U.esc(truncate(scope.fellBack, 28))}</b> ไว้ แต่มีสัญญาน้อยกว่า ${METHOD_MIN_ROWS} ฉบับ จึงแสดงทั้งชุดแทน`
-      : scope.thin ? ' · <b>ข้อมูลน้อยกว่า 5 สัญญา ตัวเลขอาจไม่นิ่งพอจะสรุป</b>' : '';
-    const btn = (mode, label) =>
-      `<button type="button" class="btn btn-sm ${state.agency.methodScope === mode ? 'btn-primary' : 'btn-outline-secondary'}"
-               data-method-scope="${mode}">${label}</button>`;
-    U.setHTML('agMethodScope', `
-      <span class="method-scope-now">กำลังวิเคราะห์: ${what} · ${U.num(rows.length)} สัญญา · ${U.money(value)} บาท${why}</span>
-      <span class="d-flex gap-1 ms-auto">
-        ${btn('auto', 'อัตโนมัติ')}${btn('agency', 'หน่วยงานที่เลือก')}${btn('all', 'ทั้งชุดข้อมูล')}
-      </span>`);
-  }
-
-  /* ---------- 1. ภาพรวมวิธีจัดหา ---------- */
-  function methodSectionOverview(bd, rows, baseByMethod) {
-    const totalV = U.sum(rows.map(r => r.contract_price_agree));
-    const body = `
-      <div class="row g-3">
-        <div class="col-md-6"><div id="agM1DonutN" style="height:230px" role="img"
-             aria-label="สัดส่วนจำนวนสัญญาแยกตามวิธีจัดหา"></div>
-          <p class="small-muted text-center mb-0">สัดส่วน<b>จำนวนสัญญา</b></p></div>
-        <div class="col-md-6"><div id="agM1DonutV" style="height:230px" role="img"
-             aria-label="สัดส่วนมูลค่าแยกตามวิธีจัดหา"></div>
-          <p class="small-muted text-center mb-0">สัดส่วน<b>มูลค่า</b></p></div>
-      </div>
-      <div class="table-wrap mt-2"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">สรุปวิธีจัดหา</caption>
-        <thead><tr><th scope="col">วิธีจัดหา</th><th scope="col" class="text-end">สัญญา</th>
-          <th scope="col" class="text-end">% จำนวน</th><th scope="col" class="text-end">มูลค่ารวม</th>
-          <th scope="col" class="text-end">% มูลค่า</th><th scope="col" class="text-end">เฉลี่ย/สัญญา</th>
-          <th scope="col" class="text-end">มัธยฐาน</th><th scope="col" class="text-end">ต่างจากค่าฐาน</th></tr></thead>
-        <tbody>${bd.map(m => {
-          const base = baseByMethod.get(m.method);
-          const diff = base ? (m.shareV - base.shareV) * 100 : null;
-          return `<tr>
-            <td>${U.esc(methodShort(m.method))}</td>
-            ${numTd(m.n)}${pctTd(m.shareN)}
-            ${moneyTd(m.value)}${pctTd(m.shareV)}
-            ${moneyTd(m.mean)}${moneyTd(m.median)}
-            <td class="text-end" ${sortAttr(diff)}>${diff === null ? '-'
-              : `<span class="${Math.abs(diff) < 1 ? 'small-muted' : ''}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</span>`}</td>
-          </tr>`;
-        }).join('') || U.emptyRow(8)}</tbody>
-      </table></div>
-      <p class="ma-note">"ต่างจากค่าฐาน" คือส่วนแบ่ง<b>มูลค่า</b>ของวิธีนั้นในขอบเขตที่เลือก ลบด้วยส่วนแบ่งเดียวกันของทั้งชุดข้อมูล
-        (หน่วยเป็น percentage point) · ค่าบวกแปลว่าใช้วิธีนั้นหนักกว่าภาพรวม ไม่ได้แปลว่าผิดในตัวเอง
-        ต้องดูคู่กับลักษณะงานและวงเงินของหน่วยงานนั้น</p>
-      ${totalV ? '' : '<p class="ma-note">ขอบเขตนี้ไม่มีมูลค่าสัญญา กราฟสัดส่วนมูลค่าจึงว่าง</p>'}`;
-    return methodCard('agM1', 1, 'ภาพรวมวิธีจัดหา',
-      'หน่วยงานนี้ใช้วิธีใดเป็นหลัก และเงินก้อนใหญ่ไปทางวิธีไหน', body, true);
-  }
-
-  /* ---------- 2. ประสิทธิภาพกระบวนการ (Efficiency) ---------- */
-  function methodSectionEfficiency(bd, rows) {
-    const gaps = rows.map(r => r.announce_gap_days).filter(v => v !== null && v !== undefined).sort((a, b) => a - b);
-    const p = q => (gaps.length ? gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * q))] : null);
-    const fast = gaps.filter(v => v < 20).length;
-    const cover = rows.length ? gaps.length / rows.length : 0;
-    const noGap = bd.filter(m => m.n >= 5 && m.gapN === 0).map(m => methodShort(m.method));
-
-    const body = `
-      <div class="ma-kpis con-kpis">
-        ${kpiTile('ประกาศ→ลงนาม (มัธยฐาน)', gaps.length ? `${U.num(p(0.5))} วัน` : '-',
-          gaps.length ? `เร็วสุด ${U.num(gaps[0])} · ช้าสุด ${U.num(gaps[gaps.length - 1])} วัน` : 'ไม่มีวันประกาศในขอบเขตนี้')}
-        ${kpiTile('ช้ากว่าปกติ (p90)', gaps.length ? `${U.num(p(0.9))} วัน` : '-', 'ร้อยละ 90 ของงานเสร็จกระบวนการก่อนวันนี้')}
-        ${kpiTile('เซ็นเร็วกว่า 20 วัน', U.num(fast), 'ช่วงเวลาสั้นผิดปกติ ควรดูเอกสารประกอบ', fast > 0)}
-        ${kpiTile('ความครอบคลุมของวันประกาศ', U.pct(cover, 1), `มีข้อมูล ${U.num(gaps.length)} จาก ${U.num(rows.length)} สัญญา`, cover < 0.5)}
-      </div>
-      <div id="agM2Bar" style="height:230px" class="mt-2" role="img"
-           aria-label="ระยะเวลาตามสัญญามัธยฐานแยกตามวิธีจัดหา"></div>
-      <p class="ma-note">แท่งด้านบนคือ<b>ระยะเวลาที่ตกลงไว้ในสัญญา</b> (duration_days) ไม่ใช่เวลาที่ใช้จริง
-        และไม่ใช่ความล่าช้า — ชุดข้อมูลนี้ไม่มีวันส่งมอบจริง จึงคำนวณอัตราความล่าช้าไม่ได้</p>
-      <details class="ma-how mt-2"><summary>ทำไมวัดเวลาได้แค่ช่วงเดียว</summary>
-        การจัดซื้อจัดจ้างมีหลายขั้น (ประกาศ → เปิดซอง → พิจารณาผล → อนุมัติ → ลงนาม) แต่ต้นทางเปิดเผยเพียง
-        <b>วันประกาศ</b>กับ<b>วันลงนามสัญญา</b> จึงวัดได้ช่วงเดียวคือประกาศถึงลงนาม ·
-        ที่สำคัญกว่านั้น <b>วันประกาศมีเฉพาะวิธีที่ต้องประกาศเชิญชวน</b>
-        ${noGap.length ? `ในขอบเขตนี้วิธี ${noGap.map(U.esc).join(' และ ')} ไม่มีวันประกาศเลย` : ''}
-        การเทียบ "ความเร็ว" ข้ามวิธีจัดหาจึงทำไม่ได้ ตัวเลขข้างบนอ่านได้เฉพาะภายในวิธีที่มีข้อมูล ·
-        ถ้าต้องการวัดประสิทธิภาพครบทุกขั้นและวัดความล่าช้าจริง ต้องขอวันเปิดซอง วันอนุมัติ และวันส่งมอบจริง
-        จากระบบ e-GP เพิ่ม
-      </details>`;
-    return methodCard('agM2', 2, 'ประสิทธิภาพกระบวนการ (Efficiency)',
-      'ใช้เวลาจากประกาศถึงลงนามนานเท่าไร และมีสัญญาไหนเร็วผิดปกติ', body);
-  }
-
-  /* ---------- 3. ความคุ้มค่าและราคา (Economy) ---------- */
-  function methodSectionEconomy(bd, rows, pilot) {
-    const withDisc = bd.filter(m => m.discMed !== null && m.n >= 3);
-    const eb = bd.find(m => m.method.includes('e-bidding'));
-    const sp = bd.find(m => m.method === Rules.SPECIFIC_METHOD);
-
-    let hypo = '';
-    if (eb && sp && eb.discMed !== null && sp.discMed !== null && eb.discMed > sp.discMed) {
-      const base = U.sum(sp.rows.filter(r => r.price_build > 0).map(r => r.price_build));
-      const gain = base * (eb.discMed - sp.discMed);
-      hypo = `<p class="ma-note"><b>เปรียบเทียบเชิงสมมติ:</b> ถ้างานที่ใช้วิธีเฉพาะเจาะจงในขอบเขตนี้
-        (ฐานราคากลางรวม ${U.money(base)} บาท) ได้ส่วนลดเท่ามัธยฐานของ e-bidding
-        (${(eb.discMed * 100).toFixed(2)}% แทน ${(sp.discMed * 100).toFixed(2)}%) มูลค่าจะต่างไป ~${U.money(gain)} บาท ·
-        <b>ไม่ใช่ความเสียหายที่พิสูจน์แล้ว</b> เพราะงานเฉพาะเจาะจงจำนวนมากเป็นงานเล็ก เร่งด่วน หรือมีผู้ขายรายเดียว
-        ซึ่งแข่งขันไม่ได้โดยสภาพ ใช้เป็นเพียงตัวชี้ขนาดของช่องว่างที่ควรตรวจสอบต่อ</p>`;
-    }
-
-    const pilotRows = pilot.bySize.map(b => `<tr>
-      <td>${U.num(b.size)}</td>${numTd(b.n)}
-      ${moneyTd(b.medPerMetre)}
-      <td class="text-end small-muted" ${sortAttr(b.maxPerMetre)}>${U.money(b.minPerMetre)} – ${U.money(b.maxPerMetre)}</td>
-    </tr>`).join('');
-
-    const body = `
-      <div id="agM3Bar" style="height:240px" role="img"
-           aria-label="ส่วนลดจากราคากลางมัธยฐานแยกตามวิธีจัดหา"></div>
-      <div class="ma-kpis con-kpis mt-2">
-        ${withDisc.slice(0, 4).map(m => kpiTile(
-          methodShort(m.method),
-          m.discMed === null ? '-' : `ลด ${(m.discMed * 100).toFixed(2)}%`,
-          `ไม่ลดเลย ${U.pct(m.discZeroShare, 0)} ของ ${U.num(m.discN)} สัญญา`,
-          m.discZeroShare !== null && m.discZeroShare > 0.3)).join('')}
-      </div>
-      ${hypo}
-      <p class="ma-note">ส่วนลดคิดจาก (ราคากลาง − มูลค่าสัญญา) ÷ ราคากลาง · ราคากลางมีครบเกือบทุกสัญญาในชุดนี้
-        จึงเป็นตัวชี้วัดความคุ้มค่าที่เชื่อถือได้ที่สุดเท่าที่ข้อมูลมี</p>
-
-      <div class="cardx p-3 mt-2" style="background:var(--surface-soft)">
-        <div class="card-title-row"><h3 class="h6 mb-0">ราคาต่อหน่วย — การ์ดนำร่อง (ท่อ)</h3>
-          <span class="badge badge-none">นำร่อง</span></div>
-        <p class="small-muted mb-2">อ่านขนาดท่อและความยาวจาก<b>ชื่อโครงการ</b> แล้วคิดบาทต่อเมตร
-          ใช้ได้ ${U.num(pilot.shownN)} จาก ${U.num(pilot.totalN)} สัญญาในขอบเขตนี้</p>
-        ${pilotRows ? `<div class="table-wrap"><table class="table table-sm mini-table mb-0">
-          <caption class="visually-hidden">ราคาต่อเมตรแยกตามขนาดท่อ</caption>
-          <thead><tr><th scope="col">ขนาดท่อ</th><th scope="col" class="text-end">สัญญา</th>
-            <th scope="col" class="text-end">฿/เมตร (มัธยฐาน)</th><th scope="col" class="text-end">ต่ำสุด – สูงสุด</th></tr></thead>
-          <tbody>${pilotRows}</tbody></table></div>`
-          : U.emptyState('ขอบเขตนี้ไม่มีสัญญาที่ระบุทั้งขนาดท่อและความยาวในชื่อโครงการมากพอ')}
-        <details class="ma-how mt-2"><summary>ตัวเลขนี้ใช้อ้างอิงราคาต่อหน่วยจริงไม่ได้</summary>
-          เป็นการ<b>ประมาณจากข้อความในชื่อโครงการ</b> ไม่ใช่ราคาตาม BOQ · สัญญาหนึ่งมักรวมงานอื่นนอกเหนือจากตัวท่อ
-          (งานดิน งานคืนผิวจราจร ข้อต่อ อุปกรณ์) ตัวเลขจึงสูงกว่าราคาท่อเปล่าเสมอ และชื่อโครงการอาจระบุขนาดหลายค่า
-          ระบบจะอ่านค่าแรกที่พบ · ใช้ได้เพียงเทียบหยาบ ๆ ว่า "ขนาดเดียวกัน หน่วยงานไหนจ่ายต่างจากที่อื่นมาก"
-          แล้วไปเปิดเอกสารจริงต่อ ไม่ใช่ข้อสรุปว่าแพงหรือถูก
-        </details>
-      </div>`;
-    return methodCard('agM3', 3, 'ความคุ้มค่าและราคา (Economy)',
-      'วิธีจัดหาที่ใช้ ทำให้ได้ราคาต่ำกว่าราคากลางมากน้อยแค่ไหน', body);
-  }
-
-  /* ---------- 4. การแข่งขันและความโปร่งใส (Integrity) ---------- */
-  function methodSectionIntegrity(bd, rows) {
-    const totalV = U.sum(rows.map(r => r.contract_price_agree));
-    const byWinner = U.groupBy(rows, r => r.winner_key);
-    let hhi = 0, topShare = 0, topName = '';
-    for (const [key, wrows] of byWinner) {
-      const v = U.sum(wrows.map(r => r.contract_price_agree));
-      const share = totalV > 0 ? v / totalV : 0;
-      hhi += (share * 100) ** 2;
-      if (share > topShare) { topShare = share; topName = wrows[0].winner_name || key; }
-    }
-    const disc = rows.map(Analytics.ceilingDiscount).filter(d => d !== null);
-    const zero = disc.length ? disc.filter(d => Math.abs(d) < 1e-9).length / disc.length : null;
-    const tight = disc.length ? disc.filter(d => d < 0.01).length / disc.length : null;
-    const rotation = Analytics.bidRotation(rows).slice(0, 5);
-
-    const body = `
-      <div class="con-nobid">⚠ <b>ชุดข้อมูลนี้ไม่มีจำนวนผู้เสนอราคาและรายชื่อผู้ยื่นซอง</b> —
-        e-GP เปิดเผยเฉพาะผู้ชนะ จึงคำนวณ "ผู้เสนอราคาเฉลี่ยต่อประกวด" "สัดส่วน single bidder"
-        และ "cover bidding" ไม่ได้เลย ด้านล่างคือสัญญาณการแข่งขันที่<b>วัดได้จริง</b>จากข้อมูลที่มี</div>
-      <div class="ma-kpis con-kpis mt-2">
-        ${kpiTile('ส่วนแบ่งผู้ชนะรายใหญ่สุด', U.pct(topShare, 1), U.esc(truncate(topName, 28)) || '-', topShare > 0.5)}
-        ${kpiTile('ดัชนีกระจุกตัว (HHI)', U.num(Math.round(hhi)), hhi > 2500 ? 'เกินเกณฑ์กระจุกตัวสูง (2,500)' : 'ต่ำกว่าเกณฑ์ 2,500', hhi > 2500)}
-        ${kpiTile('ไม่ลดจากราคากลางเลย', zero === null ? '-' : U.pct(zero, 1), `จาก ${U.num(disc.length)} สัญญาที่มีราคากลาง`, zero !== null && zero > 0.3)}
-        ${kpiTile('ราคาชิดราคากลาง (ลด <1%)', tight === null ? '-' : U.pct(tight, 1), 'ยิ่งสูงยิ่งไร้แรงกดดันด้านราคา', tight !== null && tight > 0.5)}
-      </div>
-      ${rotation.length ? `<div class="ma-list mt-2">
-        <div class="ma-list-title">คู่ผู้ชนะที่สลับกันได้งานในหน่วยงานเดียวกัน</div>
-        ${rotation.map(r => `<div class="ma-li">
-          <span>${U.esc(truncate(r.dept_name, 28))} · ${U.esc(truncate(r.top_winners[0], 20))} ↔ ${U.esc(truncate(r.top_winners[1], 20))}</span>
-          <b>${U.num(r.counts[0])}:${U.num(r.counts[1])} จาก ${U.num(r.n_total_contracts)} · ${U.money(r.total_value)}</b>
-        </div>`).join('')}
-      </div>` : ''}
-      <details class="ma-how mt-2"><summary>ตัวเลขเหล่านี้แทนการวัดการแข่งขันได้แค่ไหน</summary>
-        <b>แทนได้บางส่วนเท่านั้น</b> · "ส่วนแบ่งผู้ชนะรายใหญ่สุด" และ HHI วัดจาก<b>ผู้ชนะ</b> ไม่ใช่ผู้เข้าแข่งขัน
-        ตลาดที่มีผู้ยื่นซองจำนวนมากแต่ผู้ชนะกระจุกตัว กับตลาดที่มีผู้ยื่นซองรายเดียวทุกครั้ง จะได้ค่าเท่ากัน
-        ทั้งที่เป็นคนละปัญหา · "ไม่ลดจากราคากลางเลย" และ "ราคาชิดราคากลาง" เป็นสัญญาณทางอ้อมของการไม่มีแรงกดดัน
-        ด้านราคา ซึ่งเกิดได้ทั้งจากการขาดคู่แข่งจริงและจากการที่ราคากลางตั้งไว้ต่ำอยู่แล้ว ·
-        "คู่ผู้ชนะที่สลับกัน" คือรูปแบบที่ควรดูต่อ ไม่ใช่ข้อพิสูจน์การฮั้ว — ตลาดที่มีผู้เล่นจริงเพียงสองรายก็ให้ผลแบบนี้ได้ ·
-        ถ้าต้องการตอบเรื่องการแข่งขันอย่างแท้จริง ต้องขอ<b>รายชื่อและราคาของผู้ยื่นซองทุกราย</b>รายโครงการจากกรมบัญชีกลาง
-      </details>`;
-    return methodCard('agM4', 4, 'การแข่งขันและความโปร่งใส (Integrity)',
-      'มีสัญญาณว่าการแข่งขันถูกจำกัด หรือราคาไม่ถูกกดดันหรือไม่', body);
-  }
-
-  /* ---------- 5. ความเหมาะสมเชิงกลยุทธ์ (Kraljic) ---------- */
-  function methodSectionStrategic(fit) {
-    const top = fit.slice(0, 14);
-    const body = `
-      <div id="agM5Scatter" style="height:330px" role="img"
-           aria-label="แผนภาพกลุ่มงานตามความเสี่ยงด้านอุปทานและสาระสำคัญ"></div>
-      <p class="ma-note">แกนนอน = ดัชนีกระจุกตัวของผู้ขายในกลุ่มงานนั้น (HHI ถ่วงด้วยมูลค่า ยิ่งขวายิ่งพึ่งพาผู้ขายน้อยราย)
-        · แกนตั้ง = สัดส่วนมูลค่าของกลุ่มงาน (สาระสำคัญ) · ขนาดจุด = จำนวนสัญญา · สีจุด = สัดส่วนมูลค่าที่จัดหาแบบไม่แข่งขัน
-        · <b>กลุ่มที่ควรตรวจก่อนคือมุมขวาบนที่สีเข้ม</b> — เงินเยอะ ตลาดกระจุก และยังจัดหาโดยไม่แข่งขัน</p>
-      <div class="table-wrap mt-2"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">กลุ่มงานตามความเสี่ยงและสาระสำคัญ</caption>
-        <thead><tr><th scope="col">กลุ่มงาน</th><th scope="col" class="text-end">สัญญา</th>
-          <th scope="col" class="text-end">มูลค่า</th><th scope="col" class="text-end">% ของมูลค่า</th>
-          <th scope="col" class="text-end">ผู้ขาย</th><th scope="col" class="text-end">HHI</th>
-          <th scope="col" class="text-end">ไม่แข่งขัน (% มูลค่า)</th></tr></thead>
-        <tbody>${top.map(g => `<tr>
-          <td>${U.esc(workGroupLabel(g.group))}</td>
-          ${numTd(g.n)}${moneyTd(g.value)}${pctTd(g.shareV)}
-          ${numTd(g.suppliers)}
-          <td class="text-end" ${sortAttr(g.hhi)}>${g.hhi > 2500 ? `<span class="badge badge-critical">${U.num(g.hhi)}</span>` : U.num(g.hhi)}</td>
-          ${pctTd(g.specShareV)}
-        </tr>`).join('') || U.emptyRow(7)}</tbody>
-      </table></div>
-      <details class="ma-how mt-2"><summary>ทำไมแกนความเสี่ยงต้องคิดจากมูลค่า ไม่ใช่จำนวนสัญญา</summary>
-        ถ้าคิด HHI จาก<b>จำนวนสัญญา</b> ชุดข้อมูลนี้จะได้ค่าเพียง 17-219 ทุกกลุ่มงาน ดูเหมือนแข่งขันดีไปหมด
-        เพราะมีผู้ขายรายเล็กจำนวนมากถ่วงค่าลง · แต่เมื่อคิดจาก<b>ส่วนแบ่งมูลค่า</b>ซึ่งเป็นนิยามมาตรฐาน
-        ค่าจะกระจายเป็น 58-5,228 และเห็นทันทีว่าบางกลุ่มงานพึ่งพาผู้ขายไม่กี่รายในเชิงเม็ดเงินจริง ·
-        แผนภาพนี้ใช้กรอบ Kraljic (ความเสี่ยงด้านอุปทาน × สาระสำคัญ) โดยเพิ่มสีเป็นมิติที่สามเพื่อตอบว่า
-        กลุ่มที่เสี่ยงและเงินเยอะ ถูกจัดหาด้วยวิธีที่ไม่มีการแข่งขันด้วยหรือไม่
-      </details>`;
-    return methodCard('agM5', 5, 'ความเหมาะสมเชิงกลยุทธ์ (Kraljic)',
-      'กลุ่มงานที่ใช้เงินมากและตลาดกระจุกตัว ถูกจัดหาด้วยวิธีที่แข่งขันหรือไม่', body);
-  }
-
-  /* ---------- 6. การปฏิบัติตามระเบียบ (Compliance) ---------- */
-  function methodSectionCompliance(ev) {
-    const overRows = ev.overCeiling.slice(0, 15).map(r => `<tr>
-      <td>${clickable('project', r.project_id, truncate(r.project_name, 40))}</td>
-      <td>${U.esc(truncate(r.dept_name, 26))}</td>
-      ${moneyTd(r.contract_price_agree)}
-      ${dateTd(r.contract_date)}
-    </tr>`).join('');
-    const clusterRows = ev.clusters.slice(0, 10).map(c => `<tr>
-      <td>${U.esc(truncate(c.dept_name, 32))}</td>
-      ${dateTd(c.date)}
-      ${numTd(c.n)}${numTd(c.winners)}
-      ${moneyTd(c.total)}
-    </tr>`).join('');
-
-    const body = `
-      <div class="ma-kpis con-kpis">
-        ${kpiTile('เฉพาะเจาะจงเกินเพดาน', U.num(ev.overCeiling.length),
-          `เกิน ${U.num(ev.ceiling)} บาท · รวม ${U.money(ev.overCeilingValue)}`, ev.overCeiling.length > 0)}
-        ${kpiTile('ชิดเพดาน', U.num(ev.nearCeiling.length),
-          `${U.num(ev.nearLo)} – ${U.num(ev.ceiling)} บาท`, ev.nearCeiling.length > 0)}
-        ${kpiTile('ชุดที่เซ็นวันเดียวกันรวมเกินเพดาน', U.num(ev.clusters.length),
-          `รวม ${U.money(ev.clusterValue)} บาท`, ev.clusters.length > 0)}
-      </div>
-      <div class="ma-list-title mt-3">สัญญาวิธีเฉพาะเจาะจงที่มูลค่าเกิน ${U.num(ev.ceiling)} บาท</div>
-      <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">สัญญาเฉพาะเจาะจงที่เกินเพดานวงเงิน</caption>
-        <thead><tr><th scope="col">โครงการ</th><th scope="col">หน่วยงาน</th>
-          <th scope="col" class="text-end">มูลค่า</th><th scope="col">วันทำสัญญา</th></tr></thead>
-        <tbody>${overRows || U.emptyRow(4, 'ไม่พบสัญญาเฉพาะเจาะจงที่เกินเพดานในขอบเขตนี้')}</tbody>
-      </table></div>
-      ${ev.overCeiling.length > 15 ? `<p class="small-muted">แสดง 15 จาก ${U.num(ev.overCeiling.length)} รายการ</p>` : ''}
-
-      <div class="ma-list-title mt-3">หน่วยงานที่เซ็นสัญญาเฉพาะเจาะจงหลายฉบับในวันเดียวกันจนรวมเกินเพดาน</div>
-      <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-        <caption class="visually-hidden">ชุดสัญญาที่อาจเป็นการแบ่งซื้อแบ่งจ้าง</caption>
-        <thead><tr><th scope="col">หน่วยงาน</th><th scope="col">วันทำสัญญา</th>
-          <th scope="col" class="text-end">ฉบับ</th><th scope="col" class="text-end">ผู้รับจ้าง</th>
-          <th scope="col" class="text-end">รวมมูลค่า</th></tr></thead>
-        <tbody>${clusterRows || U.emptyRow(5, 'ไม่พบชุดสัญญาลักษณะนี้ในขอบเขตนี้')}</tbody>
-      </table></div>
-      ${ev.clusters.length > 10 ? `<p class="small-muted">แสดง 10 จาก ${U.num(ev.clusters.length)} ชุด</p>` : ''}
-
-      <p class="ma-note"><b>ทั้งสองตารางนี้คือ "รายการที่ต้องขอเอกสารเหตุผลประกอบ" ไม่ใช่ข้อสรุปว่าผิดระเบียบ</b> ·
-        พ.ร.บ. การจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 มาตรา 56(2) เปิดให้ใช้วิธีเฉพาะเจาะจงเกินวงเงินได้
-        ในหลายกรณี เช่น มีผู้ประกอบการรายเดียว เป็นงานเร่งด่วนฉุกเฉิน เป็นการซื้อต่อเนื่องจากสัญญาเดิม
-        หรือเป็นพัสดุที่ต้องซื้อจากหน่วยงานรัฐด้วยกัน · การเซ็นหลายฉบับในวันเดียวกันก็เกิดได้ตามปกติเมื่องบประมาณ
-        อนุมัติพร้อมกัน · สิ่งที่ต้องตรวจคือ<b>มีบันทึกเหตุผลและได้รับอนุมัติจากผู้มีอำนาจตามระเบียบหรือไม่</b></p>`;
-    return methodCard('agM6', 6, 'การปฏิบัติตามกฎหมายและระเบียบ (Compliance)',
-      'มีการใช้วิธีจัดหาไม่ตรงเงื่อนไขวงเงิน หรือแบ่งสัญญาเพื่อเลี่ยงเพดานหรือไม่', body);
-  }
-
-  /* ---------- สรุปจุดเสี่ยงท้ายแท็บ ---------- */
-  /** สร้างข้อสังเกตจากตัวเลขที่คำนวณได้จริงเท่านั้น — ห้ามฝังข้อสรุปตายตัว
-   *  ถ้าไม่พบอะไรต้องบอกว่าไม่พบ ไม่ใช่ปล่อยว่างให้เข้าใจว่าระบบยังไม่ได้ตรวจ */
-  function methodSectionSummary({ bd, rows, ev, fit, scope }) {
-    const finds = [];
-    const totalV = U.sum(rows.map(r => r.contract_price_agree));
-    const sp = bd.find(m => m.method === Rules.SPECIFIC_METHOD);
-    const eb = bd.find(m => m.method.includes('e-bidding'));
-
-    if (ev.overCeiling.length) {
-      finds.push({ level: 'high', v: ev.overCeilingValue,
-        head: `พบ ${U.num(ev.overCeiling.length)} สัญญาที่ใช้วิธีเฉพาะเจาะจงเกินเพดาน ${U.num(ev.ceiling)} บาท รวม ${U.money(ev.overCeilingValue)} บาท`,
-        act: 'ขอบันทึกเหตุผลการใช้วิธีเฉพาะเจาะจงและหลักฐานเข้าข้อยกเว้นตามมาตรา 56(2) รายสัญญา' });
-    }
-    if (ev.clusters.length) {
-      finds.push({ level: 'high', v: ev.clusterValue,
-        head: `พบ ${U.num(ev.clusters.length)} ชุดที่หน่วยงานเดียวเซ็นสัญญาเฉพาะเจาะจงหลายฉบับในวันเดียวกันจนรวมเกินเพดาน รวม ${U.money(ev.clusterValue)} บาท`,
-        act: 'ตรวจว่าเป็นงานเดียวกันที่ถูกแบ่งออกเป็นหลายสัญญาหรือไม่ โดยดูขอบเขตงานและสถานที่ในเอกสารจริง' });
-    }
-    if (sp && eb && sp.discMed !== null && eb.discMed !== null && eb.discMed - sp.discMed > 0.05) {
-      finds.push({ level: 'mid', v: sp.value,
-        head: `วิธีเฉพาะเจาะจงได้ส่วนลดจากราคากลางเพียง ${(sp.discMed * 100).toFixed(2)}% เทียบกับ e-bidding ที่ ${(eb.discMed * 100).toFixed(2)}% (มูลค่าที่จัดหาด้วยวิธีนี้ ${U.money(sp.value)} บาท)`,
-        act: 'สุ่มตรวจว่างานที่ใช้วิธีเฉพาะเจาะจงเข้าเงื่อนไขจริง และราคากลางถูกตั้งอย่างเหมาะสมหรือไม่' });
-    }
-    if (sp && sp.discZeroShare !== null && sp.discZeroShare > 0.3) {
-      finds.push({ level: 'mid', v: sp.value * sp.discZeroShare,
-        head: `สัญญาเฉพาะเจาะจง ${U.pct(sp.discZeroShare, 1)} ทำราคาเท่าราคากลางพอดีไม่ลดเลย`,
-        act: 'ตรวจที่มาของราคากลางว่าอ้างอิงจากอะไร และมีการต่อรองราคาก่อนลงนามหรือไม่' });
-    }
-    const risky = fit.filter(g => g.hhi > 2500 && g.shareV > 0.05);
-    for (const g of risky.slice(0, 2)) {
-      finds.push({ level: 'mid', v: g.value,
-        head: `กลุ่มงาน "${workGroupLabel(g.group)}" มีมูลค่า ${U.pct(g.shareV, 1)} ของทั้งหมด และตลาดกระจุกตัวสูง (HHI ${U.num(g.hhi)} จากผู้ขาย ${U.num(g.suppliers)} ราย)`,
-        act: 'ทบทวนว่ามีการเปิดตลาดให้ผู้เล่นรายใหม่เข้าแข่งขันเพียงพอหรือไม่ และมีเหตุผลทางเทคนิคที่ทำให้ผู้ขายมีน้อยรายจริงหรือไม่' });
-    }
-    if (ev.nearCeiling.length >= 20) {
-      finds.push({ level: 'mid', v: ev.nearCeilingValue,
-        head: `มี ${U.num(ev.nearCeiling.length)} สัญญาเฉพาะเจาะจงที่ราคาอยู่ชิดเพดาน (${U.num(ev.nearLo)}–${U.num(ev.ceiling)} บาท) รวม ${U.money(ev.nearCeilingValue)} บาท`,
-        act: 'ดูว่าการกำหนดขอบเขตงานถูกตัดให้พอดีเพดานหรือไม่ โดยเทียบกับงานลักษณะเดียวกันที่ใช้วิธีประกาศเชิญชวน' });
-    }
-    finds.sort((a, b) => (a.level === b.level ? b.v - a.v : a.level === 'high' ? -1 : 1));
-
-    const body = `
-      <p class="small-muted">สร้างจากตัวเลขในขอบเขตที่กำลังวิเคราะห์อยู่ (${scope.isAgency ? U.esc(truncate(scope.name, 40)) : 'ทั้งชุดข้อมูล'} ·
-        ${U.num(rows.length)} สัญญา · ${U.money(totalV)} บาท) เรียงตามขนาดเม็ดเงินที่เกี่ยวข้อง</p>
-      ${finds.length ? finds.map(f => `
-        <div class="method-find ${f.level === 'high' ? 'is-high' : 'is-mid'}">
-          <div><b>${f.head}</b><span>→ ${f.act}</span></div>
-        </div>`).join('')
-        : '<p class="ma-note">ไม่พบจุดเสี่ยงตามเกณฑ์ที่ระบบตรวจในขอบเขตนี้ — ไม่ได้แปลว่าไม่มีปัญหา แปลว่าไม่มีรูปแบบที่ตรวจจับได้จากข้อมูลที่มี</p>'}
-      <p class="ma-note mt-2">ข้อสังเกตทั้งหมดเป็น<b>จุดตั้งต้นในการตรวจสอบ</b> ไม่ใช่ข้อสรุปว่ามีการกระทำผิด
-        ทุกข้อต้องยืนยันกับเอกสารจริงของหน่วยงานก่อนนำไปใช้</p>`;
-    return methodCard('agM7', 7, 'สรุปจุดเสี่ยงและข้อเสนอแนะ',
-      'จากทั้งหกส่วนข้างบน อะไรคือสิ่งที่ควรลงมือตรวจก่อน', body, true);
-  }
-
-  /* ---------- กราฟทั้งหมดของแท็บย่อย ---------- */
-  function drawMethodCharts(bd, fit) {
-    // รวมวิธีเล็ก ๆ เป็น "อื่นๆ" เพื่อไม่ให้โดนัทเต็มไปด้วยเสี้ยวบาง ๆ ที่อ่านไม่ออก
-    const fold = (items, key) => {
-      const top = items.slice(0, 4);
-      const rest = items.slice(4);
-      const restSum = U.sum(rest.map(x => x[key]));
-      const labels = top.map(x => methodShort(x.method));
-      const values = top.map(x => x[key]);
-      if (restSum > 0) { labels.push(`อื่นๆ (${rest.length} วิธี)`); values.push(restSum); }
-      return { labels, values };
-    };
-    const byN = [...bd].sort((a, b) => b.n - a.n);
-    const dn = fold(byN, 'n');
-    Charts.donut('agM1DonutN', dn.labels, dn.values, null, 'สัญญา');
-    const dv = fold(bd, 'value');
-    Charts.donut('agM1DonutV', dv.labels, dv.values, null, 'บาท');
-
-    const dur = bd.filter(m => m.durMed !== null && m.durN >= 3);
-    Charts.bar('agM2Bar', dur.map(m => methodShort(m.method)), dur.map(m => m.durMed), {
-      horizontal: true, axisTitle: 'ระยะเวลาตามสัญญา (วัน)',
-      colors: dur.map(() => Charts.C.sky),
-    });
-
-    const disc = bd.filter(m => m.discMed !== null && m.n >= 3);
-    Charts.bar('agM3Bar', disc.map(m => methodShort(m.method)), disc.map(m => +(m.discMed * 100).toFixed(2)), {
-      horizontal: true, axisTitle: 'ส่วนลดจากราคากลาง (%)',
-      colors: disc.map(m => m.discMed >= 0.05 ? Charts.C.teal : m.discMed >= 0.01 ? Charts.C.yellow : Charts.C.orange),
-    });
-
-    Charts.scatter('agM5Scatter', fit.slice(0, 14).map(g => ({
-      x: g.hhi, y: +(g.shareV * 100).toFixed(2),
-      size: Math.max(10, Math.min(46, Math.sqrt(g.n) * 2.6)),
-      color: +(g.specShareV * 100).toFixed(1),
-      label: `${U.esc(workGroupLabel(g.group))}<br>มูลค่า ${U.money(g.value)} (${U.pct(g.shareV, 1)})` +
-        `<br>HHI ${U.num(g.hhi)} · ผู้ขาย ${U.num(g.suppliers)} ราย<br>ไม่แข่งขัน ${U.pct(g.specShareV, 1)} ของมูลค่า`,
-    })), { xTitle: 'ความเสี่ยงด้านอุปทาน (HHI ถ่วงมูลค่า)', yTitle: 'สัดส่วนมูลค่า (%)', colorTitle: 'ไม่แข่งขัน %' });
-  }
-
   function buildAgencyCompareStats(name) {
     const rows = state.filtered.filter(r => r.dept_key === name);
     const total = U.sum(rows.map(r => r.contract_price_agree));
@@ -8832,17 +5755,14 @@ ${placemarks.join('\n')}
     };
   }
 
-  /** วาดการ์ดเปรียบเทียบหน่วยงานสองแห่ง โดยรับ id ของกล่องเนื้อหาเป็นพารามิเตอร์
-   *  แยกออกมาเพื่อใช้ซ้ำได้ทั้งจาก modal เดิมในแท็บเครือข่าย (renderAgencyCompare ด้านล่าง)
-   *  และจากการ์ดที่ฝังอยู่ในแท็บหน่วยงานโดยตรง (renderAgencyCompareInline) แบบเดียวกับที่ทำไว้กับผู้รับจ้าง */
-  function renderAgencyCompareInto(nameA, nameB, bodyId) {
-    const a = buildAgencyCompareStats(nameA);
-    const b = buildAgencyCompareStats(nameB);
-    if (!a.rows.length || !b.rows.length) { U.setHTML(bodyId, U.emptyState('เลือกหน่วยงานทั้งสองฝั่งเพื่อเปรียบเทียบ')); return; }
+  function renderAgencyCompare() {
+    const a = buildAgencyCompareStats(state.compare.a);
+    const b = buildAgencyCompareStats(state.compare.b);
+    if (!a.rows.length || !b.rows.length) { U.setHTML('compareBody', U.emptyState('เลือกหน่วยงานทั้งสองฝั่งเพื่อเปรียบเทียบ')); return; }
 
     const shared = [...a.contractorNames].filter(x => b.contractorNames.has(x));
 
-    U.setHTML(bodyId, `
+    U.setHTML('compareBody', `
       <div class="compare-head">
         <div class="compare-name compare-a">${U.esc(truncate(a.name, 50))}</div>
         <div class="compare-vs">เทียบกับ</div>
@@ -8865,44 +5785,6 @@ ${placemarks.join('\n')}
               `<div class="item">${clickable('contractor', name, truncate(name, 60))}</div>`).join('')}</div>`
           : U.emptyState('ไม่มีผู้รับจ้างที่ทำงานร่วมกันทั้งสองหน่วยงาน')}
       </div>`);
-  }
-
-  /** ใช้กับ modal เปรียบเทียบหน่วยงานในแท็บเครือข่ายเท่านั้น (ปุ่ม compareAgenciesBtn) — คงพฤติกรรมเดิมไว้ทุกจุด */
-  function renderAgencyCompare() {
-    renderAgencyCompareInto(state.compare.a, state.compare.b, 'compareBody');
-  }
-
-  /** การ์ดเปรียบเทียบหน่วยงานที่ฝังอยู่ในแท็บหน่วยงานโดยตรง — มิเรอร์ renderContractorCompareInline ทุกจุด
-   *  ค่าเริ่มต้นคือสองอันดับแรกตามมูลค่ารวม (agencyProfiles() เรียงจากมากไปน้อยอยู่แล้ว)
-   *  ใช้ agencyTotals (ระดับกรมเสมอ) ไม่ใช่ agencyProfiles ที่อาจอยู่ระดับสาขา เพราะ buildAgencyCompareStats
-   *  กรองด้วย dept_key ตรง ๆ ซึ่งเป็นคีย์ระดับกรมเท่านั้น — เทียบข้ามระดับสาขาจะได้ผลผิดเพี้ยน */
-  function renderAgencyCompareInline() {
-    const names = Analytics.agencyTotals(state.filtered).map(a => a.dept_name);
-    if (names.length < 2) {
-      U.setHTML('agComparSelectA', ''); U.setHTML('agComparSelectB', '');
-      U.setHTML('agComparBody', U.emptyState('มีหน่วยงานไม่พอให้เปรียบเทียบภายใต้ตัวกรองปัจจุบัน'));
-      return;
-    }
-    const ac = state.agencyCompare;
-    if (!names.includes(ac.a)) ac.a = names[0];
-    if (!names.includes(ac.b) || ac.b === ac.a) ac.b = names.find(n => n !== ac.a) || names[1];
-
-    const opts = selected => names.map(n =>
-      `<option value="${U.esc(n)}" ${n === selected ? 'selected' : ''}>${U.esc(truncate(n, 55))}</option>`).join('');
-    U.setHTML('agComparSelectA', opts(ac.a));
-    U.setHTML('agComparSelectB', opts(ac.b));
-
-    try {
-      renderAgencyCompareInto(ac.a, ac.b, 'agComparBody');
-    } catch (e) {
-      U.setHTML('agComparBody', `<div class="alert alert-danger small">แสดงผลเปรียบเทียบไม่สำเร็จ: ${U.esc(e.message)}</div>`);
-      console.error('renderAgencyCompareInline ล้มเหลว', e);
-    }
-  }
-
-  function wireAgencyCompareInline() {
-    U.$('agComparSelectA').addEventListener('change', e => { state.agencyCompare.a = e.target.value; renderAgencyCompareInline(); });
-    U.$('agComparSelectB').addEventListener('change', e => { state.agencyCompare.b = e.target.value; renderAgencyCompareInline(); });
   }
 
   /* =========================================================
@@ -9332,7 +6214,7 @@ ${placemarks.join('\n')}
   }
 
   /* =========================================================
-     แท็บ AI Lab
+     แท็บผู้ช่วย AI
      =========================================================
 
      ขั้นตอนในหน้ามีสามจังหวะเสมอ: เชื่อมต่อ AI → เลือกงานและเงื่อนไข → อ่านผลแล้วถามต่อ
@@ -9431,13 +6313,12 @@ ${placemarks.join('\n')}
 
   function aiScopeRows(scope = ai.opts.scope) {
     if (scope === 'all') return state.records;
-    // ตะกร้ามีตะกร้าย่อยของโครงการ/ผู้รับจ้าง/หน่วยงานด้วย แต่ AI ยังต่อยอดได้เฉพาะระดับสัญญา
-    if (scope === 'cart') return cart.items.filter(it => cartTypeOf(it) === 'contract').map(it => recordByCartKey(it.key)).filter(Boolean);
+    if (scope === 'cart') return cart.items.map(it => recordByCartKey(it.key)).filter(Boolean);
     return state.filtered;
   }
   function aiScopeLabel(scope = ai.opts.scope) {
     if (scope === 'all') return `ทั้งชุดข้อมูล ${U.num(state.records.length)} สัญญา`;
-    if (scope === 'cart') return `สัญญาในตะกร้า ${U.num(cartCountOf('contract'))} รายการ`;
+    if (scope === 'cart') return `สัญญาในตะกร้า ${U.num(cart.items.length)} รายการ`;
     return `ตามตัวกรอง: ${U.$('gfSummary').textContent.replace(/✕|ล้างทั้งหมด/g, '').replace(/\s+/g, ' ').trim()}`;
   }
 
@@ -10017,7 +6898,7 @@ ${placemarks.join('\n')}
     fillEntitySelect('aiTargetAgency', Analytics.agencyTotals(state.filtered).sort(byFlag).slice(0, 80), 'dept_name');
     document.querySelectorAll('#aiScopeSeg input').forEach(inp => {
       inp.checked = inp.value === ai.opts.scope;
-      const n = inp.value === 'all' ? state.records.length : inp.value === 'cart' ? cartCountOf('contract') : state.filtered.length;
+      const n = inp.value === 'all' ? state.records.length : inp.value === 'cart' ? cart.items.length : state.filtered.length;
       inp.closest('label').querySelector('em').textContent = U.num(n);
     });
   }
@@ -10040,7 +6921,7 @@ ${placemarks.join('\n')}
       if (a === b) return { ok: false, reason: 'เลือกผู้รับจ้างสองรายที่ต่างกัน' };
       return { ok: true, arg: [a, b] };
     }
-    if (t.needs === 'cart') return cartCountOf('contract') ? { ok: true, arg: null } : { ok: false, reason: 'ตะกร้าสัญญายังว่าง · เพิ่มสัญญาจากตารางใดก็ได้ก่อน (ตะกร้าโครงการ/ผู้รับจ้าง/หน่วยงานยังใช้กับ AI ไม่ได้)' };
+    if (t.needs === 'cart') return cart.items.length ? { ok: true, arg: null } : { ok: false, reason: 'ตะกร้ายังว่าง · เพิ่มสัญญาจากตารางใดก็ได้ก่อน' };
     return { ok: true, arg: null };
   }
 
@@ -10057,7 +6938,7 @@ ${placemarks.join('\n')}
     };
     document.querySelectorAll('#aiRunbar [data-field]').forEach(el => { el.hidden = !fields[el.dataset.field]; });
     U.$('aiFieldContractorLabel').textContent = t.needs === 'compare' ? 'ผู้รับจ้าง A' : 'ผู้รับจ้าง';
-    U.$('aiCartInfo').textContent = cartCountOf('contract') ? `${U.num(cartCountOf('contract'))} สัญญาในตะกร้า พร้อมหมายเหตุที่คุณเขียน` : 'ตะกร้ายังว่าง';
+    U.$('aiCartInfo').textContent = cart.items.length ? `${U.num(cart.items.length)} สัญญาในตะกร้า พร้อมหมายเหตุที่คุณเขียน` : 'ตะกร้ายังว่าง';
     U.$('aiOptSummary').textContent = aiOptionSummary() + (compactMode() ? ' · ย่อข้อมูลอัตโนมัติ' : '');
     const conn = aiConnReady(), input = aiTaskInput(t);
     const ok = conn.ok && input.ok && !ai.busy;
@@ -10473,7 +7354,7 @@ ${placemarks.join('\n')}
         closeProfile();
         openAITask(btn.dataset.aiTask, r);
       } else if (btn.closest('#cartDrawer')) {
-        if (!cartCountOf('contract')) { cartToast('ยังไม่มีสัญญาในตะกร้าให้ AI ร่างบันทึก'); return; }
+        if (!cart.items.length) { cartToast('ยังไม่มีสัญญาในตะกร้าให้ AI ร่างบันทึก'); return; }
         closeCart();
         openAITask('cart');
       }
@@ -10499,7 +7380,6 @@ ${placemarks.join('\n')}
       wireAIHero();
       wireAIHistory();
       wireAgent();
-      wireNameLab();
       wireAIViews();
       saveAIHistory(loadAIHistory());
       // ครั้งแรกที่ยังไม่ได้ตั้งค่า เปิดแผงตั้งค่าให้เลย ผู้ใช้จะได้ไม่ต้องหาว่าเริ่มตรงไหน
@@ -10908,7 +7788,6 @@ ${placemarks.join('\n')}
     if (view === 'history') { renderAIHistory(); if (!aiHist.openId) renderHistoryViewer([]); }
     if (view === 'agent') renderAgentSetup();
     if (view === 'lab') renderLab();
-    if (view === 'names') renderNameLab();
   }
 
   function wireAIViews() {
@@ -11196,7 +8075,7 @@ ${placemarks.join('\n')}
         if (!f.center) return { name: key, contracts: f.all.length, with_coordinates: 0, note: 'ไม่มีพิกัดงาน' };
         const base = footprintBaselineKm();
         return { name: key, contracts: f.all.length, with_coordinates: f.use.length, median_km_from_center: Math.round(f.medKm), p90_km: Math.round(f.p90Km), max_km: Math.round(f.maxKm),
-          over_100km: f.overFar, typical_median_km_all_contractors: base.km === null ? null : Math.round(base.km), area_km2: Math.round(f.hullKm2), agencies: f.mixN,
+          over_100km: f.over100, typical_median_km_all_contractors: base.km === null ? null : Math.round(base.km), area_km2: Math.round(f.hullKm2), agencies: f.agencies,
           provinces_of_agencies: f.provinces.slice(0, 6).map(([p, n]) => `${p} (${n})`),
           farthest: f.dist.slice(-3).reverse().map(({ r, km }) => ({ ...agentCompact(r), km: Math.round(km) })) };
       },
@@ -11911,605 +8790,6 @@ ${labVocabText()}`;
   }
 
   /* =========================================================
-     แท็บ AI · มุมมอง "ชื่อโครงการ"
-
-     ชื่อโครงการเป็นข้อความอิสระที่มีข้อมูลเยอะที่สุดในชุดข้อมูล แต่ระบบใช้ประโยชน์จากมันแค่
-     จัดกลุ่มงานด้วยพจนานุกรมชุดเดียวที่ฝังมากับ ETL ซึ่งพอเปลี่ยนชุดข้อมูล (เช่นนำเข้าเอง)
-     สำนวนการเขียนชื่อก็เปลี่ยน พจนานุกรมเดิมจึงครอบคลุมน้อยลงโดยไม่มีใครรู้
-
-     มุมมองนี้ทำให้ผู้ใช้: ดูว่าชื่อในชุดนี้แกะอะไรได้ · แก้พจนานุกรมเอง · เห็นสัญญาณที่ได้จากชื่อ
-     · บันทึกทั้งหมดเป็นโปรไฟล์เพื่อใช้กับชุดข้อมูลถัดไป
-     ========================================================= */
-
-  const nameLab = {
-    tab: 'anatomy',
-    groups: null,          // พจนานุกรมกลุ่มงานที่กำลังแก้อยู่
-    purposes: null,        // พจนานุกรมวัตถุประสงค์
-    result: null,          // ผลวิเคราะห์กลุ่มงาน
-    purposeResult: null,
-    anatomy: null,
-    findings: null,
-    mined: null,
-    profileId: '',
-    dirty: false,
-    status: '',
-    busy: '',
-  };
-
-  function nameLabInit() {
-    if (!nameLab.groups) {
-      const active = Names.getProfile(Names.activeProfileId());
-      nameLab.groups = active ? active.groups.map(g => ({ ...g })) : Names.defaultGroups();
-      nameLab.purposes = active ? (active.purposes || Names.defaultPurposes()).map(p => ({ ...p })) : Names.defaultPurposes();
-      nameLab.profileId = active ? active.id : '';
-    }
-  }
-
-  const nlRows = () => state.filtered.length ? state.filtered : state.records;
-
-  function renderNameLab() {
-    nameLabInit();
-    document.querySelectorAll('[data-nl-tab]').forEach(b => {
-      const on = b.dataset.nlTab === nameLab.tab;
-      b.classList.toggle('is-on', on);
-      b.setAttribute('aria-pressed', String(on));
-    });
-    document.querySelectorAll('[data-nl-pane]').forEach(p => { p.hidden = p.dataset.nlPane !== nameLab.tab; });
-    U.setHTML('nlProfileBar', nlProfileBarHTML());
-    if (nameLab.tab === 'anatomy') renderNlAnatomy();
-    if (nameLab.tab === 'groups') renderNlGroups();
-    if (nameLab.tab === 'purpose') renderNlPurpose();
-    if (nameLab.tab === 'findings') renderNlFindings();
-  }
-
-  /* ---------- แถบโปรไฟล์ ---------- */
-
-  function nlProfileBarHTML() {
-    const list = Names.listProfiles();
-    const cur = nameLab.profileId ? Names.getProfile(nameLab.profileId) : null;
-    return `
-      <div class="nl-profile">
-        <span class="nl-profile-label">พจนานุกรมที่ใช้อยู่</span>
-        <select class="form-select form-select-sm" id="nlProfileSelect" aria-label="เลือกพจนานุกรมที่บันทึกไว้">
-          <option value="">ชุดตั้งต้นของระบบ (14 กลุ่มงาน)</option>
-          ${list.map(p => `<option value="${U.esc(p.id)}"${p.id === nameLab.profileId ? ' selected' : ''}>${U.esc(p.name)} · ${U.num(p.groups.length)} กลุ่ม</option>`).join('')}
-        </select>
-        ${nameLab.dirty ? '<span class="nl-dirty">แก้ไขแล้วยังไม่บันทึก</span>' : ''}
-        <button type="button" class="btn btn-sm btn-primary" data-nl-save>💾 บันทึกเป็นโปรไฟล์</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-nl-apply title="เขียนผลการจัดกลุ่มลงข้อมูลที่โหลดอยู่ ตัวกรองและกราฟกลุ่มงานจะใช้ค่าใหม่ทันที">↧ ใช้กับข้อมูลชุดนี้</button>
-        ${cur ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-nl-export title="ส่งออกเป็นไฟล์ JSON">⬇</button>
-          <button type="button" class="btn btn-sm btn-outline-danger" data-nl-delete title="ลบโปรไฟล์นี้">✕</button>` : ''}
-        <label class="btn btn-sm btn-outline-secondary mb-0" title="นำเข้าโปรไฟล์จากไฟล์ JSON">⬆<input type="file" id="nlImport" accept="application/json,.json" hidden></label>
-      </div>
-      ${cur && cur.autoApply ? `<div class="nl-profile-note nl-auto">🔁 ใช้อัตโนมัติทุกครั้งที่เปิดแอป และกับชุดข้อมูลที่นำเข้าใหม่
-        <button type="button" class="btn btn-sm btn-link p-0 align-baseline" data-nl-auto-off>เลิกใช้อัตโนมัติ</button></div>` : ''}
-      ${cur && cur.snapshot ? `<div class="nl-profile-note">บันทึกจาก "${U.esc(cur.snapshot.datasetName || '-')}" เมื่อ ${U.thaiDate(String(cur.updated).slice(0, 10))} · ตอนนั้นครอบคลุม ${U.pct(cur.snapshot.coverage || 0, 1)} ของ ${U.num(cur.snapshot.n || 0)} สัญญา</div>` : ''}
-      ${nameLab.status ? `<div class="ai-ok mt-1">${U.esc(nameLab.status)}</div>` : ''}
-      ${nameLab.busy ? `<div class="imp-busy"><span class="ag-spin"></span> ${U.esc(nameLab.busy)}</div>` : ''}`;
-  }
-
-  /* ---------- 1. แยกส่วนประกอบ ---------- */
-
-  function renderNlAnatomy() {
-    const rows = nlRows();
-    nameLab.anatomy = Names.anatomy(rows);
-    const top = [...nameLab.anatomy].sort((a, b) => b.pct - a.pct);
-    U.setHTML('nlAnatomy', `
-      <p class="small-muted">ตรวจว่าชื่อโครงการในชุดข้อมูลที่กำลังดู (${U.num(rows.length)} สัญญา) เขียนอะไรไว้บ้าง
-        ส่วนที่ครอบคลุมสูงคือส่วนที่เอาไปใช้วิเคราะห์ต่อได้จริง ส่วนที่ต่ำมากแปลว่าชุดนี้ไม่ได้เขียนไว้ อย่าลงแรงกับมัน</p>
-      <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-        <thead><tr><th scope="col">ส่วนประกอบ</th><th scope="col" class="text-end">พบ</th><th scope="col">สัดส่วน</th><th scope="col">ใช้ทำอะไรได้</th></tr></thead>
-        <tbody>${top.map(p => `<tr>
-          <td>${U.esc(p.label)}${p.sample.length ? `<div class="small-muted nl-sample" title="${U.esc(p.sample[0])}">${U.esc(truncate(p.sample[0], 54))}</div>` : ''}</td>
-          <td class="text-end" data-sort="${p.n}">${U.num(p.n)}</td>
-          <td data-sort="${p.pct}"><span class="imp-bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></span> ${U.pct(p.pct, 1)}</td>
-          <td class="small-muted">${U.esc(p.use)}</td></tr>`).join('')}</tbody>
-      </table></div>`);
-  }
-
-  /* ---------- 2. กลุ่มงาน ---------- */
-
-  function dictTableHTML(dict, kind, result) {
-    const counts = result ? result.counts : {};
-    const primary = result ? result.primary : {};
-    return `<div class="table-wrap nl-dict-wrap"><table class="table table-sm mini-table mb-0">
-      <thead><tr><th scope="col" style="width:30%">กลุ่ม</th><th scope="col">คำที่ใช้ตรวจ (regex)</th>
-        <th scope="col" class="text-end">เข้าข่าย</th><th scope="col" class="text-end">เป็นกลุ่มหลัก</th><th scope="col"></th></tr></thead>
-      <tbody>${dict.map((d, i) => `<tr class="${d.source === 'custom' ? 'nl-custom' : ''}">
-        <td><input class="form-control form-control-sm" value="${U.esc(d.label)}" data-nl-label="${kind}:${i}" aria-label="ชื่อกลุ่ม"></td>
-        <td><input class="form-control form-control-sm nl-pattern" value="${U.esc(d.pattern)}" data-nl-pattern="${kind}:${i}" aria-label="คำที่ใช้ตรวจ">
-          ${(result?.errors || []).find(e => e.key === d.key) ? `<div class="ai-warn">${U.esc((result.errors.find(e => e.key === d.key) || {}).error)}</div>` : ''}</td>
-        <td class="text-end">${U.num(counts[d.key] || 0)}</td>
-        <td class="text-end">${U.num(primary[d.key] || 0)}</td>
-        <td><button type="button" class="btn btn-sm btn-link p-0" data-nl-up="${kind}:${i}" title="เลื่อนขึ้น (ลำดับมีผลกับกลุ่มหลัก)">↑</button>
-          <button type="button" class="btn btn-sm btn-link p-0 text-danger" data-nl-del="${kind}:${i}" title="ลบกลุ่มนี้">✕</button></td>
-      </tr>`).join('')}</tbody></table></div>
-      <div class="lab-row mt-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-nl-add="${kind}">+ เพิ่มกลุ่ม</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-nl-reset="${kind}">คืนค่าตั้งต้น</button>
-      </div>`;
-  }
-
-  function renderNlGroups() {
-    const rows = nlRows();
-    const res = Names.analyze(rows, nameLab.groups);
-    nameLab.result = res;
-    const labelOf = k => (nameLab.groups.find(g => g.key === k) || {}).label || k;
-    const dist = Object.entries(res.byCount).sort((a, b) => a[0] - b[0]);
-
-    U.setHTML('nlGroups', `
-      <div class="ma-kpis nl-kpis">
-        <div><span>ครอบคลุม</span><b>${U.pct(res.coverage, 1)}</b><em>${U.num(res.matched)} จาก ${U.num(res.n)} สัญญา</em></div>
-        <div class="${res.unmatchedTotal > res.n * 0.15 ? 'is-warn' : ''}"><span>ยังไม่เข้ากลุ่ม</span><b>${U.num(res.unmatchedTotal)}</b><em>${U.pct(res.unmatchedTotal / (res.n || 1), 1)} ของทั้งหมด</em></div>
-        <div><span>เข้าได้หลายกลุ่ม</span><b>${U.pct(res.multiShare, 1)}</b><em>ระบบเก็บเฉพาะกลุ่มแรกที่ตรง</em></div>
-        <div><span>จำนวนกลุ่ม</span><b>${U.num(nameLab.groups.length)}</b><em>${U.num(nameLab.groups.filter(g => g.source === 'custom').length)} กลุ่มที่เพิ่มเอง</em></div>
-      </div>
-
-      <details class="lab-section" open><summary>พจนานุกรมกลุ่มงาน <small class="small-muted">(ลำดับมีความหมาย กลุ่มแรกที่ตรงคือกลุ่มหลัก)</small></summary>
-        ${dictTableHTML(nameLab.groups, 'groups', res)}
-      </details>
-
-      <details class="lab-section"><summary>ชื่อที่เข้าได้หลายกลุ่ม</summary>
-        <p class="ma-note">การนับสัญญาแยกตามกลุ่มจะต่ำกว่าความจริงเสมอถ้าเก็บกลุ่มเดียว
-          ตัวเลขนี้บอกว่าข้อมูลสูญหายไปเท่าไร · จำนวนกลุ่มต่อสัญญา: ${dist.map(([k, v]) => `${k} กลุ่ม ${U.num(v)}`).join(' · ')}</p>
-        ${res.overlaps.length ? `<ul class="nl-overlap">${res.overlaps.map(o =>
-          `<li><span>${U.esc(labelOf(o.keys[0]))} + ${U.esc(labelOf(o.keys[1]))}</span><b>${U.num(o.n)}</b></li>`).join('')}</ul>` : '<p class="ma-note">ไม่มีชื่อที่เข้าหลายกลุ่ม</p>'}
-      </details>
-
-      <details class="lab-section" ${res.unmatchedTotal ? 'open' : ''}><summary>ชื่อที่ยังไม่เข้ากลุ่ม (${U.num(res.unmatchedTotal)})</summary>
-        <div class="lab-row mb-2">
-          <button type="button" class="btn btn-sm btn-primary" data-nl-mine>⛏ ขุดคำที่ควรเพิ่ม</button>
-          <button type="button" class="mp-btn is-ai" data-nl-ai title="ส่งเฉพาะชื่อที่ยังไม่เข้ากลุ่ม 40 ชื่อให้ AI เสนอกลุ่มและคำ แล้วคุณกดเพิ่มเอง">✨ ให้ AI เสนอกลุ่ม</button>
-        </div>
-        ${nameLab.mined ? minedHTML(nameLab.mined, 'groups') : ''}
-        <ul class="nl-unmatched">${res.unmatched.map(r => `<li>${clickable('project', r.project_id, truncate(r.project_name, 78))}</li>`).join('') || '<li class="small-muted">ไม่มี</li>'}</ul>
-      </details>`);
-  }
-
-  function minedHTML(mined, kind) {
-    if (!mined.terms.length) return '<p class="ma-note">ไม่พบคำที่แยกกลุ่มได้ชัดพอ ลองลดเกณฑ์จำนวนครั้งหรือเพิ่มกลุ่มเอง</p>';
-    return `<div class="nl-mined">
-      <div class="small-muted mb-1">คำที่โผล่บ่อยในชื่อที่ยังไม่เข้ากลุ่ม แต่ไม่ค่อยโผล่ในชื่อที่เข้ากลุ่มแล้ว — กดเพื่อสร้างกลุ่มใหม่จากคำนั้น</div>
-      ${mined.terms.map(t => `<button type="button" class="nl-term" data-nl-term="${U.esc(t.term)}" data-nl-kind="${kind}"
-        title="${U.esc('พบใน ' + U.num(t.n) + ' ชื่อที่ยังไม่เข้ากลุ่ม · พบในชื่อที่เข้ากลุ่มแล้ว ' + U.num(t.leak) + (t.example ? ' — ตัวอย่าง: ' + t.example.slice(0, 160) : ''))}">${U.esc(t.term)} <b>${U.num(t.n)}</b></button>`).join('')}
-    </div>`;
-  }
-
-  /* ---------- 3. วัตถุประสงค์ ---------- */
-
-  function renderNlPurpose() {
-    const rows = nlRows();
-    const res = Names.analyze(rows, nameLab.purposes);
-    nameLab.purposeResult = res;
-    const labelOf = k => (nameLab.purposes.find(g => g.key === k) || {}).label || k;
-
-    // ส่วนผสมวัตถุประสงค์รายหน่วยงาน — ใช้ดูว่าหน่วยงานไหนทุ่มไปทางซ่อมบำรุงผิดปกติ
-    const compiled = Names.compile(nameLab.purposes);
-    const byDept = new Map();
-    for (const r of rows) {
-      const hits = Names.classify(r.project_name, compiled);
-      if (!hits.length) continue;
-      let d = byDept.get(r.dept_key);
-      if (!d) byDept.set(r.dept_key, d = { dept: r.dept_key, n: 0, value: 0, mix: {} });
-      d.n++; d.value += r.contract_price_agree || 0;
-      d.mix[hits[0]] = (d.mix[hits[0]] || 0) + 1;
-    }
-    const overall = {};
-    for (const k of Object.keys(res.primary)) overall[k] = res.primary[k] / Math.max(1, res.matched);
-    const depts = [...byDept.values()].filter(d => d.n >= 10).map(d => {
-      let worst = null;
-      for (const [k, c] of Object.entries(d.mix)) {
-        const share = c / d.n;
-        const diff = share - (overall[k] || 0);
-        if (!worst || diff > worst.diff) worst = { key: k, share, diff };
-      }
-      return { ...d, worst };
-    }).filter(d => d.worst && d.worst.diff > 0.2).sort((a, b) => b.worst.diff - a.worst.diff).slice(0, 12);
-
-    U.setHTML('nlPurpose', `
-      <p class="small-muted">วัตถุประสงค์อ่านจากคำในชื่อ เช่น "ขยายเขต" คืองานเพิ่มบริการ ส่วน "ซ่อม/ปรับปรุง" คืองานบำรุงรักษา
-        ใช้ดูว่าเงินของหน่วยงานหนึ่งลงไปกับอะไรเทียบกับหน่วยงานอื่น</p>
-      <div class="ma-kpis nl-kpis">
-        <div><span>ครอบคลุม</span><b>${U.pct(res.coverage, 1)}</b><em>${U.num(res.matched)} จาก ${U.num(res.n)} สัญญา</em></div>
-        <div><span>ยังไม่เข้าหมวด</span><b>${U.num(res.unmatchedTotal)}</b><em>เพิ่มคำได้ในตารางด้านล่าง</em></div>
-      </div>
-
-      <div class="nl-mixbar" role="img" aria-label="สัดส่วนวัตถุประสงค์">
-        ${nameLab.purposes.map((p, i) => {
-          const share = (res.primary[p.key] || 0) / Math.max(1, res.matched);
-          return share > 0.001 ? `<i style="width:${(share * 100).toFixed(2)}%;background:${categoryColor(i, nameLab.purposes.length)}" title="${U.esc(p.label)} ${U.pct(share, 1)}"></i>` : '';
-        }).join('')}
-      </div>
-      <div class="nl-legend">${nameLab.purposes.map((p, i) => `<span><i style="background:${categoryColor(i, nameLab.purposes.length)}"></i>${U.esc(p.label)} ${U.num(res.primary[p.key] || 0)}</span>`).join('')}</div>
-
-      <details class="lab-section" open><summary>หน่วยงานที่ส่วนผสมต่างจากภาพรวมมากที่สุด</summary>
-        ${depts.length ? `<div class="table-wrap"><table class="table table-sm mini-table mb-0">
-          <thead><tr><th scope="col">หน่วยงาน</th><th scope="col" class="text-end">สัญญา</th><th scope="col">หมวดที่เด่นผิดปกติ</th><th scope="col" class="text-end">สัดส่วน</th><th scope="col" class="text-end">ภาพรวม</th></tr></thead>
-          <tbody>${depts.map(d => `<tr>
-            <td>${clickable('agency', d.dept, truncate(d.dept, 40))}</td>
-            <td class="text-end">${U.num(d.n)}</td>
-            <td>${U.esc(labelOf(d.worst.key))}</td>
-            <td class="text-end"><strong>${U.pct(d.worst.share, 0)}</strong></td>
-            <td class="text-end small-muted">${U.pct(overall[d.worst.key] || 0, 0)}</td></tr>`).join('')}</tbody>
-        </table></div>
-        <p class="ma-note">ส่วนผสมที่ต่างจากภาพรวมไม่ใช่ความผิดในตัวเอง หน่วยงานที่ระบบเก่ากว่าย่อมซ่อมมากกว่า
-          แต่ถ้าซ่อมมากผิดปกติ <strong>และ</strong> ซ้ำที่เดิมบ่อย (ดูแท็บ "สิ่งที่พบ") จึงควรขอเอกสารดู</p>`
-        : '<p class="ma-note">ยังไม่มีหน่วยงานที่มีสัญญาถึง 10 รายการและส่วนผสมต่างจากภาพรวมเกิน 20 จุด</p>'}
-      </details>
-
-      <details class="lab-section"><summary>พจนานุกรมวัตถุประสงค์</summary>
-        ${dictTableHTML(nameLab.purposes, 'purposes', res)}
-      </details>
-
-      <details class="lab-section"><summary>ชื่อที่ยังไม่เข้าหมวด (${U.num(res.unmatchedTotal)})</summary>
-        <div class="lab-row mb-2"><button type="button" class="btn btn-sm btn-primary" data-nl-mine-purpose>⛏ ขุดคำที่ควรเพิ่ม</button></div>
-        ${nameLab.minedPurpose ? minedHTML(nameLab.minedPurpose, 'purposes') : ''}
-        <ul class="nl-unmatched">${res.unmatched.slice(0, 20).map(r => `<li>${clickable('project', r.project_id, truncate(r.project_name, 78))}</li>`).join('') || '<li class="small-muted">ไม่มี</li>'}</ul>
-      </details>`);
-  }
-
-  /* ---------- 4. สิ่งที่พบ ---------- */
-
-  function renderNlFindings() {
-    const rows = nlRows();
-    if (!nameLab.findings || nameLab.findingsFor !== rows.length) {
-      nameLab.findings = {
-        dup: Names.nearDuplicates(rows),
-        place: Names.repeatPlaces(rows),
-        prov: Names.provinceMismatch(rows),
-      };
-      nameLab.findingsFor = rows.length;
-    }
-    const f = nameLab.findings;
-
-    U.setHTML('nlFindings', `
-      <p class="small-muted">สัญญาณสามอย่างนี้อ่านได้จากชื่อโครงการอย่างเดียว ไม่ต้องใช้พิกัดหรือผลโมเดล
-        จึงใช้ได้กับชุดข้อมูลที่นำเข้าเองด้วย · คำนวณจาก ${U.num(rows.length)} สัญญาที่กรองอยู่</p>
-
-      <details class="lab-section" open><summary>ชื่อคล้ายกันมากในหน่วยงานเดียวกัน ภายใน 30 วัน (${U.num(f.dup.pairs)} คู่)</summary>
-        <p class="ma-note">ต่างจากกฎ R10 ที่ดูวันที่กับมูลค่า ข้อนี้ดูว่า "เนื้องานที่เขียนไว้เหมือนกัน" ซึ่งจับการแบ่งงานที่ตั้งชื่อต่างกันเล็กน้อยได้</p>
-        ${f.dup.items.length ? f.dup.items.slice(0, 12).map(d => `
-          <div class="nl-pair">
-            <div class="nl-pair-head">${U.esc(truncate(d.dept, 44))} · ห่างกัน ${d.gapDays} วัน · ความคล้าย ${(d.sim * 100).toFixed(0)}% · รวม ${U.money(d.total)} บาท</div>
-            <div class="nl-pair-row">${clickable('project', d.a.project_id, truncate(d.a.project_name, 58))}<b>${U.money(d.a.contract_price_agree)}</b>${cartBtn(d.a)}</div>
-            <div class="nl-pair-row">${clickable('project', d.b.project_id, truncate(d.b.project_name, 58))}<b>${U.money(d.b.contract_price_agree)}</b>${cartBtn(d.b)}</div>
-          </div>`).join('') : '<p class="ma-note">ไม่พบ</p>'}
-      </details>
-
-      <details class="lab-section"><summary>งานซ้ำที่เดิม (${U.num(f.place.places)} จุด · ${U.num(f.place.contracts)} สัญญา)</summary>
-        <p class="ma-note">จับคู่จาก "หมู่ที่ + ตำบล" ในชื่อ กับหน่วยงานเดียวกัน แกะที่ตั้งได้ ${U.num(f.place.placesParsed)} จุด ·
-          ทำงานซ้ำที่เดิมอาจแปลว่างานเดิมไม่ได้คุณภาพ หรือแบ่งงานใหญ่ออกเป็นหลายสัญญา</p>
-        ${f.place.items.length ? `<div class="table-wrap"><table class="table table-sm mini-table mb-0">
-          <thead><tr><th scope="col">หน่วยงาน</th><th scope="col">จุด</th><th scope="col" class="text-end">ครั้ง</th><th scope="col" class="text-end">มูลค่ารวม</th><th scope="col"></th></tr></thead>
-          <tbody>${f.place.items.slice(0, 15).map(g => `<tr>
-            <td>${clickable('agency', g.dept, truncate(g.dept, 34))}</td>
-            <td>${U.esc(g.place)}</td>
-            <td class="text-end">${U.num(g.n)}</td>
-            <td class="text-end">${U.money(g.value)}</td>
-            <td><button type="button" class="btn btn-sm btn-link p-0" data-nl-place-cart="${U.esc(g.dept + '␀' + g.place)}">🛒 ใส่ตะกร้า</button></td></tr>`).join('')}</tbody>
-        </table></div>` : '<p class="ma-note">ไม่พบ</p>'}
-      </details>
-
-      <details class="lab-section"><summary>จังหวัดในชื่อไม่ตรงกับจังหวัดของหน่วยงาน (${U.num(f.prov.mismatch)} จาก ${U.num(f.prov.named)})</summary>
-        <p class="ma-note">ใช้ได้แม้ไม่มีพิกัด ต่างจากกฎ R17 ซึ่งต้องมีพิกัด · หน่วยงานส่วนกลางทำงานข้ามจังหวัดได้ตามปกติ
-          สิ่งที่ควรดูคือหน่วยงานท้องถิ่นที่ไปทำงานนอกพื้นที่ตัวเอง</p>
-        ${f.prov.items.length ? `<div class="table-wrap"><table class="table table-sm mini-table mb-0">
-          <thead><tr><th scope="col">โครงการ</th><th scope="col">หน่วยงาน</th><th scope="col">จังหวัดในชื่อ</th><th scope="col">จังหวัดหน่วยงาน</th><th scope="col" class="text-end">มูลค่า</th></tr></thead>
-          <tbody>${f.prov.items.slice(0, 15).map(x => `<tr>
-            <td>${clickable('project', x.r.project_id, truncate(x.r.project_name, 46))}</td>
-            <td>${U.esc(truncate(x.r.dept_name, 28))}</td>
-            <td><strong>${U.esc(x.inName)}</strong></td>
-            <td>${U.esc(x.agencyProvince)}</td>
-            <td class="text-end">${U.money(x.r.contract_price_agree)}</td></tr>`).join('')}</tbody>
-        </table></div>` : '<p class="ma-note">ไม่พบ</p>'}
-      </details>
-
-      <div class="ma-actions">
-        <button type="button" class="mp-btn is-ai" data-nl-findings-ai>✨ ให้ AI สรุปสิ่งที่พบเป็นข้อเสนอตรวจสอบ</button>
-      </div>`);
-  }
-
-  /* ---------- การทำงาน ---------- */
-
-  function nlDict(kind) { return kind === 'purposes' ? nameLab.purposes : nameLab.groups; }
-  function nlMarkDirty() { nameLab.dirty = true; nameLab.status = ''; }
-
-  /** แกนของการใช้พจนานุกรมกับข้อมูล — ไม่แตะ UI เพื่อให้ตอนเปิดแอปเรียกใช้ซ้ำได้ก่อนวาดหน้าจอ */
-  function applyNameDicts(groups, purposes) {
-    const counts = Names.applyGroups(state.records, groups);
-    Names.applyGroups(state.records, purposes || [], { primaryField: 'purpose_group', allField: 'purpose_groups', fallback: 'none' });
-
-    // อัปเดตพจนานุกรมใน payload ให้ทุกส่วนของแอปเห็นตรงกัน (ตัวกรอง กราฟ ป้ายชื่อกลุ่ม)
-    const models = state.payload.models || (state.payload.models = {});
-    const labels = Object.fromEntries(groups.map(g => [g.key, g.label]));
-    labels.other = 'อื่นๆ';
-    models.work_groups = {
-      labels,
-      order: [...groups.map(g => g.key), 'other'],
-      counts,
-      coverage: 1 - (counts.other || 0) / (state.records.length || 1),
-      method: 'พจนานุกรมคำจากชื่อโครงการ ปรับในแท็บ AI · มุมมองชื่อโครงการ',
-    };
-    return models.work_groups;
-  }
-
-  /** เปิดแอป/สลับชุดข้อมูลแล้วใช้พจนานุกรมที่เคยกด "ใช้กับข้อมูล" ไว้ต่อทันที
-      สำคัญกับชุดที่นำเข้าเอง ซึ่งชื่อโครงการอาจเขียนคนละแบบกับชุดหลัก จนกลุ่มงานของ ETL ใช้ไม่ได้
-      ★ ต้องเรียกก่อน buildFilterOptions() ไม่งั้นตัวเลือกกลุ่มงานจะเป็นของชุดเก่า */
-  function autoApplyNameProfile() {
-    const prof = Names.getProfile(Names.activeProfileId());
-    if (!prof || !prof.autoApply || !Array.isArray(prof.groups) || !prof.groups.length) return null;
-    try {
-      const wg = applyNameDicts(prof.groups, prof.purposes || []);
-      // บอกให้รู้ว่ากลุ่มงานที่เห็นมาจากพจนานุกรมของผู้ใช้ ไม่ใช่ค่าที่ ETL ใส่มา ไม่งั้นตัวเลขจะเปลี่ยนไปเงียบ ๆ
-      const note = `กลุ่มงานจัดตามพจนานุกรม "${prof.name}" ที่บันทึกไว้ · ครอบคลุม ${U.pct(wg.coverage, 1)} · ปรับได้ที่แท็บ AI › ชื่อโครงการ`;
-      state.datasetNotice = state.datasetNotice ? state.datasetNotice + ' · ' + note : note;
-      return { name: prof.name, coverage: wg.coverage };
-    } catch (e) {
-      console.warn('ใช้พจนานุกรมชื่อโครงการอัตโนมัติไม่สำเร็จ', e);
-      return null;
-    }
-  }
-
-  function nlApplyToData() {
-    const wg = applyNameDicts(nameLab.groups, nameLab.purposes);
-    // จำไว้ว่าผู้ใช้เลือกใช้พจนานุกรมนี้จริง ครั้งต่อไปที่เปิดแอปหรือนำเข้าชุดใหม่จะใช้ให้เลย
-    if (nameLab.profileId) {
-      const prof = Names.getProfile(nameLab.profileId);
-      if (prof) Names.saveProfile({ ...prof, autoApply: true });
-    }
-    const keep = U.$('gfWorkGroup').value;
-    buildFilterOptions();
-    U.$('gfWorkGroup').value = wg.labels[keep] ? keep : '';
-    if (!wg.labels[keep]) state.filters.workGroup = '';
-    state.dirty = new Set(Object.keys(TAB_RENDERERS));
-    applyFilters();
-    nameLab.status = `ใช้พจนานุกรมกับข้อมูลแล้ว · ครอบคลุม ${U.pct(wg.coverage, 1)} · ตัวกรองและกราฟกลุ่มงานใช้ค่าใหม่แล้ว`
-      + (nameLab.profileId ? ' · จะใช้ให้อัตโนมัติเมื่อเปิดแอปครั้งต่อไปและกับชุดข้อมูลที่นำเข้าใหม่' : ' · บันทึกเป็นโปรไฟล์ไว้ถ้าอยากให้ใช้อัตโนมัติครั้งหน้า');
-    renderNameLab();
-  }
-
-  function nlSaveProfile() {
-    const name = prompt('ตั้งชื่อโปรไฟล์พจนานุกรม', (Names.getProfile(nameLab.profileId) || {}).name || `พจนานุกรม ${state.dataset.name}`);
-    if (!name || !name.trim()) return;
-    const res = nameLab.result || Names.analyze(nlRows(), nameLab.groups);
-    const entry = Names.saveProfile({
-      id: nameLab.profileId || undefined,
-      name: name.trim(),
-      groups: nameLab.groups.map(g => ({ ...g })),
-      purposes: nameLab.purposes.map(p => ({ ...p })),
-      snapshot: {
-        datasetName: state.dataset.name, datasetId: state.dataset.id,
-        n: res.n, coverage: res.coverage, multiShare: res.multiShare,
-        counts: res.counts, savedAt: new Date().toISOString(),
-      },
-    });
-    nameLab.profileId = entry.id;
-    Names.setActiveProfile(entry.id);
-    nameLab.dirty = false;
-    nameLab.status = `บันทึก "${entry.name}" แล้ว · เลือกใช้กับชุดข้อมูลอื่นได้จากช่องด้านบน`;
-    renderNameLab();
-  }
-
-  function nlLoadProfile(id) {
-    if (!id) {
-      nameLab.groups = Names.defaultGroups();
-      nameLab.purposes = Names.defaultPurposes();
-      nameLab.profileId = '';
-      Names.setActiveProfile('');
-    } else {
-      const p = Names.getProfile(id);
-      if (!p) return;
-      nameLab.groups = p.groups.map(g => ({ ...g }));
-      nameLab.purposes = (p.purposes || Names.defaultPurposes()).map(x => ({ ...x }));
-      nameLab.profileId = id;
-      Names.setActiveProfile(id);
-      const res = Names.analyze(nlRows(), nameLab.groups);
-      const before = p.snapshot ? p.snapshot.coverage : null;
-      nameLab.status = before !== null
-        ? `ใช้ "${p.name}" · ครอบคลุมชุดนี้ ${U.pct(res.coverage, 1)} (ตอนบันทึกได้ ${U.pct(before, 1)})`
-        : `ใช้ "${p.name}" · ครอบคลุมชุดนี้ ${U.pct(res.coverage, 1)}`;
-    }
-    nameLab.dirty = false;
-    nameLab.mined = null; nameLab.minedPurpose = null;
-    renderNameLab();
-  }
-
-  async function nlAskAI() {
-    // มุมมองนี้อยู่ล่างสุดของแท็บ AI การเปิดแผงตั้งค่าเฉย ๆ ผู้ใช้จะไม่เห็นว่ามีอะไรเกิดขึ้น (โดยเฉพาะบนมือถือ)
-    if (!aiConnReady().ok) return nlNeedAI();
-    const res = nameLab.result || Names.analyze(nlRows(), nameLab.groups);
-    if (!res.unmatched.length) { nameLab.status = 'ไม่มีชื่อที่ยังไม่เข้ากลุ่ม'; renderNameLab(); return; }
-    nameLab.busy = 'กำลังให้ AI อ่านชื่อที่ยังไม่เข้ากลุ่ม...';
-    renderNameLab();
-    try {
-      const names = res.unmatched.slice(0, 40).map(r => r.project_name);
-      const system = 'คุณช่วยจัดหมวดงานจัดซื้อจัดจ้างภาครัฐไทยจากชื่อโครงการ ' +
-        'ตอบเป็น JSON ก้อนเดียวเท่านั้น รูปแบบ {"groups":[{"label":"ชื่อกลุ่มภาษาไทย","pattern":"คำ1|คำ2|คำ3","why":"เหตุผลสั้น ๆ"}]} ' +
-        'pattern คือคำไทยคั่นด้วย | ที่ใช้ค้นในชื่อโครงการได้ตรง ๆ ห้ามใส่ regex ซับซ้อน ห้ามใส่คำกว้างเกินไปเช่น "จ้าง" หรือ "ซื้อ" ' +
-        'เสนอไม่เกิน 6 กลุ่ม และต้องไม่ซ้ำกับกลุ่มที่มีอยู่แล้ว';
-      const existing = nameLab.groups.map(g => `${g.label}: ${g.pattern}`).join('\n');
-      const prompt = `กลุ่มที่มีอยู่แล้ว:\n${existing}\n\nชื่อโครงการที่ยังไม่เข้ากลุ่มใดเลย:\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}`;
-      const text = await AI.stream({ ...aiRequestBase(), system, maxTokens: 2000, messages: [{ role: 'user', content: prompt }] });
-      const json = AI.extractJSON(text);
-      if (!json || !Array.isArray(json.groups)) throw new Error('AI ไม่ได้ตอบเป็นรายการกลุ่มที่อ่านได้');
-      nameLab.aiProposal = json.groups.slice(0, 6).filter(g => g && g.label && g.pattern);
-      nameLab.busy = '';
-      nameLab.status = `AI เสนอ ${nameLab.aiProposal.length} กลุ่ม ตรวจแล้วกดเพิ่มได้ในตารางด้านล่าง`;
-      renderNameLab();
-      const box = U.$('nlGroups');
-      if (box) box.insertAdjacentHTML('afterbegin', `<div class="nl-ai-proposal">
-        <strong>✨ กลุ่มที่ AI เสนอ</strong> <span class="small-muted">ตรวจคำก่อนเพิ่มเสมอ — คำกว้างเกินไปจะดึงงานอื่นเข้ามาด้วย</span>
-        ${nameLab.aiProposal.map((g, i) => `<div class="nl-ai-row">
-          <span><b>${U.esc(g.label)}</b> <code>${U.esc(g.pattern)}</code>${g.why ? `<small>${U.esc(g.why)}</small>` : ''}</span>
-          <button type="button" class="btn btn-sm btn-outline-primary" data-nl-accept="${i}">+ เพิ่ม</button></div>`).join('')}
-      </div>`);
-    } catch (err) {
-      nameLab.busy = '';
-      nameLab.status = '';
-      renderNameLab();
-      U.$('nlGroups').insertAdjacentHTML('afterbegin', aiErrorHTML(err));
-    }
-  }
-
-  /** บอกให้เห็นตรงจุดที่กด แล้วค่อยพาไปแผงตั้งค่า */
-  function nlNeedAI() {
-    const why = aiConnReady().reason || 'ยังตั้งค่า AI ไม่ครบ';
-    nameLab.status = `${why} · เปิดแผงตั้งค่า AI ไว้ให้แล้วด้านบนของแท็บนี้`;
-    renderNameLab();
-    toggleAISettings(true);
-    const panel = U.$('aiSettingsPanel');
-    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  function nlFindingsToAI() {
-    const f = nameLab.findings;
-    if (!f) return;
-    if (!aiConnReady().ok) return nlNeedAI();
-    const lines = [
-      `ชื่อคล้ายกันมากในหน่วยงานเดียวกันภายใน 30 วัน: ${f.dup.pairs} คู่`,
-      ...f.dup.items.slice(0, 10).map(d => `- ${d.dept} · ห่าง ${d.gapDays} วัน · คล้าย ${(d.sim * 100).toFixed(0)}% · [P:${d.a.project_id}] ${d.a.project_name} (${U.money(d.a.contract_price_agree)}) กับ [P:${d.b.project_id}] ${d.b.project_name} (${U.money(d.b.contract_price_agree)})`),
-      ``,
-      `งานซ้ำที่เดิม: ${f.place.places} จุด ${f.place.contracts} สัญญา`,
-      ...f.place.items.slice(0, 8).map(g => `- ${g.dept} · ${g.place} · ${g.n} ครั้ง · ${U.money(g.value)} บาท`),
-      ``,
-      `จังหวัดในชื่อไม่ตรงกับจังหวัดหน่วยงาน: ${f.prov.mismatch} จาก ${f.prov.named} สัญญาที่ระบุจังหวัด`,
-      ...f.prov.items.slice(0, 8).map(x => `- [P:${x.r.project_id}] ${x.r.dept_name} (${x.agencyProvince}) ทำงานที่ ${x.inName} · ${U.money(x.r.contract_price_agree)} บาท`),
-    ];
-    labSendToAssistant('📝 สรุปสิ่งที่พบจากชื่อโครงการ',
-      'จากสัญญาณที่อ่านได้จากชื่อโครงการต่อไปนี้ ให้จัดลำดับว่าควรตรวจอะไรก่อน โดยแยกให้ชัดว่ากรณีไหนมีคำอธิบายปกติที่เป็นไปได้ ' +
-      '(เช่น หน่วยงานส่วนกลางทำงานข้ามจังหวัดเป็นเรื่องปกติ หรือการซื้อวัสดุประจำเดือนย่อมมีชื่อซ้ำกัน) ' +
-      'และกรณีไหนที่ควรขอเอกสารเพิ่ม พร้อมระบุว่าจะขอเอกสารอะไร',
-      lines.join('\n'));
-  }
-
-  function wireNameLab() {
-    const pane = U.$('nlPane');
-    if (!pane) return;
-
-    document.querySelectorAll('[data-nl-tab]').forEach(b =>
-      b.addEventListener('click', () => { nameLab.tab = b.dataset.nlTab; renderNameLab(); }));
-
-    pane.addEventListener('click', async e => {
-      const t = e.target.closest('button, label');
-      if (!t) return;
-      const d = t.dataset;
-
-      if ('nlSave' in d) return nlSaveProfile();
-      if ('nlAutoOff' in d) {
-        const prof = Names.getProfile(nameLab.profileId);
-        if (prof) Names.saveProfile({ ...prof, autoApply: false });
-        nameLab.status = 'เลิกใช้อัตโนมัติแล้ว · ข้อมูลที่โหลดอยู่ยังใช้ผลเดิมจนกว่าจะเปิดแอปใหม่';
-        return renderNameLab();
-      }
-      if ('nlApply' in d) return nlApplyToData();
-      if ('nlDelete' in d) {
-        if (t.dataset.confirm !== '1') { t.dataset.confirm = '1'; t.textContent = 'ยืนยัน?'; setTimeout(() => { if (document.contains(t)) { t.dataset.confirm = ''; t.textContent = '✕'; } }, 3000); return; }
-        Names.deleteProfile(nameLab.profileId);
-        nlLoadProfile('');
-        return;
-      }
-      if ('nlExport' in d) {
-        const p = Names.getProfile(nameLab.profileId);
-        if (!p) return;
-        downloadBlob(new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }), `name-profile-${p.name.replace(/[\\/:*?"<>|]/g, '_')}.json`);
-        return;
-      }
-      if ('nlMine' in d) {
-        nameLab.busy = 'กำลังขุดคำ...'; renderNameLab();
-        setTimeout(() => { nameLab.mined = Names.mineTerms(nlRows(), nameLab.groups); nameLab.busy = ''; renderNameLab(); }, 30);
-        return;
-      }
-      if ('nlMinePurpose' in d) {
-        nameLab.busy = 'กำลังขุดคำ...'; renderNameLab();
-        setTimeout(() => { nameLab.minedPurpose = Names.mineTerms(nlRows(), nameLab.purposes); nameLab.busy = ''; renderNameLab(); }, 30);
-        return;
-      }
-      if ('nlAi' in d) return nlAskAI();
-      if ('nlFindingsAi' in d) return nlFindingsToAI();
-      if (d.nlAccept !== undefined) {
-        const g = (nameLab.aiProposal || [])[Number(d.nlAccept)];
-        if (!g) return;
-        nameLab.groups.push({ key: 'ai_' + Date.now().toString(36), label: g.label, pattern: g.pattern, source: 'custom' });
-        nlMarkDirty();
-        return renderNameLab();
-      }
-      if (d.nlTerm) {
-        const dict = nlDict(d.nlKind);
-        // คำที่ขุดได้เป็นข้อความดิบ อาจมีอักขระที่ regex ถือเป็นสัญลักษณ์ (เช่น "กม. +" หรือวงเล็บ) จึงต้อง escape ก่อน
-        const pattern = d.nlTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        dict.push({ key: 'c_' + Date.now().toString(36), label: d.nlTerm, pattern, source: 'custom' });
-        nlMarkDirty();
-        nameLab.mined = null; nameLab.minedPurpose = null;
-        return renderNameLab();
-      }
-      if (d.nlAdd) {
-        nlDict(d.nlAdd).push({ key: 'c_' + Date.now().toString(36), label: 'กลุ่มใหม่', pattern: '', source: 'custom' });
-        nlMarkDirty();
-        return renderNameLab();
-      }
-      if (d.nlReset) {
-        if (d.nlReset === 'purposes') nameLab.purposes = Names.defaultPurposes();
-        else nameLab.groups = Names.defaultGroups();
-        nlMarkDirty();
-        return renderNameLab();
-      }
-      if (d.nlDel) {
-        const [kind, i] = d.nlDel.split(':');
-        nlDict(kind).splice(Number(i), 1);
-        nlMarkDirty();
-        return renderNameLab();
-      }
-      if (d.nlUp) {
-        const [kind, iRaw] = d.nlUp.split(':');
-        const i = Number(iRaw);
-        if (i > 0) { const dict = nlDict(kind); [dict[i - 1], dict[i]] = [dict[i], dict[i - 1]]; nlMarkDirty(); }
-        return renderNameLab();
-      }
-      if (d.nlPlaceCart) {
-        const [dept, place] = d.nlPlaceCart.split('␀');
-        const g = (nameLab.findings?.place.items || []).find(x => x.dept === dept && x.place === place);
-        if (g) addManyToCart(g.rows);
-        return;
-      }
-    });
-
-    pane.addEventListener('change', async e => {
-      const t = e.target;
-      if (t.id === 'nlProfileSelect') return nlLoadProfile(t.value);
-      if (t.id === 'nlImport') {
-        const file = t.files && t.files[0];
-        t.value = '';
-        if (!file) return;
-        try {
-          const p = JSON.parse(await file.text());
-          if (!Array.isArray(p.groups)) throw new Error('ไฟล์นี้ไม่ใช่โปรไฟล์พจนานุกรม');
-          // ไฟล์ที่นำเข้าอาจติดธง "ใช้อัตโนมัติ" มาจากเครื่องอื่น อย่าเพิ่งเปิดให้เอง
-          // ให้ผู้ใช้ดูผลแล้วกด "ใช้กับข้อมูลชุดนี้" เองก่อน
-          const entry = Names.saveProfile({ ...p, id: undefined, autoApply: false, name: (p.name || 'โปรไฟล์ที่นำเข้า') + ' (นำเข้า)' });
-          nlLoadProfile(entry.id);
-        } catch (err) {
-          nameLab.status = 'นำเข้าไม่สำเร็จ: ' + String(err.message || err).slice(0, 80);
-          renderNameLab();
-        }
-        return;
-      }
-      if (t.dataset.nlLabel) {
-        const [kind, i] = t.dataset.nlLabel.split(':');
-        nlDict(kind)[Number(i)].label = t.value;
-        nlMarkDirty();
-        return renderNameLab();
-      }
-      if (t.dataset.nlPattern) {
-        const [kind, i] = t.dataset.nlPattern.split(':');
-        nlDict(kind)[Number(i)].pattern = t.value;
-        nlMarkDirty();
-        return renderNameLab();
-      }
-    });
-  }
-
-  /* =========================================================
      ระยะ 4: ป้ายผลการตรวจ · ความแม่นยำของกฎ · ข้อเสนอที่ต้องอนุมัติ · ผู้ตรวจทาน
      ========================================================= */
 
@@ -12824,7 +9104,10 @@ ${labVocabText()}`;
   }
 
   function filterChipsHTML(f) {
-    const chips = activeFilterSummary(f);
+    const chips = [
+      f.q && `ค้นหา "${f.q}"`, f.province, f.method, f.type, f.workGroup && `กลุ่มงาน ${workGroupLabel(f.workGroup)}`,
+      f.band && `ระดับ ${f.band === 'priority' ? 'ควรตรวจสอบก่อน' : bandLabel(f.band)}`, f.rule && `กฎ ${f.rule}`, f.minValue && `มูลค่า ≥ ${baht(f.minValue)}`,
+    ].filter(Boolean);
     return chips.map(c => `<span class="ai-chip">${U.esc(c)}</span>`).join('') || '<span class="small-muted">ไม่มีเงื่อนไข</span>';
   }
 
@@ -13436,10 +9719,7 @@ ${labVocabText()}`;
     const total = U.sum(rows.map(r => r.contract_price_agree));
     U.setHTML('detailModalBody', `
       <div class="detail-section">
-        <div class="d-flex justify-content-between align-items-start gap-2">
-          <h6 class="mb-0">${U.esc(name)}</h6>
-          ${entityCartBtn('contractor', rows[0].winner_key, rows[0].winner_name)}
-        </div>
+        <h6>${U.esc(name)}</h6>
         ${rows.some(r => r.lat !== null) ? `<button type="button" class="btn btn-sm btn-outline-secondary mb-2" data-map-footprint="${U.esc(rows[0].winner_key)}">👣 ดูรอยเท้าบนแผนที่</button>` : ''}
         ${kvRow('เลขผู้เสียภาษี', [...new Set(rows.map(r => r.winner_tin))].map(U.esc).join(', '))}
         ${kvRow('จำนวนสัญญา', U.num(rows.length))}
@@ -13479,10 +9759,7 @@ ${labVocabText()}`;
     const methods = [...U.countBy(rows, r => r.purchase_method_name)].sort((a, b) => b[1] - a[1]);
     U.setHTML('detailModalBody', `
       <div class="detail-section">
-        <div class="d-flex justify-content-between align-items-start gap-2">
-          <h6 class="mb-0">${U.esc(name)}</h6>
-          ${entityCartBtn('agency', rows[0].dept_key, rows[0].dept_name)}
-        </div>
+        <h6>${U.esc(name)}</h6>
         ${kvRow('จำนวนสัญญา', U.num(rows.length))}
         ${kvRow('มูลค่ารวม', U.baht(total))}
         ${kvRow('จำนวนผู้รับจ้าง', U.num(contractors.length))}
@@ -13519,9 +9796,6 @@ ${labVocabText()}`;
     U.$('mlBlindOnly')?.addEventListener('change', () => renderMlCard());
     wireCompare();
     wireContractorCompareInline();
-    wireAgencyCompareInline();
-    wireAgencyControls();
-    wireOverviewQueue();
     wireCases();
     wireDensity();
     wireCollapsibleCards();

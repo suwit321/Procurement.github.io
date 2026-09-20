@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="css/style.css?v=136">
+<link rel="stylesheet" href="css/style.css?v=98">
 </head>
 <body>
 
@@ -87,10 +87,6 @@
                   type="button" role="tab" aria-controls="tab-contractor" aria-selected="false"
                   title="การจัดลำดับความเสี่ยงผู้รับจ้าง"><span class="nav-icon" aria-hidden="true">🏗️</span><span class="nav-text">ผู้รับจ้าง<em>Contractors</em></span></button></li>
         <li class="nav-item" role="presentation" data-group="deepdive" data-cat="deepdive">
-          <button class="nav-link" id="pill-agency" data-bs-toggle="pill" data-bs-target="#tab-agency"
-                  type="button" role="tab" aria-controls="tab-agency" aria-selected="false"
-                  title="โปรไฟล์และการจัดอันดับหน่วยงานจัดซื้อ"><span class="nav-icon" aria-hidden="true">🏛️</span><span class="nav-text">หน่วยงาน<em>Agencies</em></span></button></li>
-        <li class="nav-item" role="presentation" data-group="deepdive" data-cat="deepdive">
           <button class="nav-link" id="pill-network" data-bs-toggle="pill" data-bs-target="#tab-network"
                   type="button" role="tab" aria-controls="tab-network" aria-selected="false"
                   title="เครือข่ายความสัมพันธ์หน่วยงานกับผู้รับจ้าง"><span class="nav-icon" aria-hidden="true">🕸️</span><span class="nav-text">เครือข่ายความสัมพันธ์<em>Network Analysis</em></span></button></li>
@@ -116,7 +112,7 @@
         <li class="nav-item" role="presentation" data-group="ai" data-cat="ai">
           <button class="nav-link" id="pill-ai" data-bs-toggle="pill" data-bs-target="#tab-ai"
                   type="button" role="tab" aria-controls="tab-ai" aria-selected="false"
-                  title="สรุป อธิบาย และร่างเอกสารด้วย AI"><span class="nav-icon" aria-hidden="true">✨</span><span class="nav-text">AI Lab<em>AI Analyst</em></span></button></li>
+                  title="สรุป อธิบาย และร่างเอกสารด้วย AI"><span class="nav-icon" aria-hidden="true">✨</span><span class="nav-text">ผู้ช่วย AI<em>AI Analyst</em></span></button></li>
       </ul>
     </nav>
 
@@ -134,11 +130,8 @@
     <div class="top-search">
       <span class="top-search-icon" aria-hidden="true">⌕</span>
       <input id="gfSearch" type="search" placeholder="ค้นหาโครงการ / หน่วยงาน / ผู้รับจ้าง"
-             aria-label="ค้นหาโครงการ หน่วยงาน หรือผู้รับจ้าง" aria-describedby="gfSummary"
-             autocomplete="off">
+             aria-label="ค้นหาโครงการ หน่วยงาน หรือผู้รับจ้าง" aria-describedby="gfSummary">
       <span class="kbd" aria-hidden="true">Ctrl K</span>
-      <!-- รายการแนะนำแยกตามประเภท เติมด้วย JS (ดู wireSearchSuggest ใน app.js) -->
-      <div class="search-pop" id="searchPop" role="listbox" aria-label="รายการแนะนำจากการค้นหา" hidden></div>
     </div>
 
     <span class="top-spacer"></span>
@@ -149,11 +142,6 @@
       <button type="button" class="density-btn active" data-density="explain" aria-pressed="true"
               title="แสดงคำอธิบายประกอบทุกส่วน เหมาะกับผู้ใช้ครั้งแรก">อธิบาย</button>
     </div>
-    <!-- โผล่มาเฉพาะตอนซ่อนแถบตัวกรองทั้งหมดไว้ (ดูปุ่ม ✕ ในแถบตัวกรอง) เป็นทางเดียวที่เรียกกลับได้
-         เพราะเห็นได้จากทุกแท็บเหมือนแถบบนอื่นๆ ไม่ต้องเลื่อนกลับไปหาตำแหน่งเดิม -->
-    <button class="top-btn" id="filterShowBtn" type="button" hidden
-            title="แสดงแถบตัวกรองอีกครั้ง" aria-label="แสดงแถบตัวกรอง">
-      <span aria-hidden="true">⚲</span> <span class="lbl-full">ตัวกรอง</span><span class="lbl-short" aria-hidden="true">กรอง</span><b class="top-btn-n" id="filterShowN" hidden>0</b></button>
     <button class="top-btn" id="provenanceBtn" type="button"
             title="ดูที่มาของข้อมูล ขอบเขต และข้อจำกัดของชุดข้อมูล"
             aria-label="ดูที่มาและข้อจำกัดของข้อมูล"><span class="lbl-full">ที่มาของข้อมูล</span><span class="lbl-short" aria-hidden="true">ที่มา</span></button>
@@ -177,14 +165,9 @@
       <h2 class="visually-hidden" id="filterHeading">ตัวกรองข้อมูล</h2>
       <div class="filter-head">
         <span class="section-label mb-0" aria-hidden="true">ตัวกรองข้อมูล</span>
-        <span class="filter-head-actions">
-          <button class="filter-collapse" id="gfCollapse" type="button"
-                  aria-expanded="true" aria-controls="gfBody"
-                  title="ย่อแถบตัวกรองให้เหลือบรรทัดเดียว ระบบจะจำค่านี้ไว้">ย่อ</button>
-          <button class="filter-hide" id="gfHide" type="button"
-                  title="ซ่อนแถบตัวกรองทั้งหมด กดปุ่ม &quot;ตัวกรอง&quot; บนแถบด้านบนเพื่อเรียกกลับ"
-                  aria-label="ซ่อนแถบตัวกรองทั้งหมด">✕</button>
-        </span>
+        <button class="filter-collapse" id="gfCollapse" type="button"
+                aria-expanded="true" aria-controls="gfBody"
+                title="ย่อแถบตัวกรองให้เหลือบรรทัดเดียว ระบบจะจำค่านี้ไว้">ย่อ</button>
       </div>
       <div id="gfBody">
       <!-- ชั้นแรก: ช่องที่ใช้บ่อยที่สุด เพื่อไม่ให้เจอ 8 ช่องพร้อมกันตั้งแต่เปิดหน้า
@@ -258,52 +241,15 @@
 
       <!-- ============ Overview / ภาพรวม ============ -->
       <div class="tab-pane fade show active" id="tab-overview" role="tabpanel" aria-labelledby="pill-overview" tabindex="0">
-        <!-- คิวตรวจสอบวันนี้: จัดด้วยคะแนน × มูลค่า ไม่ใช่คะแนนอย่างเดียว -->
-        <section class="cardx p-3 mb-3 section-block" aria-labelledby="ovQueueHeading">
-          <h2 class="visually-hidden" id="ovQueueHeading">คิวตรวจสอบวันนี้</h2>
-          <div class="row g-2 align-items-end mb-2">
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="ovQueueMode">จัดลำดับด้วย</label>
-              <select class="form-select form-select-sm" id="ovQueueMode">
-                <option value="exposure" selected>คะแนน × มูลค่า (แนะนำ)</option>
-                <option value="score">คะแนนความเสี่ยงอย่างเดียว</option>
-                <option value="value">มูลค่าสัญญาอย่างเดียว</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="ovQueueN">จำนวนเรื่อง</label>
-              <select class="form-select form-select-sm" id="ovQueueN">
-                <option value="20">20</option><option value="40" selected>40</option><option value="100">100</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="ovQueueMateriality">ตรวจเสมอถ้ามูลค่า ≥ (ล้านบาท)</label>
-              <input class="form-control form-control-sm" id="ovQueueMateriality" type="number" min="0" step="5">
-            </div>
-            <div class="col-6 col-md-3">
-              <button class="btn btn-sm btn-outline-secondary w-100" id="ovQueueExport" type="button">ส่งออก CSV ของคิวนี้</button>
-            </div>
-          </div>
-          <div class="small-muted mb-2" id="ovQueueSummary" aria-live="polite"></div>
-          <div class="queue-list" id="ovQueueList" role="list"></div>
-          <details class="ma-how mt-2"><summary>"คะแนน × มูลค่า" คืออะไร ทำไมไม่ใช้คะแนนอย่างเดียว</summary>
-            คะแนนความเสี่ยงบอกว่า "ผิดปกติแค่ไหน" ส่วนมูลค่าบอกว่า "ถ้าผิดจริงเสียหายเท่าไร" สองอย่างนี้ต้องดูคู่กัน
-            การจัดลำดับนี้จึงคูณสองค่าเข้าด้วยกัน (ไม่ได้ทอนด้วย log เพื่อให้อธิบายง่าย) ข้อจำกัด: สัญญาที่คะแนน 0
-            จะไม่ติดคิวจากการคูณเลยไม่ว่ามูลค่าจะสูงแค่ไหน — จึงมีเงื่อนไข "ตรวจเสมอถ้ามูลค่า ≥" แยกไว้ต่างหาก
-            เพื่อจับสัญญาก้อนใหญ่ที่กฎยังไม่จับสัญญาณ ไม่ใช่สรุปว่าสัญญาที่ไม่ติดคิวไม่มีปัญหา
-          </details>
-        </section>
-
-        <div class="section-label mb-2">ภาพรวมเชิงสถิติทั้งชุดข้อมูล</div>
-
         <section class="ov-hero mb-3" aria-labelledby="ovHeroTitle">
           <div class="ov-hero-main">
             <h1 id="ovHeroTitle">ภาพรวมความเสี่ยงการจัดซื้อจัดจ้าง</h1>
-            <div class="ov-hero-kicker">มูลค่าตามระดับความเสี่ยง (ภาพรวมทั้งชุด — คิวตรวจสอบที่แนะนำอยู่ด้านบนสุดของหน้า)</div>
+            <div class="ov-hero-kicker">มูลค่าสัญญาที่ควรตรวจสอบก่อน (ระดับวิกฤต + สูง)</div>
             <div class="ov-hero-value" id="ovHeroValue"></div>
             <div class="ov-hero-sub" id="ovHeroSub"></div>
             <div class="ov-hero-bar" id="ovHeroBar" role="img"></div>
             <div class="ov-hero-legend" id="ovHeroLegend" aria-label="กรองตามระดับความเสี่ยง"></div>
+            <div class="ov-hero-lede" id="overviewLede"></div>
           </div>
           <figure class="ov-hero-donut" id="ovHeroDonut" role="img"></figure>
         </section>
@@ -333,9 +279,9 @@
         </section>
         <div class="row g-3">
 
-          <!-- 2. แนวโน้มรายเดือน -->
+          <!-- 2. แนวโน้มรายเดือน เป็นภาพหลักของหน้า -->
           <div class="col-lg-8">
-            <div class="cardx p-3 h-100" data-collapse-id="ovMonthlyCard" data-collapse-default="closed">
+            <div class="cardx p-3 h-100">
               <div class="card-title-row"><h2 class="h6 mb-0">จำนวนและมูลค่าสัญญารายเดือน</h2>
                 <span class="badge badge-real">ข้อมูลจริง</span></div>
               <p class="small-muted mb-2">แยกตามระดับความเสี่ยง ใช้ดูจังหวะการทำสัญญาตลอดปีงบประมาณ</p>
@@ -346,7 +292,7 @@
 
           <!-- 3. การกระจายระดับความเสี่ยง -->
           <div class="col-lg-4">
-            <div class="cardx p-3 h-100" data-collapse-id="ovBandCard" data-collapse-default="closed">
+            <div class="cardx p-3 h-100" data-collapse-id="ovBandCard" data-collapse-default="open">
               <div class="card-title-row"><h2 class="h6 mb-0">การกระจายระดับความเสี่ยง</h2>
                 <span class="badge badge-derived">คำนวณ</span></div>
               <p class="small-muted mb-2">สัดส่วนสัญญาในแต่ละระดับ ตามคะแนนจากกฎที่ใช้ข้อมูลจริง</p>
@@ -413,8 +359,15 @@
 
           <!-- แผนที่กว้างเต็มแถว ตัวควบคุมลอยอยู่บนแผนที่ ตัวเลือกที่ใช้น้อยอยู่ในแผงที่เปิดเมื่อกด -->
           <div class="col-12">
-            <div class="cardx map-card is-bare" id="mapCard">
-              <h2 class="visually-hidden">แผนที่โครงการ</h2>
+            <div class="cardx map-card" id="mapCard">
+              <div class="card-title-row map-title-row">
+                <h2 class="h6 mb-0">แผนที่โครงการ</h2>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge badge-real">พิกัดจริง</span>
+                  <button class="btn btn-sm btn-outline-secondary py-0 px-2" id="mapFullscreen"
+                          type="button" title="ขยายเต็มจอ" aria-label="ขยายแผนที่เต็มจอ">⛶</button>
+                </div>
+              </div>
 
               <div class="map-shell" id="mapShell">
                 <div id="map" role="application"
@@ -438,8 +391,6 @@
                     <span aria-hidden="true">👣</span> รอยเท้า</button>
                   <button type="button" class="mapchip mapchip-icon" data-map-panel="more" aria-expanded="false" aria-controls="mapPanel"
                           title="มุมมอง ส่งออก และตัวเลือกอื่น" aria-label="ตัวเลือกเพิ่มเติม">⋯</button>
-                  <button type="button" class="mapchip mapchip-icon" id="mapFullscreen"
-                          title="ขยายเต็มจอ" aria-label="ขยายแผนที่เต็มจอ">⛶</button>
                 </div>
 
                 <div class="map-overlay-stats" id="mapStats" aria-live="polite" role="status"></div>
@@ -473,23 +424,12 @@
                       </select>                    </section>
                     <section data-map-sec="layers">
                       <label class="form-label" for="mapBasemap">พื้นหลัง</label>
-                      <select class="form-select form-select-sm" id="mapBasemap" title="เลือกแผนที่พื้นหลัง"></select>
-                      <label class="form-label mt-2" for="mapBaseOpacity">ความเข้มพื้นหลัง <span id="mapBaseOpacityLabel">100%</span></label>
-                      <input type="range" class="form-range" id="mapBaseOpacity" min="20" max="100" step="5" value="100"
-                             title="ลดความเข้มของแผนที่พื้นหลังเพื่อให้หมุดและชั้นข้อมูลที่นำเข้าเด่นขึ้น">
-
-                      <div class="map-panel-sub">ชั้นข้อมูลของคุณ</div>
-                      <div class="map-layer-add">
-                        <label class="btn btn-sm btn-outline-primary mb-0">＋ เพิ่มชั้นข้อมูล
-                          <input type="file" id="mapLayerInput" hidden multiple
-                                 accept=".geojson,.json,.kml,.gpx,.zip,.shp,application/geo+json,application/json">
-                        </label>
-                        <span class="map-layer-hint">GeoJSON · KML · GPX · Shapefile (.zip)</span>
-                      </div>
-                      <div id="mapLayerList" class="map-layer-list" role="list" aria-label="ชั้นข้อมูลที่นำเข้า"></div>
-                      <div class="map-layer-msg" id="mapLayerMsg" role="status" aria-live="polite"></div>
-
-                      <div class="map-panel-sub">หมุดสัญญา</div>
+                      <select class="form-select form-select-sm" id="mapBasemap" title="เลือกแผนที่พื้นหลัง">
+                        <option value="light">ถนน · OpenStreetMap</option>
+                        <option value="gray">เทาอ่อน · เน้นหมุด</option>
+                        <option value="dark">มืด</option>
+                        <option value="satellite">ภาพถ่ายดาวเทียม</option>
+                      </select>
                       <div class="form-check form-switch mb-0 mt-2">
                         <input class="form-check-input" type="checkbox" role="switch" id="mapSizeByValue" checked>
                         <label class="form-check-label small" for="mapSizeByValue">ขนาดหมุดตามมูลค่า</label>
@@ -518,16 +458,10 @@
                               title="คลิกบนแผนที่เพื่อเลือกสัญญาภายในรัศมีที่กำหนด">◯ เลือกรัศมี</button>
                       <button type="button" class="map-tool-btn" data-map-tool="polygon" aria-pressed="false"
                               title="คลิกหลายจุดบนแผนที่เพื่อวาดขอบเขตพื้นที่เอง">⬠ วาดพื้นที่</button>
-                      <div class="map-fp-kind mapseg" role="group" aria-label="ดูรอยเท้าของใคร">
-                        <button type="button" class="mapseg-btn is-on" data-fp-kind="contractor" aria-pressed="true"
-                                title="ดูว่าผู้รับจ้างรายนี้รับงานอยู่ที่ไหนบ้าง">ผู้รับจ้าง</button>
-                        <button type="button" class="mapseg-btn" data-fp-kind="dept" aria-pressed="false"
-                                title="กลับด้าน: ดูว่าหน่วยงานนี้กระจายงานไปที่ไหน ให้ใครบ้าง">หน่วยงาน</button>
-                      </div>
-                      <label class="map-fp-pick" title="พิมพ์หรือเลือกชื่อ เพื่อดูทุกงานของรายนั้นบนแผนที่">
+                      <label class="map-fp-pick" title="พิมพ์หรือเลือกชื่อผู้รับจ้าง เพื่อดูทุกงานของรายนั้นบนแผนที่">
                         <span aria-hidden="true">👣</span>
                         <input class="form-control form-control-sm" id="mapFootprintInput" list="mapFootprintList"
-                               placeholder="รอยเท้าผู้รับจ้าง: พิมพ์ชื่อ" aria-label="รอยเท้า พิมพ์ชื่อผู้รับจ้างหรือหน่วยงาน" autocomplete="off">
+                               placeholder="รอยเท้าผู้รับจ้าง: พิมพ์ชื่อ" aria-label="รอยเท้าผู้รับจ้าง พิมพ์ชื่อผู้รับจ้าง" autocomplete="off">
                       </label>
                       <datalist id="mapFootprintList"></datalist>
                     </div>
@@ -588,40 +522,38 @@
             </div>
           </div>
 
-          <!-- แผงเดียวใต้แผนที่แทนการ์ดใหญ่ 4 ใบ: สลับดูรายการ รายละเอียด สัญญาณ และที่มาของคะแนนได้ในที่เดิม
-               แผนที่จึงกินพื้นที่ได้เต็มที่ และไม่ต้องเลื่อนหน้าจอไปมาระหว่างดูแผนที่กับอ่านผล -->
-          <div class="col-12">
-            <div class="gis-panel" id="gisPanel">
-              <div class="gis-tabs">
-                <div class="gis-tabs-scroll" role="tablist" aria-label="ข้อมูลประกอบแผนที่">
-                  <button type="button" class="gis-tab is-on" data-gis-tab="list" role="tab" aria-selected="true">
-                    รายการ <b class="gis-n" id="listCount"></b></button>
-                  <button type="button" class="gis-tab" data-gis-tab="detail" role="tab" aria-selected="false">รายละเอียด</button>
-                  <button type="button" class="gis-tab" data-gis-tab="rules" role="tab" aria-selected="false">สัญญาณที่พบ</button>
-                  <button type="button" class="gis-tab" data-gis-tab="score" role="tab" aria-selected="false">ที่มาของคะแนน</button>
-                  <button type="button" class="gis-tab" data-gis-tab="stack" role="tab" aria-selected="false">จุดเดียวหลายสัญญา</button>
-                </div>
-                <button type="button" class="gis-collapse" id="gisPanelToggle" aria-expanded="true"
-                        title="ย่อแผงลงเพื่อให้แผนที่เต็มจอมากที่สุด">▾</button>
-              </div>
-              <div class="gis-body">
-                <div data-gis-pane="list">
-                  <div id="list" class="list-box" role="list" aria-label="รายการโครงการเรียงตามคะแนนความเสี่ยง"></div>
-                </div>
-                <div data-gis-pane="detail" hidden><div id="detail"></div></div>
-                <div data-gis-pane="rules" hidden><div id="rulesPanel"></div></div>
-                <div data-gis-pane="score" hidden>
-                  <div id="waterfall" style="height:230px" role="img"
-                       aria-label="แผนภูมิน้ำตกแสดงที่มาของคะแนนความเสี่ยง"></div>
-                </div>
-                <div data-gis-pane="stack" hidden>
-                  <div class="stack-tabs" role="tablist">
-                    <button type="button" class="ai-cat is-on" data-stack-tab="exact" role="tab" aria-selected="true">⚠ พิกัดซ้ำเป๊ะ</button>
-                    <button type="button" class="ai-cat" data-stack-tab="cluster" role="tab" aria-selected="false">📍 จุดที่มีงานซ้ำ</button>
-                  </div>
-                  <div id="mapStackBody"></div>
-                </div>
-              </div>
+          <div class="col-lg-5 col-xl-4">
+            <div class="cardx p-3 h-100">
+              <div class="card-title-row"><h2 class="h6 mb-0">รายการโครงการ</h2>
+                <span class="small-muted" id="listCount"></span></div>
+              <p class="small-muted mb-2">เรียงตามคะแนนความเสี่ยง เลือกรายการเพื่อดูรายละเอียด</p>
+              <div id="list" class="list-box" role="list" aria-label="รายการโครงการเรียงตามคะแนนความเสี่ยง"></div>
+            </div>
+          </div>
+
+          <div class="col-lg-7 col-xl-8">
+            <div class="cardx p-3 h-100">
+              <h2 class="h6">รายละเอียดโครงการ</h2>
+              <div id="detail"></div>
+            </div>
+          </div>
+
+          <!-- แถวรอง: เหตุผลของคะแนน วางไว้ใต้แผนที่เพื่อให้ลำดับบนมือถือเป็น แผนที่ ▸ รายการ ▸ รายละเอียด ▸ กฎ -->
+          <div class="col-xl-7">
+            <div class="cardx p-3 h-100" data-collapse-id="gisRulesCard" data-collapse-default="closed">
+              <div class="card-title-row"><h2 class="h6 mb-0">สัญญาณความเสี่ยงที่พบ</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">เงื่อนไขที่โครงการนี้เข้าข่าย พร้อมค่าที่พบจริงและสูตรที่ใช้</p>
+              <div id="rulesPanel"></div>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <div class="cardx p-3 h-100" data-collapse-id="gisWaterfallCard" data-collapse-default="closed">
+              <div class="card-title-row"><h2 class="h6 mb-0">ที่มาของคะแนน</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">น้ำหนักที่แต่ละกฎบวกเข้าไปในคะแนนรวมของโครงการที่เลือก</p>
+              <div id="waterfall" style="height:240px" role="img"
+                   aria-label="แผนภูมิน้ำตกแสดงที่มาของคะแนนความเสี่ยง"></div>
             </div>
           </div>
         </div>
@@ -1083,45 +1015,6 @@
               <div id="hhiChart" style="height:340px" role="img"
                    aria-label="แผนภูมิแท่งดัชนีการกระจุกตัวของตลาดรายหน่วยงาน"></div>
             </div>
-            <div class="cardx p-3 mb-3" data-collapse-id="netTerritoryCard" data-collapse-default="closed">
-              <div class="card-title-row"><h2 class="h6 mb-0">คู่ผู้รับจ้างที่ครองพื้นที่เดียวกัน</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <p class="small-muted mb-2">การกระจุกตัวด้านบนมองทั้งหน่วยงาน หน่วยงานที่มีสัญญาทั้งประเทศจึงไม่มีวันติดเกณฑ์
-                ทั้งที่ในพื้นที่หนึ่งอาจเหลือผู้เล่นแค่สองราย ข้อนี้ตัดเป็นรายพื้นที่ก่อนแล้วค่อยนับส่วนแบ่ง
-                กดปุ่มรอยเท้าเพื่อเปิดทั้งคู่ซ้อนกันบนแผนที่</p>
-              <div class="terr-controls">
-                <label>ครองอย่างน้อย
-                  <select class="form-select form-select-sm" id="terrShare">
-                    <option value="0.4">40%</option>
-                    <option value="0.5" selected>50%</option>
-                    <option value="0.6">60%</option>
-                    <option value="0.75">75%</option>
-                  </select></label>
-                <label>สัญญาในพื้นที่ ≥
-                  <select class="form-select form-select-sm" id="terrMarket">
-                    <option value="5">5</option>
-                    <option value="8" selected>8</option>
-                    <option value="15">15</option>
-                    <option value="30">30</option>
-                  </select></label>
-                <label>เรียงตาม
-                  <select class="form-select form-select-sm" id="terrSort">
-                    <option value="impact" selected>ส่วนแบ่ง × จำนวน</option>
-                    <option value="share">ส่วนแบ่งสูงสุด</option>
-                    <option value="value">มูลค่ารวม</option>
-                    <option value="balance">แบ่งกันเท่า ๆ กัน</option>
-                  </select></label>
-              </div>
-              <div id="netTerritory" class="terr-list" role="list" aria-label="คู่ผู้รับจ้างที่ครองพื้นที่เดียวกัน"></div>
-            </div>
-            <div class="cardx p-3 mb-3" data-collapse-id="netDirectorCard" data-collapse-default="closed">
-              <div class="card-title-row"><h2 class="h6 mb-0">กรรมการที่ซ้ำกันข้ามผู้รับจ้าง</h2>
-                <span class="badge badge-derived">คำนวณจากข้อมูลที่กรอกเอง</span></div>
-              <p class="small-muted mb-2">ต้องพิมพ์รายชื่อกรรมการเข้ามาเองก่อน (จากหน้าโปรไฟล์ผู้รับจ้าง หรือแท็บนำเข้าข้อมูล)
-                แอปไม่ได้ดึงข้อมูลนี้จากที่ไหนอัตโนมัติ · จับคู่ชื่อแบบตรงตัวอักษรเท่านั้น สะกดต่างเล็กน้อยจะไม่ถูกจับ
-                และชื่อสามัญที่พ้องกันโดยบังเอิญจะถูกนับเป็นคนเดียวกัน ต้องเปิดดูรายละเอียดก่อนสรุป</p>
-              <div id="netDirectorList" class="list-box" role="list"></div>
-            </div>
             <div class="cardx p-3 mb-3" data-collapse-id="netRepeatCard" data-collapse-default="closed">
               <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างที่ได้งานหลายหน่วยงาน</h2>
                 <span class="badge badge-real">ข้อมูลจริง</span></div>
@@ -1330,63 +1223,6 @@
                     <tbody id="contractorCaseBody"></tbody></table></div>
                 </div>
               </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="conTypeCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ประเภทงานและความถนัด</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorTypes"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="conTimingCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">จังหวะเวลาของสัญญา (เทียบปีงบประมาณ)</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorTiming"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="conBidCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">สัญญาณการแข่งขัน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorBids"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3 mt-0">
-          <div class="col-lg-7">
-            <div class="cardx p-3 h-100" data-collapse-id="conUnderbidCard" data-collapse-default="closed">
-              <div class="card-title-row"><h2 class="h6 mb-0">ลดราคาน้อยกว่าสนามของตัวเองมากที่สุด</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <p class="small-muted mb-2">"สนาม" คือสัญญาที่วิธีจัดหาและประเภทโครงการเดียวกัน
-                รายการนี้ดูทั้งชุดข้อมูลให้เลย ไม่ต้องเปิดดูทีละราย · กดที่แถวเพื่อเปิดข้อมูลรายนั้นด้านบน</p>
-              <div class="terr-controls">
-                <label>สัญญาที่เทียบได้ ≥
-                  <select class="form-select form-select-sm" id="ubMin">
-                    <option value="3" selected>3</option><option value="5">5</option><option value="10">10</option>
-                  </select></label>
-                <label>มูลค่ารวม ≥
-                  <select class="form-select form-select-sm" id="ubValue">
-                    <option value="0" selected>ไม่จำกัด</option><option value="10000000">10 ล้าน</option>
-                    <option value="50000000">50 ล้าน</option><option value="100000000">100 ล้าน</option>
-                  </select></label>
-                <label>เรียงตาม
-                  <select class="form-select form-select-sm" id="ubSort">
-                    <option value="rel" selected>ต่ำกว่าสนามมากสุด</option>
-                    <option value="gap">ส่วนต่างเป็นเงิน</option>
-                    <option value="value">มูลค่ารวม</option>
-                  </select></label>
-              </div>
-              <div id="conUnderbid"></div>
-            </div>
-          </div>
-          <div class="col-lg-5">
-            <div class="cardx p-3 h-100" data-collapse-id="conJvCard" data-collapse-default="closed">
-              <div class="card-title-row"><h2 class="h6 mb-0">กิจการค้าร่วม (JV)</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <div id="conJv"></div>
             </div>
           </div>
         </div>
@@ -1412,140 +1248,6 @@
               <div id="ccCompareBody"></div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ============ หน่วยงาน ============ -->
-      <div class="tab-pane fade" id="tab-agency" role="tabpanel" aria-labelledby="pill-agency" tabindex="0">
-        <nav class="ag-views" aria-label="มุมมองของแท็บหน่วยงาน">
-          <button type="button" class="ag-view is-on" data-ag-view="overview" aria-pressed="true">🏛️ ภาพรวมหน่วยงาน</button>
-          <button type="button" class="ag-view" data-ag-view="method" aria-pressed="false">🔎 วิเคราะห์เชิงลึกวิธีจัดหา</button>
-        </nav>
-
-        <div data-ag-pane="overview">
-        <div class="hero mb-3">
-          <h1 class="h5 mb-2">โปรไฟล์และการจัดอันดับหน่วยงานจัดซื้อ</h1>
-          <div class="small" id="agencyLevelNote">นับที่ระดับกรม (รวมทุกสาขาเข้าด้วยกัน) — สลับเป็นระดับสาขาได้จากตัวกรองด้านซ้าย</div>
-        </div>
-        <div class="warn-note mb-3" role="note">
-          ตัวเลขในหน้านี้เป็นการสรุปข้อมูลที่มีอยู่จริง ไม่ใช่คะแนนความเสี่ยงหรือข้อสรุปว่าหน่วยงานใดกระทำผิด
-          ชุดข้อมูลนี้ไม่มีจำนวนผู้เสนอราคา จึงตอบได้เพียงว่า "ให้ใครได้งานด้วยวิธีอะไร" ไม่ใช่ "เหตุใดรายนั้นจึงชนะ"
-        </div>
-
-        <section aria-labelledby="agencyKpiHeading" class="mb-3">
-          <h2 class="visually-hidden" id="agencyKpiHeading">ตัวชี้วัดหน่วยงาน</h2>
-          <div class="row g-3 analytics-kpi-grid" id="agencyKpis"></div>
-        </section>
-
-        <div class="row g-3">
-          <div class="col-xl-4">
-            <div class="cardx p-3 h-100">
-              <div class="section-label" aria-hidden="true">ตัวกรองหน่วยงาน</div>
-              <div class="row g-2 mb-2">
-                <div class="col-12">
-                  <label class="form-label" for="agencySearch">ค้นหาหน่วยงาน</label>
-                  <input class="form-control form-control-sm" id="agencySearch" type="search" placeholder="ชื่อหน่วยงาน">
-                </div>
-                <div class="col-12">
-                  <label class="form-label" for="agencyLevel">นับที่ระดับ</label>
-                  <select class="form-select form-select-sm" id="agencyLevel">
-                    <option value="agency" selected>กรม/หน่วยงานต้นสังกัด</option>
-                    <option value="sub">หน่วยงานย่อย/สาขา</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="agencyContractMin">สัญญา ≥ <span id="agencyContractMinLabel">1</span></label>
-                  <input class="form-range" id="agencyContractMin" type="range" min="1" max="50" step="1" value="1"
-                         aria-describedby="agencyContractMinLabel">
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="agencyHhiMin">HHI ≥ <span id="agencyHhiMinLabel">0</span></label>
-                  <input class="form-range" id="agencyHhiMin" type="range" min="0" max="10000" step="500" value="0"
-                         aria-describedby="agencyHhiMinLabel">
-                </div>
-              </div>
-              <div class="card-title-row"><h2 class="h6 mb-0">เรียงตามมูลค่ารวม</h2>
-                <span class="small-muted" id="agencyCount"></span></div>
-              <div id="agencyRankList" class="list-box contractor-list" role="list"
-                   aria-label="หน่วยงานเรียงตามมูลค่ารวม"></div>
-            </div>
-          </div>
-          <div class="col-xl-8">
-            <div class="row g-3">
-              <div class="col-12">
-                <div class="cardx p-3 h-100">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ข้อมูลหน่วยงาน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyProfile"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="agContractorsCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างที่ได้งาน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyContractors"></div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="cardx p-3 h-100" data-collapse-id="agMethodsCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">วิธีจัดหาที่ใช้</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyMethods"></div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="cardx p-3 h-100" data-collapse-id="agTypesCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ประเภทงาน/กลุ่มงาน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyTypes"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="agTimingCard" data-collapse-default="closed">
-                  <div class="card-title-row"><h2 class="h6 mb-0">จังหวะเวลาของสัญญา (เทียบปีงบประมาณ)</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyTiming"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="agLoyaltyCard" data-collapse-default="closed">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างรายใหม่เทียบรายเดิม</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyLoyalty"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- เปรียบเทียบหน่วยงาน 2 แห่ง: ฝังตรงในแท็บให้เห็นทันทีที่เปิด เหมือนที่แท็บผู้รับจ้างทำไว้ -->
-        <div class="row g-3 mt-0">
-          <div class="col-12">
-            <div class="cardx p-3">
-              <div class="card-title-row"><h2 class="h6 mb-0">เปรียบเทียบหน่วยงาน 2 แห่ง</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <p class="small-muted mb-2">ค่าเริ่มต้นคือสองอันดับแรกตามมูลค่ารวมภายใต้ตัวกรองปัจจุบัน (นับที่ระดับกรมเสมอ)
-                เปลี่ยนได้จากช่องเลือกด้านล่าง</p>
-              <div class="row g-2 compare-picker mb-2">
-                <div class="col-6">
-                  <label class="form-label" for="agComparSelectA">รายการที่ 1</label>
-                  <select class="form-select form-select-sm" id="agComparSelectA"></select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="agComparSelectB">รายการที่ 2</label>
-                  <select class="form-select form-select-sm" id="agComparSelectB"></select>
-                </div>
-              </div>
-              <div id="agComparBody"></div>
-            </div>
-          </div>
-        </div>
-        </div><!-- /data-ag-pane="overview" -->
-
-        <!-- แท็บย่อย: วิเคราะห์เชิงลึกวิธีจัดหา (3E + Integrity ตามแนว INTOSAI GUID 5280) -->
-        <div data-ag-pane="method" hidden>
-          <div class="method-scope" id="agMethodScope"></div>
-          <div id="agMethodBody"></div>
         </div>
       </div>
 
@@ -1840,7 +1542,7 @@
         <div class="hero-import mb-3">
           <h1 class="h5 mb-2">นำเข้าข้อมูลจัดซื้อจัดจ้าง</h1>
           <div class="small">ใช้ไฟล์ของคุณเอง (CSV · XLSX · JSON) หรือดึงจาก e-GP Open Data
-            แล้ววิเคราะห์ด้วยเครื่องมือทั้งหมดของระบบ — กฎตรวจจับ แผนที่ เครือข่าย ตะกร้า และ AI Lab</div>
+            แล้ววิเคราะห์ด้วยเครื่องมือทั้งหมดของระบบ — กฎตรวจจับ แผนที่ เครือข่าย ตะกร้า และผู้ช่วย AI</div>
         </div>
         <div class="warn-note mb-3" role="note">
           ไฟล์ที่เลือกถูกอ่านและประมวลผลในเบราว์เซอร์ของเครื่องนี้เท่านั้น ไม่ถูกอัปโหลดไปที่ใด
@@ -1853,13 +1555,12 @@
           </div>
           <div class="col-xl-5">
             <div class="cardx p-3 mb-3" id="importDatasets"></div>
-            <div class="cardx p-3 mb-3" id="importTools"></div>
-            <div class="cardx p-3" id="directorsCard"></div>
+            <div class="cardx p-3" id="importTools"></div>
           </div>
         </div>
       </div>
 
-      <!-- ============ AI Lab ============ -->
+      <!-- ============ AI / ผู้ช่วยวิเคราะห์ ============ -->
       <div class="tab-pane fade" id="tab-ai" role="tabpanel" aria-labelledby="pill-ai" tabindex="0">
 
         <!-- หัวแท็บ: ชื่อ ขั้นตอน 3 จังหวะ และสถานะการเชื่อมต่อ -->
@@ -1867,7 +1568,7 @@
           <div class="ai-head-title">
             <span class="ai-head-icon" aria-hidden="true">✨</span>
             <div>
-              <h1>AI Lab</h1>
+              <h1>ผู้ช่วยวิเคราะห์ด้วย AI</h1>
               <p>สรุป หารูปแบบพฤติกรรม และร่างเอกสารจากผลคัดกรอง · <strong>ทุกคำตอบเป็นร่าง ต้องตรวจตัวเลขก่อนใช้</strong></p>
             </div>
           </div>
@@ -1937,11 +1638,10 @@
           </div>
         </section>
 
-        <nav class="ai-views" aria-label="มุมมองของ AI Lab">
+        <nav class="ai-views" aria-label="มุมมองของผู้ช่วย AI">
           <button type="button" class="ai-view" data-ai-view="assistant" aria-pressed="true" title="งานสำเร็จรูป ถามตอบ และค้นหาเป็นตัวกรอง">💬 ผู้ช่วยวิเคราะห์</button>
           <button type="button" class="ai-view" data-ai-view="agent" aria-pressed="false" title="ให้ AI เลือกใช้เครื่องมืออ่านข้อมูลเองทีละขั้นจนได้หลักฐาน">🕵️ โหมดนักสืบ <span class="ai-new">ใหม่</span></button>
           <button type="button" class="ai-view" data-ai-view="lab" aria-pressed="false" title="สร้างกฎจากคำพูด ขุดกฎความสัมพันธ์ และตรวจสุขภาพของกฎ">🧪 ห้องทดลองกฎ <span class="ai-new">ใหม่</span></button>
-          <button type="button" class="ai-view" data-ai-view="names" aria-pressed="false" title="วิเคราะห์ชื่อโครงการ: แยกส่วนประกอบ จัดกลุ่ม จัดหมวดวัตถุประสงค์ และบันทึกพจนานุกรมไว้ใช้ซ้ำ">📝 ชื่อโครงการ <span class="ai-new">ใหม่</span></button>
           <button type="button" class="ai-view" data-ai-view="history" aria-pressed="false" title="ผลวิเคราะห์ที่เคยทำ เปิดดูซ้ำหรือเปรียบเทียบ">🕘 ประวัติ <span class="ai-cat-n" id="aiHistCount"></span></button>
         </nav>
 
@@ -2270,30 +1970,6 @@
         </div>
 
         <!-- ============ ประวัติ ============ -->
-        <div data-ai-pane="names" hidden id="nlPane">
-          <div class="ai-lab-head">
-            <div>
-              <h2 class="h6 mb-1">วิเคราะห์ชื่อโครงการ</h2>
-              <span class="small-muted">ชื่อโครงการเป็นข้อความอิสระที่มีรายละเอียดมากที่สุดในชุดข้อมูล ·
-                ชุดข้อมูลแต่ละชุดเขียนชื่อคนละสำนวน จึงปรับพจนานุกรมเองแล้วบันทึกไว้ใช้กับชุดถัดไปได้ · คำนวณในเครื่องทั้งหมด</span>
-            </div>
-          </div>
-
-          <div id="nlProfileBar"></div>
-
-          <div class="ai-cats lab-tabs" role="group" aria-label="ส่วนของการวิเคราะห์ชื่อโครงการ">
-            <button type="button" class="ai-cat is-on" data-nl-tab="anatomy" aria-pressed="true" title="ชื่อในชุดนี้เขียนอะไรไว้บ้าง แกะอะไรออกมาใช้ได้">🔍 แยกส่วนประกอบ</button>
-            <button type="button" class="ai-cat" data-nl-tab="groups" aria-pressed="false" title="พจนานุกรมกลุ่มงาน ความครอบคลุม และคำที่ควรเพิ่ม">🧩 กลุ่มงาน</button>
-            <button type="button" class="ai-cat" data-nl-tab="purpose" aria-pressed="false" title="วัตถุประสงค์ของงาน และส่วนผสมงบของแต่ละหน่วยงาน">🎯 วัตถุประสงค์</button>
-            <button type="button" class="ai-cat" data-nl-tab="findings" aria-pressed="false" title="สัญญาณที่อ่านได้จากชื่ออย่างเดียว">🚩 สิ่งที่พบ</button>
-          </div>
-
-          <div data-nl-pane="anatomy"><div id="nlAnatomy"></div></div>
-          <div data-nl-pane="groups" hidden><div id="nlGroups"></div></div>
-          <div data-nl-pane="purpose" hidden><div id="nlPurpose"></div></div>
-          <div data-nl-pane="findings" hidden><div id="nlFindings"></div></div>
-        </div>
-
         <div data-ai-pane="history" hidden>
           <div class="ai-hist-layout">
             <section class="cardx ai-hist-side" aria-labelledby="histHeading">
@@ -2343,7 +2019,7 @@
     <div class="profile-tagrow">
       <span class="profile-tags" id="profileTags"></span>
       <span class="profile-cart"><button type="button" class="ai-ask-btn" data-ai-task="contract"
-            title="เปิดแท็บ AI Lab แล้วให้อธิบายสัญญานี้">✨ ถาม AI</button> <span id="profileCart"></span></span>
+            title="เปิดแท็บผู้ช่วย AI แล้วให้อธิบายสัญญานี้">✨ ถาม AI</button> <span id="profileCart"></span></span>
     </div>
   </header>
   <div class="profile-body" id="profileBody">
@@ -2403,25 +2079,18 @@
       <button type="button" class="cart-close" id="cartCloseBtn" aria-label="ปิดตะกร้า" title="ปิด (Esc)">✕</button>
     </div>
   </div>
-  <div class="cart-tabs" id="cartTabs" role="tablist" aria-label="ตะกร้าย่อยตามประเภท">
-    <button type="button" class="cart-tab is-on" data-cart-tab="all" role="tab" aria-selected="true">ทั้งหมด</button>
-    <button type="button" class="cart-tab" data-cart-tab="contract" role="tab" aria-selected="false">📄 สัญญา</button>
-    <button type="button" class="cart-tab" data-cart-tab="project" role="tab" aria-selected="false">🏗️ โครงการ</button>
-    <button type="button" class="cart-tab" data-cart-tab="contractor" role="tab" aria-selected="false">👷 ผู้รับจ้าง</button>
-    <button type="button" class="cart-tab" data-cart-tab="agency" role="tab" aria-selected="false">🏛️ หน่วยงาน</button>
-  </div>
   <div class="cart-summary" id="cartSummary" aria-live="polite"></div>
   <div class="cart-body">
     <ol class="cart-list" id="cartList"></ol>
     <div class="cart-empty" id="cartEmpty">
       <div class="cart-empty-art" aria-hidden="true"><svg class="cart-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42a.25.25 0 0 1-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
-      <strong id="cartEmptyTitle">ยังไม่มีสัญญาในตะกร้า</strong>
-      <span id="cartEmptyHint">กดปุ่มรูปตะกร้าหน้าชื่อโครงการในตาราง รายการ แผนที่ หรือหน้าต่างรายละเอียด</span>
+      <strong>ยังไม่มีสัญญาในตะกร้า</strong>
+      กดปุ่มรูปตะกร้าหน้าชื่อโครงการในตาราง รายการ แผนที่ หรือหน้าต่างรายละเอียด
     </div>
   </div>
   <div class="cart-foot">
     <button type="button" class="cart-clear" id="cartClearBtn">ล้างตะกร้า</button>
-    <button type="button" class="ai-ask-btn" id="cartAiBtn" data-ai-task="cart" title="ให้ AI ร่างบันทึกข้อตรวจพบจากสัญญาในตะกร้า">✨ ร่างด้วย AI</button>
+    <button type="button" class="ai-ask-btn" data-ai-task="cart" title="ให้ AI ร่างบันทึกข้อตรวจพบจากสัญญาในตะกร้า">✨ ร่างด้วย AI</button>
     <button type="button" class="cart-export" id="cartExportBtn"
             title="ส่งออกทุกสัญญาในตะกร้า พร้อมข้อมูลต้นทาง ผลของกฎ ผลของโมเดล และหมายเหตุ">⬇ ส่งออก CSV</button>
   </div>
@@ -2477,7 +2146,7 @@
 <!-- ?v= บังคับให้เบราว์เซอร์โหลดไฟล์ใหม่หลังแก้โค้ด ให้เพิ่มเลขนี้เมื่อแก้ไฟล์ในโฟลเดอร์ js/ -->
 <script src="js/util.js?v=16"></script>
 <script src="js/rules.js?v=21"></script>
-<script src="js/analytics.js?v=32"></script>
+<script src="js/analytics.js?v=19"></script>
 <script src="js/charts.js?v=19"></script>
 <script src="js/tablesort.js?v=15"></script>
 <script src="js/diagrams.js?v=4"></script>
@@ -2485,13 +2154,9 @@
 <script src="js/ai.js?v=5"></script>
 <script src="js/patterns.js?v=2"></script>
 <script src="js/rulelab.js?v=2"></script>
-<script src="js/names.js?v=5"></script>
-<script src="js/dataio.js?v=7"></script>
+<script src="js/dataio.js?v=6"></script>
 <script src="js/datasets.js?v=2"></script>
-<script src="js/importui.js?v=6"></script>
-<script src="js/directors.js?v=2"></script>
-<script src="js/app.js?v=140"></script>
-  <!-- ใบสรุปผู้รับจ้าง 1 หน้า: อยู่นอกสายตาตอนปกติ และเป็นสิ่งเดียวที่ถูกพิมพ์เมื่อสั่งพิมพ์ -->
-  <div id="printSheet" aria-hidden="true"></div>
+<script src="js/importui.js?v=5"></script>
+<script src="js/app.js?v=85"></script>
 </body>
 </html>

@@ -387,6 +387,505 @@ const Analytics = (() => {
     return out.sort((a, b) => b.alternation_ratio - a.alternation_ratio || b.total_value - a.total_value);
   }
 
+  /** คู่ผู้รับจ้างที่ "ครองพื้นที่เดียวกัน" ของหน่วยงานเดียวกัน
+   *
+   *  ต่างจาก bidRotation ตรงที่ข้อนั้นมองทั้งหน่วยงาน หน่วยงานที่มีสัญญาทั้งประเทศจึงไม่มีวันติดเกณฑ์
+   *  ทั้งที่ในอำเภอหนึ่งอาจเหลือผู้เล่นแค่สองราย ข้อนี้จึงตัดเป็นรายพื้นที่ก่อนแล้วค่อยนับส่วนแบ่ง
+   *
+   *  วิธีคิด: หาผู้รับจ้างที่มีงานพร้อมพิกัดพอจะรู้ "พื้นที่ทำงาน" (ศูนย์กลาง + รัศมีที่ครอบ 90% ของงาน)
+   *  จับคู่เฉพาะรายที่พื้นที่ทับกันและเคยรับงานจากหน่วยงานเดียวกัน แล้วนับว่าในรัศมีนั้น
+   *  สัญญาของหน่วยงานร่วมทั้งหมดตกเป็นของสองรายนี้กี่เปอร์เซ็นต์
+   *
+   *  วัดกับชุดข้อมูลหลัก: 596 คู่ผ่านเกณฑ์พื้นฐาน · 18 คู่ครองตั้งแต่ 60% ของสัญญาอย่างน้อย 8 ฉบับ
+   *  ข้อที่วัดแล้ว "ไม่ใช่" สัญญาณ: การสลับกันชนะตามเวลาของคู่เหล่านี้พอ ๆ กับการสุ่ม (เช่น สลับจริง 6 ครั้ง
+   *  จากที่คาดไว้ 6.5) จึงไม่นำมาคิดคะแนน และไม่ควรนำไปอ้างว่าเป็นการผลัดกันชนะ
+   */
+  function territoryPairs(records, {
+    minGeo = 3, minMarket = 8, minShare = 0.5, minPairContracts = 4, limit = 40,
+  } = {}) {
+    const rad = Math.PI / 180;
+    const km = (a, b) => {
+      const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad, mid = (a[0] + b[0]) / 2 * rad;
+      const x = dLon * Math.cos(mid), y = dLat;
+      return Math.sqrt(x * x + y * y) * 6371;
+    };
+
+    // โปรไฟล์พื้นที่ของผู้รับจ้าง — ใช้เฉพาะพิกัดที่ไม่ใช่พิกัดใช้ร่วม (มักเป็นที่ตั้งสำนักงาน)
+    const prof = [];
+    for (const [key, rows] of U.groupBy(records, r => r.winner_key)) {
+      const geo = rows.filter(r => r.lat !== null && r.lon !== null && r.geo_quality !== 'shared');
+      if (geo.length < minGeo) continue;
+      const center = [U.median(geo.map(r => r.lat)), U.median(geo.map(r => r.lon))];
+      const ds = geo.map(r => km(center, [r.lat, r.lon])).sort((x, y) => x - y);
+      prof.push({
+        key, name: rows[0].winner_name, rows, center,
+        p90: ds[Math.floor(0.9 * (ds.length - 1))],
+        depts: new Set(rows.map(r => r.dept_key)),
+      });
+    }
+
+    const byDept = U.groupBy(records.filter(r => r.lat !== null && r.lon !== null && r.geo_quality !== 'shared'),
+      r => r.dept_key);
+
+    const out = [];
+    for (let i = 0; i < prof.length; i++) {
+      for (let j = i + 1; j < prof.length; j++) {
+        const a = prof[i], b = prof[j];
+        const shared = [...a.depts].filter(d => b.depts.has(d));
+        if (!shared.length) continue;
+        const apart = km(a.center, b.center);
+        // "พื้นที่ทับกัน" = ศูนย์กลางห่างกันไม่เกินรัศมีเฉลี่ยของทั้งคู่ (อย่างน้อย 8 กม. กันกรณีงานกระจุกจุดเดียว)
+        const reach = Math.max(8, (a.p90 + b.p90) / 2);
+        if (apart > reach) continue;
+
+        const mid = [(a.center[0] + b.center[0]) / 2, (a.center[1] + b.center[1]) / 2];
+        let market = 0, taken = 0, value = 0;
+        const deptHit = new Map(), provinces = new Map(), rows = [];
+        for (const dk of shared) {
+          for (const r of (byDept.get(dk) || [])) {
+            if (km(mid, [r.lat, r.lon]) > reach) continue;
+            market++;
+            if (r.winner_key !== a.key && r.winner_key !== b.key) continue;
+            taken++;
+            value += r.contract_price_agree || 0;
+            rows.push(r);
+            deptHit.set(r.dept_name || dk, (deptHit.get(r.dept_name || dk) || 0) + 1);
+            if (r.province) provinces.set(r.province, (provinces.get(r.province) || 0) + 1);
+          }
+        }
+        if (market < minMarket || taken < minPairContracts) continue;
+        const share = taken / market;
+        if (share < minShare) continue;
+
+        const nA = rows.filter(r => r.winner_key === a.key).length;
+        out.push({
+          a: { key: a.key, name: a.name, n: nA },
+          b: { key: b.key, name: b.name, n: taken - nA },
+          depts: [...deptHit].sort((x, y) => y[1] - x[1]),
+          provinces: [...provinces].sort((x, y) => y[1] - x[1]),
+          apartKm: apart, radiusKm: reach, market, taken, share, value, rows,
+          // ถ่วงกันไม่ให้คู่ที่รายหนึ่งกินขาดขึ้นมาบังคู่ที่แบ่งกันจริง ๆ
+          balance: Math.min(nA, taken - nA) / Math.max(1, Math.max(nA, taken - nA)),
+        });
+      }
+    }
+    return out
+      .sort((x, y) => y.share * y.taken - x.share * x.taken || y.value - x.value)
+      .slice(0, limit);
+  }
+
+  /** จุดที่มีหลายสัญญาอยู่ด้วยกัน แยกเป็นสองแบบที่ความหมายต่างกันคนละเรื่อง
+   *
+   *  1) `exact` — ทุกสัญญาในกลุ่มอยู่ที่พิกัดเดียวกันเป๊ะทุกทศนิยม
+   *     วัดกับชุดข้อมูลหลักได้ 35 กลุ่ม 149 สัญญา รวม 4,394 ล้านบาท และตัวอย่างที่ใหญ่ที่สุดคือ
+   *     13 สัญญา 13 ผู้รับจ้าง 2,305 ล้านบาท ปักที่จุดเดียวในกรุงเทพฯ ของกรมทรัพยากรน้ำบาดาล
+   *     ทั้งที่ชื่องานเป็นระบบประปาบาดาลคนละแห่ง → แทบแน่ใจได้ว่าเป็นพิกัดตั้งต้นหรือที่ตั้งหน่วยงาน
+   *     กติกา geo_quality='shared' ของ ETL จับไม่ได้ เพราะกติกานั้นต้องมีชื่องานต่างกันตั้งแต่ 3 แบบ
+   *     แต่ชื่อของกลุ่มพวกนี้เกือบเหมือนกันหมด จุดพวกนี้จึงยังถ่วงแผนที่ จุดร้อน และรอยเท้าอยู่
+   *
+   *  2) `cluster` — สัญญาอยู่ใกล้กันแต่คนละพิกัด (เช่น งานวางท่อหลายเส้นในย่านเดียวกัน)
+   *     อันนี้คือสถานที่จริงที่มีงานซ้ำ ๆ ใช้ดูว่างานเดิมถูกจ้างซ้ำหรือเปลี่ยนมือผู้รับจ้างหรือไม่
+   *     ข้อควรระวังที่วัดแล้ว: ในชุดนี้เหลือเพียง 33 กลุ่ม และส่วนใหญ่เป็นย่านที่มีงานหนาแน่นตามปกติ
+   *     (เช่น งานวางท่อของการประปานครหลวงในกรุงเทพฯ) ไม่ใช่การผลัดกันรับงานที่จุดเดียว
+   */
+  function stackedPoints(records, { cellDeg = 0.005, minContracts = 3, limit = 60 } = {}) {
+    const geo = records.filter(r => r.lat !== null && r.lon !== null && r.geo_quality !== 'shared');
+    const cells = new Map();
+    for (const r of geo) {
+      const k = `${Math.round(r.lat / cellDeg)}|${Math.round(r.lon / cellDeg)}`;
+      let c = cells.get(k);
+      if (!c) cells.set(k, c = []);
+      c.push(r);
+    }
+    const out = [];
+    for (const rows of cells.values()) {
+      if (rows.length < minContracts) continue;
+      const coords = new Set(rows.map(r => `${r.lat.toFixed(6)},${r.lon.toFixed(6)}`));
+      const winners = [...U.countBy(rows, r => r.winner_name || r.winner_key)].sort((a, b) => b[1] - a[1]);
+      const depts = [...U.countBy(rows, r => r.dept_name || r.dept_key)].sort((a, b) => b[1] - a[1]);
+      const dates = rows.map(r => r.contract_date).filter(Boolean).sort();
+      out.push({
+        kind: coords.size === 1 ? 'exact' : 'cluster',
+        lat: U.median(rows.map(r => r.lat)), lon: U.median(rows.map(r => r.lon)),
+        rows, n: rows.length, nCoords: coords.size,
+        winners, depts,
+        province: rows[0].province || '',
+        value: U.sum(rows.map(r => r.contract_price_agree)),
+        firstDate: dates[0] || null, lastDate: dates[dates.length - 1] || null,
+      });
+    }
+    return out
+      .sort((a, b) => b.n - a.n || b.value - a.value)
+      .slice(0, limit);
+  }
+
+  /** คีย์ของสัญญาที่อยู่ในกลุ่ม "พิกัดซ้ำเป๊ะ" — ใช้ซ่อนออกจากแผนที่ได้ทั้งชุด */
+  function stackedExactKeys(records, opts = {}) {
+    const keys = new Set();
+    for (const g of stackedPoints(records, { ...opts, limit: Infinity })) {
+      if (g.kind !== 'exact') continue;
+      for (const r of g.rows) keys.add(`${r.lat.toFixed(6)},${r.lon.toFixed(6)}`);
+    }
+    return keys;
+  }
+
+  /* ---------------------------------------------------------------
+     พฤติกรรมผู้รับจ้าง: ประเภทงาน · ราคาเทียบตลาด · สัญญาณการแข่งขัน
+     --------------------------------------------------------------- */
+
+  /** ส่วนลดจากราคากลาง — ตัวเดียวที่ข้อมูลชุดนี้มีจริงและบอกเรื่องการแข่งขันได้
+   *  price_build มีครบ 10,152 จาก 10,174 สัญญา (99.8%) จึงใช้เป็นฐานได้ทั้งชุด */
+  function ceilingDiscount(r) {
+    const base = r.price_build;
+    if (!base || base <= 0 || r.contract_price_agree === null || r.contract_price_agree === undefined) return null;
+    return (base - r.contract_price_agree) / base;
+  }
+
+  /** ค่ากลางของตลาดไว้เทียบ แยกตาม (วิธีจัดหา × ประเภทโครงการ)
+   *  ต้องแยกสองชั้นนี้ ไม่งั้นจะเทียบข้ามคนละสนาม — วัดกับข้อมูลจริงแล้วต่างกันคนละโลก:
+   *  e-bidding ลดกลาง 14.33% ไม่ลดเลยแค่ 1.9% · เฉพาะเจาะจง ลดกลาง 0.09% ไม่ลดเลย 40.7%
+   *  ถ้าเอาสองอย่างมาเทียบกันตรง ๆ ผู้รับจ้างที่รับงานเฉพาะเจาะจงจะดู "ไม่ยอมลดราคา" ทุกราย
+   */
+  function marketBaselines(records, { minCell = 20 } = {}) {
+    const cells = new Map();
+    const add = (map, key, d) => {
+      let v = map.get(key);
+      if (!v) map.set(key, v = []);
+      v.push(d);
+    };
+    const byType = new Map(), byMethod = new Map();
+    for (const r of records) {
+      const d = ceilingDiscount(r);
+      if (d === null) continue;
+      add(cells, `${r.purchase_method_name}|${r.project_type_name}`, d);
+      add(byType, r.project_type_name, d);
+      add(byMethod, r.purchase_method_name, d);
+    }
+    const summarize = list => ({
+      n: list.length,
+      med: U.median(list),
+      zeroShare: list.filter(d => Math.abs(d) < 1e-9).length / list.length,
+    });
+    const shrink = (map, min) => {
+      const out = new Map();
+      for (const [k, v] of map) if (v.length >= min) out.set(k, summarize(v));
+      return out;
+    };
+    const all = [];
+    for (const v of cells.values()) all.push(...v);
+    return {
+      cell: shrink(cells, minCell),
+      type: shrink(byType, 5),
+      method: shrink(byMethod, 5),
+      overall: all.length ? summarize(all) : null,
+    };
+  }
+
+  /** ดัชนีตลาด (จังหวัด × กลุ่มงาน) → เซ็ตผู้รับจ้างที่เคยชนะในตลาดนั้น
+   *  ใช้ตอบว่า "ผู้รับจ้างรายนี้มีคู่แข่งกี่รายในสนามที่ตัวเองเล่น"
+   *  ไม่ใช่จำนวนผู้ยื่นเสนอราคา (ข้อมูลชุดนี้ไม่มี) แต่เป็นจำนวนผู้เล่นที่เคยชนะงานแบบเดียวกันในพื้นที่เดียวกัน */
+  function marketPlayers(records) {
+    const idx = new Map();
+    for (const r of records) {
+      const k = `${r.province || '-'}|${r.work_group || 'other'}`;
+      let v = idx.get(k);
+      if (!v) idx.set(k, v = new Set());
+      v.add(r.winner_key);
+    }
+    return idx;
+  }
+
+  /** โครงการที่แยกเป็นหลายสัญญา (project_id เดียว หลายฉบับ)
+   *  วัดแล้วมี 51 โครงการจาก 10,000 และ 49 ใน 51 มีผู้ชนะมากกว่าหนึ่งราย
+   *  นี่คือที่เดียวในชุดข้อมูลที่ตอบได้ว่า "งานก้อนเดียวกันใครได้ส่วนไหน" */
+  function multiLotProjects(records) {
+    const out = new Map();
+    for (const [pid, rows] of U.groupBy(records, r => r.project_id)) {
+      if (rows.length < 2) continue;
+      const winners = new Set(rows.map(r => r.winner_key));
+      // ★ แถวที่เป็นสมาชิกกิจการค้าร่วม (is_jv) มียอดซ้ำกับแถวของกิจการค้าร่วมเอง
+      //   ถ้ารวมทุกแถวจะนับซ้ำ จึงแยกยอดที่ตัดส่วนซ้ำออกไว้ให้ด้วย (ดู jvGroups)
+      const jvRows = rows.filter(r => r.is_jv);
+      out.set(pid, {
+        project_id: pid, project_name: rows[0].project_name,
+        dept_name: rows[0].dept_name, rows, n: rows.length, nWinners: winners.size,
+        value: U.sum(rows.map(r => r.contract_price_agree)),
+        nJv: jvRows.length,
+        valueNoDup: U.sum(rows.filter(r => !r.is_jv).map(r => r.contract_price_agree)),
+      });
+    }
+    return out;
+  }
+
+  /** ภาพพฤติกรรมของผู้รับจ้างรายเดียว เทียบกับตลาดที่ตัวเองเล่นอยู่ */
+  function contractorBehaviour(rows, { baselines, players, lots, groupLabel = k => k } = {}) {
+    const n = rows.length;
+    const tally = (keyFn, labelFn) => [...U.groupBy(rows, keyFn)]
+      .map(([k, list]) => {
+        const ds = list.map(ceilingDiscount).filter(d => d !== null);
+        return {
+          key: k, label: labelFn ? labelFn(k) : k, n: list.length,
+          value: U.sum(list.map(r => r.contract_price_agree)),
+          share: list.length / n,
+          medDisc: ds.length ? U.median(ds) : null,
+          zeroShare: ds.length ? ds.filter(d => Math.abs(d) < 1e-9).length / ds.length : null,
+          rows: list,
+        };
+      })
+      .sort((a, b) => b.n - a.n);
+
+    const groups = tally(r => r.work_group || 'other', groupLabel);
+    const types = tally(r => r.project_type_name);
+    const methods = tally(r => r.purchase_method_name);
+
+    // ส่วนลดเทียบตลาดของ "วิธีจัดหา × ประเภท" เดียวกัน — ต่างเป็นลบคือลดน้อยกว่าคนอื่นในสนามเดียวกัน
+    const rel = [];
+    const relByType = new Map();
+    for (const r of rows) {
+      const d = ceilingDiscount(r);
+      if (d === null || !baselines) continue;
+      const m = baselines.cell.get(`${r.purchase_method_name}|${r.project_type_name}`);
+      if (!m) continue;
+      const diff = d - m.med;
+      rel.push({ r, diff });
+      let v = relByType.get(r.project_type_name);
+      if (!v) relByType.set(r.project_type_name, v = []);
+      v.push(diff);
+    }
+    // ★ ตารางประเภทงานต้องใช้ฐานเดียวกับ KPI ไม่งั้นจะขัดกันเอง: เทียบกับ "ประเภท" เฉย ๆ
+    //   จะกลบผลของวิธีจัดหาจนผู้รับจ้างที่ลดน้อยกว่าสนาม e-bidding ถึง 17% ขึ้นมาเป็น -0.3%
+    for (const t of types) t.relDisc = relByType.has(t.key) ? U.median(relByType.get(t.key)) : null;
+    const ds = rows.map(ceilingDiscount).filter(d => d !== null);
+
+    // คู่แข่ง: ผู้รับจ้างรายอื่นที่เคยชนะงานกลุ่มเดียวกันในจังหวัดเดียวกัน
+    const me = rows[0] ? rows[0].winner_key : null;
+    const cells = new Set(rows.map(r => `${r.province || '-'}|${r.work_group || 'other'}`));
+    const rivals = new Set();
+    if (players) {
+      for (const c of cells) for (const w of (players.get(c) || [])) if (w !== me) rivals.add(w);
+    }
+
+    // งานนอกความถนัด: กลุ่มงานที่คิดเป็นไม่ถึง 10% ของงานทั้งหมดของรายนี้
+    const offSpec = groups.filter(g => g.share < 0.1);
+
+    // โครงการที่แบ่งหลายสัญญาแล้วรายนี้ได้ส่วนหนึ่ง
+    const inLots = [];
+    if (lots) {
+      const seen = new Set();
+      for (const r of rows) {
+        const lot = lots.get(r.project_id);
+        if (!lot || seen.has(r.project_id)) continue;
+        seen.add(r.project_id);
+        inLots.push(lot);
+      }
+    }
+
+    return {
+      n, groups, types, methods,
+      spec: groups.length ? groups[0].share : 0,
+      specLabel: groups.length ? groups[0].label : '-',
+      medDisc: ds.length ? U.median(ds) : null,
+      zeroShare: ds.length ? ds.filter(d => Math.abs(d) < 1e-9).length / ds.length : null,
+      relDisc: rel.length ? U.median(rel.map(x => x.diff)) : null,
+      relN: rel.length,
+      relWorst: rel.sort((a, b) => a.diff - b.diff).slice(0, 5),
+      rivals: rivals.size, marketCells: cells.size,
+      offSpec, offSpecN: offSpec.reduce((s, g) => s + g.n, 0),
+      lots: inLots.sort((a, b) => b.value - a.value),
+    };
+  }
+
+  /** กลุ่มกิจการค้าร่วม (JV) ที่ประกอบขึ้นใหม่จากแถวที่กระจายอยู่
+   *
+   *  โครงสร้างที่ตรวจพบในข้อมูลจริง: สัญญาร่วมค้าหนึ่งฉบับถูกบันทึกเป็นหลายแถวที่ใช้
+   *  project_id กับ contract_no ร่วมกัน — แถวหนึ่งเป็นชื่อกิจการค้าร่วม อีกหลายแถวเป็นบริษัทสมาชิก
+   *  (ETL ตัดคำว่า "(สัญญากิจการค้าร่วม)" ออกจากชื่อแล้วตั้งธง is_jv ไว้แทน · build_data.py:172)
+   *
+   *  ★ ตรวจแล้ว 17 จาก 18 กลุ่ม ยอดของสมาชิกรวมกันได้เท่ากับยอดของกิจการค้าร่วมเป๊ะทุกบาท
+   *  แปลว่าแถวสมาชิกคือการ "แบ่งส่วน" ของสัญญาฉบับเดียวกัน ไม่ใช่สัญญาเพิ่ม
+   *  การรวมยอดทุกแถวตรง ๆ จึงนับซ้ำ — เป็นข้อจำกัดของชุดข้อมูล ไม่ใช่ของการคำนวณ
+   */
+  function jvGroups(records) {
+    const buckets = new Map();
+    for (const r of records) {
+      const k = `${r.project_id || ''}||${r.contract_no || ''}`;
+      let v = buckets.get(k);
+      if (!v) buckets.set(k, v = []);
+      v.push(r);
+    }
+    const out = [];
+    for (const [key, rows] of buckets) {
+      const members = rows.filter(r => r.is_jv);
+      if (!members.length) continue;
+      const others = rows.filter(r => !r.is_jv);
+      const memberSum = U.sum(members.map(r => r.contract_price_agree));
+      // กิจการค้าร่วมคือแถวที่ยอดตรงกับผลรวมสมาชิกพอดี ไม่ใช่แค่แถวที่ชื่อขึ้นต้นว่า "กิจการค้าร่วม"
+      // เพราะโครงการใหญ่หนึ่งโครงการอาจมีผู้ชนะรายอื่นปนอยู่ใน project_id เดียวกันด้วย
+      const entity = others.find(r => Math.abs((r.contract_price_agree || 0) - memberSum) < 1) || null;
+      out.push({
+        key, project_id: rows[0].project_id, contract_no: rows[0].contract_no,
+        project_name: rows[0].project_name, dept_name: rows[0].dept_name,
+        province: rows[0].province, contract_date: rows[0].contract_date,
+        purchase_method_name: rows[0].purchase_method_name,
+        entity, members: [...members].sort((a, b) => (b.contract_price_agree || 0) - (a.contract_price_agree || 0)),
+        memberSum, entityValue: entity ? entity.contract_price_agree : null,
+        matched: !!entity,
+      });
+    }
+    return out.sort((a, b) => b.memberSum - a.memberSum);
+  }
+
+  /** คู่พันธมิตรที่เข้าร่วมค้าด้วยกันบ่อย — นับจากกลุ่มที่ประกอบได้ข้างบน */
+  function jvPartners(groups) {
+    const pairs = new Map();
+    for (const g of groups) {
+      const keys = g.members.map(m => m.winner_key);
+      for (let i = 0; i < keys.length; i++) {
+        for (let j = i + 1; j < keys.length; j++) {
+          const [a, b] = [keys[i], keys[j]].sort();
+          const k = `${a}||${b}`;
+          let v = pairs.get(k);
+          if (!v) pairs.set(k, v = { a, b, n: 0, value: 0, groups: [] });
+          v.n++; v.value += g.memberSum; v.groups.push(g);
+        }
+      }
+    }
+    return [...pairs.values()].sort((x, y) => y.n - x.n || y.value - x.value);
+  }
+
+  /** จัดอันดับผู้รับจ้างที่ "ลดราคาน้อยกว่าสนามของตัวเอง" มากที่สุดทั้งชุดข้อมูล
+   *  สนาม = วิธีจัดหา × ประเภทโครงการ เดียวกัน (ดูเหตุผลที่ marketBaselines)
+   *  ค่าติดลบมาก = ชนะงานด้วยราคาที่สูงกว่าคนอื่นในสนามเดียวกันเป็นปกติ */
+  function underbidRanking(records, baselines, { minComparable = 3, minValue = 0, limit = Infinity } = {}) {
+    const out = [];
+    for (const [key, rows] of U.groupBy(records, r => r.winner_key)) {
+      const diffs = [];
+      for (const r of rows) {
+        const d = ceilingDiscount(r);
+        if (d === null) continue;
+        const m = baselines.cell.get(`${r.purchase_method_name}|${r.project_type_name}`);
+        if (!m) continue;
+        diffs.push({ r, diff: d - m.med });
+      }
+      if (diffs.length < minComparable) continue;
+      const value = U.sum(rows.map(r => r.contract_price_agree));
+      if (value < minValue) continue;
+      const methods = [...U.countBy(rows, r => r.purchase_method_name)].sort((a, b) => b[1] - a[1]);
+      const ds = rows.map(ceilingDiscount).filter(d => d !== null);
+      out.push({
+        winner_key: key, winner_name: rows[0].winner_name, rows,
+        n: rows.length, nComparable: diffs.length, value,
+        method: methods[0] ? methods[0][0] : '-',
+        methodShare: methods[0] ? methods[0][1] / rows.length : 0,
+        medDisc: ds.length ? U.median(ds) : null,
+        rel: U.median(diffs.map(x => x.diff)),
+        // เงินที่ต่างจากการลดเท่าค่ากลางของสนาม — ใช้จัดลำดับตามน้ำหนักจริง ไม่ใช่ตามเปอร์เซ็นต์ลอย ๆ
+        gapValue: diffs.reduce((s, x) => s + x.diff * (x.r.price_build || 0), 0),
+      });
+    }
+    out.sort((a, b) => a.rel - b.rel);
+    return Number.isFinite(limit) ? out.slice(0, limit) : out;
+  }
+
+  /* ---------------------------------------------------------------
+     จังหวะเวลาของสัญญาเทียบปีงบประมาณ
+     --------------------------------------------------------------- */
+
+  /** ปีงบประมาณไทยเริ่ม 1 ต.ค. — เดือนตุลาคมคือเดือนที่ 1 ของปีงบ */
+  const FISCAL_ORDER = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+  function fiscalYear(dateStr) {
+    if (!dateStr) return null;
+    const y = +dateStr.slice(0, 4), m = +dateStr.slice(5, 7);
+    return (m >= 10 ? y + 1 : y) + 543;   // คืนเป็น พ.ศ.
+  }
+  function fiscalQuarter(dateStr) {
+    if (!dateStr) return null;
+    const m = +dateStr.slice(5, 7);
+    return m >= 10 ? 1 : m <= 3 ? 2 : m <= 6 ? 3 : 4;
+  }
+
+  /** ปฏิทินปีงบของทั้งชุดข้อมูล — ใช้เป็นฉากหลังให้รู้ว่าเดือนไหน "ไม่มีข้อมูล"
+   *  ต่างจากเดือนที่ "มีข้อมูลแต่ผู้รับจ้างรายนี้ไม่มีงาน" ซึ่งคนละความหมายกันคนละเรื่อง */
+  function fiscalCalendar(records) {
+    const months = new Map();
+    let total = 0;
+    for (const r of records) {
+      if (!r.contract_date) continue;
+      const k = r.contract_date.slice(0, 7);
+      months.set(k, (months.get(k) || 0) + 1);
+      total++;
+    }
+    const keys = [...months.keys()].sort();
+    if (!keys.length) return { slots: [], total: 0, years: [] };
+    const years = [...new Set(keys.map(k => fiscalYear(k + '-01')))].sort();
+    const slots = [];
+    for (const fy of years) {
+      for (const m of FISCAL_ORDER) {
+        // ต.ค.-ธ.ค. อยู่ในปี ค.ศ. ก่อนหน้าปีงบ
+        const cal = m >= 10 ? fy - 543 - 1 : fy - 543;
+        const key = `${cal}-${String(m).padStart(2, '0')}`;
+        slots.push({ key, fy, month: m, n: months.get(key) || 0, inData: months.has(key) });
+      }
+    }
+    return { slots, total, years };
+  }
+
+  /** จังหวะเวลาของผู้รับจ้างรายหนึ่ง เทียบกับปฏิทินปีงบและกับค่าเฉลี่ยของทั้งชุด */
+  function contractTiming(rows, calendar, { sameDayMin = 3 } = {}) {
+    const dated = rows.filter(r => r.contract_date);
+    const byMonth = new Map();
+    for (const r of dated) {
+      const k = r.contract_date.slice(0, 7);
+      byMonth.set(k, (byMonth.get(k) || 0) + 1);
+    }
+    const slots = calendar.slots.map(s => ({
+      ...s,
+      mine: byMonth.get(s.key) || 0,
+      // สัดส่วนของทั้งชุดในเดือนนั้น ใช้เป็นเส้นเทียบว่ารายนี้กระจุกผิดจังหวะไหม
+      baseShare: calendar.total ? s.n / calendar.total : 0,
+    }));
+    const myTotal = dated.length;
+    for (const s of slots) s.myShare = myTotal ? s.mine / myTotal : 0;
+
+    const peak = slots.filter(s => s.mine > 0).sort((a, b) => b.myShare - a.myShare)[0] || null;
+
+    // วันเดียวเซ็นหลายฉบับ — วัดแล้วมี 18 รายที่เซ็น ≥5 ฉบับในวันเดียว
+    // รายที่สุดคือ 27 จาก 28 ฉบับในวันที่ 1 ต.ค. 2568 ซึ่งเป็นวันแรกของปีงบ
+    const byDay = new Map();
+    for (const r of dated) {
+      let v = byDay.get(r.contract_date);
+      if (!v) byDay.set(r.contract_date, v = []);
+      v.push(r);
+    }
+    const bursts = [...byDay.entries()]
+      .filter(([, list]) => list.length >= sameDayMin)
+      .map(([date, list]) => ({
+        date, n: list.length, rows: list,
+        value: U.sum(list.map(r => r.contract_price_agree)),
+        depts: [...new Set(list.map(r => r.dept_name || r.dept_key))],
+        firstOfFiscalYear: date.slice(5) === '10-01',
+      }))
+      .sort((a, b) => b.n - a.n || b.value - a.value);
+
+    const gaps = dated.map(r => r.announce_gap_days).filter(g => g !== null && g !== undefined);
+    const durs = dated.map(r => r.duration_days).filter(d => d !== null && d !== undefined);
+    const quarters = new Map();
+    for (const r of dated) {
+      const q = fiscalQuarter(r.contract_date);
+      quarters.set(q, (quarters.get(q) || 0) + 1);
+    }
+
+    return {
+      slots, myTotal, peak, bursts,
+      burstRows: bursts.reduce((s, b) => s + b.n, 0),
+      quarters: [1, 2, 3, 4].map(q => ({ q, n: quarters.get(q) || 0 })),
+      gapMedian: gaps.length ? U.median(gaps) : null, gapN: gaps.length,
+      durMedian: durs.length ? U.median(durs) : null, durN: durs.length,
+      dated: dated.length, undated: rows.length - dated.length,
+    };
+  }
+
   /* ---------------------------------------------------------------
      การรวมกลุ่มพื้นฐาน
      --------------------------------------------------------------- */
@@ -497,7 +996,20 @@ const Analytics = (() => {
    */
   const RISK_WEIGHTS = { network: 0.30, price: 0.20, competition: 0.20, contract: 0.20, concentration: 0.10 };
 
-  function contractorProfiles(records, nodeIndex, { minContracts = 1 } = {}) {
+  /** น้ำหนักที่ใช้จริงกับชุดข้อมูลตรงหน้า
+   *  ดัชนีเครือข่าย (composite_risk_norm) มาจาก ETL เท่านั้น ชุดข้อมูลที่ผู้ใช้นำเข้าเองจึงไม่มี
+   *  ถ้าปล่อยให้มิตินั้นเป็น 0 คะแนนรวมจะหายไป 30% เงียบ ๆ ทั้งที่คำอธิบายบนหน้าจอยังบอกว่า 30%
+   *  จึงตัดมิติที่ไม่มีข้อมูลออก แล้วเกลี่ยน้ำหนักที่เหลือให้รวมเป็น 1 และให้หน้าจออ่านค่าจากที่นี่ */
+  function riskWeights(hasNetwork = true) {
+    if (hasNetwork) return { ...RISK_WEIGHTS };
+    const rest = { ...RISK_WEIGHTS, network: 0 };
+    const total = Object.values(rest).reduce((s, v) => s + v, 0);
+    for (const k of Object.keys(rest)) if (k !== 'network') rest[k] = rest[k] / total;
+    return rest;
+  }
+
+  function contractorProfiles(records, nodeIndex, { minContracts = 1, hasNetwork } = {}) {
+    const W = riskWeights(hasNetwork === undefined ? !!(nodeIndex && nodeIndex.size) : hasNetwork);
     const edges = networkEdges(records);
     const byContractor = new Map();
     for (const e of edges) {
@@ -532,9 +1044,9 @@ const Analytics = (() => {
       const concentration = totalValue > 0 ? topPair / totalValue * 100 : 0;
 
       const final =
-        RISK_WEIGHTS.network * network + RISK_WEIGHTS.price * price +
-        RISK_WEIGHTS.competition * competition + RISK_WEIGHTS.contract * contract +
-        RISK_WEIGHTS.concentration * concentration;
+        W.network * network + W.price * price +
+        W.competition * competition + W.contract * contract +
+        W.concentration * concentration;
 
       profiles.push({
         winner_name: name,
@@ -561,13 +1073,374 @@ const Analytics = (() => {
     return profiles.sort((a, b) => b.risk.final - a.risk.final);
   }
 
+  /** ส่วนแบ่งงานที่ให้ "ผู้รับจ้างรายใหม่" — ไล่สัญญาตามลำดับวันที่ทำสัญญา แล้วนับว่าผู้ชนะแต่ละรายเคย
+   *  ปรากฏในหน่วยงานนี้มาก่อนหรือไม่ ใช้ตอบคำถาม "หน่วยงานนี้เปิดให้รายใหม่เข้าหรือให้กลุ่มเดิมซ้ำ"
+   *
+   *  ข้อจำกัดสำคัญ: ชุดข้อมูลนี้มีข้อมูลเพียงปีงบเดียว "รายใหม่" ที่วัดได้จึงหมายถึง
+   *  "ไม่เคยปรากฏภายในช่วงเวลาที่มีข้อมูล" เท่านั้น ไม่ใช่ผู้รับจ้างหน้าใหม่ในระบบจัดซื้อจริง
+   *  (ผู้ชนะสัญญาแรกสุดของหน่วยงานถูกนับเป็น "ใหม่" เสมอ เพราะไม่มีข้อมูลก่อนหน้าให้เทียบ)
+   */
+  function newSupplierShare(rows) {
+    const dated = rows.filter(r => r.contract_date)
+      .slice().sort((a, b) => (a.contract_date < b.contract_date ? -1 : a.contract_date > b.contract_date ? 1 : 0));
+    const seen = new Set();
+    let newN = 0, newValue = 0;
+    const totalValue = U.sum(dated.map(r => r.contract_price_agree));
+    for (const r of dated) {
+      if (!seen.has(r.winner_key)) { newN++; newValue += r.contract_price_agree || 0; }
+      seen.add(r.winner_key);
+    }
+    return {
+      n: dated.length, newN, share: dated.length ? newN / dated.length : null,
+      newValue, valueShare: totalValue > 0 ? newValue / totalValue : null,
+      distinctWinners: seen.size, undated: rows.length - dated.length,
+    };
+  }
+
+  /** โปรไฟล์รายหน่วยงาน — คล้าย contractorProfiles แต่ไม่มีมิติเครือข่าย (agency ไม่มีคะแนนจาก ETL)
+   *  ตอบ 3 คำถามหลัก: มีกี่โครงการ/สัญญา ใครได้งาน และด้วยวิธีอะไร พร้อมสัญญาณเสริมที่วัดจากข้อมูลได้จริง
+   *  level ควบคุมว่านับที่ระดับกรม (รวมทุกสาขา) หรือระดับสาขา — ดูคอมเมนต์ BUYER_LEVELS ด้านบนเรื่องทำไมต้องแยกสองระดับ
+   */
+  function agencyProfiles(records, { level = 'agency', minContracts = 1 } = {}) {
+    const keyFn = buyerKeyFn(level);
+    const hhiByDept = new Map(hhi(records, { minContracts: 1, level }).map(h => [h.dept_name, h]));
+    const screenByDept = new Map(screening(records, { minContracts: 1, level }).map(s => [s.dept_name, s]));
+    // ค่าฐานสัดส่วนวิธีจัดหาทั้งชุด ใช้เทียบว่าหน่วยงานหนึ่งเบี่ยงจากค่าฐานแค่ไหน (หลักการเดียวกับ marketBaselines ด้านบน)
+    const baseMethodShare = new Map();
+    for (const [m, n] of U.countBy(records, r => r.purchase_method_name)) baseMethodShare.set(m, n / records.length);
+
+    const out = [];
+    for (const [key, rows] of U.groupBy(records, keyFn)) {
+      if (!key || rows.length < minContracts) continue;
+      const totalValue = U.sum(rows.map(r => r.contract_price_agree));
+      const contractors = contractorTotals(rows);
+      const methods = [...U.countBy(rows, r => r.purchase_method_name)]
+        .map(([label, n]) => ({ label, n, share: n / rows.length, baseShare: baseMethodShare.get(label) || 0 }))
+        .sort((a, b) => b.n - a.n);
+      const types = [...U.countBy(rows, r => r.work_group || 'other')]
+        .map(([label, n]) => ({ label, n, share: n / rows.length }))
+        .sort((a, b) => b.n - a.n);
+      const h = hhiByDept.get(key);
+      const scr = screenByDept.get(key);
+
+      out.push({
+        dept_name: key,
+        // การ์ดตะกร้าทำงานที่ระดับกรมเท่านั้น (renderAgencyModal/cartAgencySummary เดิม) จึงยึด dept_key/dept_name
+        // ของแถวจริงเป็นตัวอ้างอิงตะกร้าเสมอ แม้กำลังดูที่ระดับสาขาก็ตาม — ไม่ใช่บั๊ก แต่เป็นข้อจำกัดที่ตั้งใจ
+        dept_key: rows[0].dept_key,
+        parent_dept_name: rows[0].dept_name,
+        dept_sub_name: rows[0].dept_sub_name || '',
+        level,
+        n_contracts: rows.length,
+        n_projects: new Set(rows.map(r => r.project_id)).size,
+        total_value: totalValue,
+        n_contractors: contractors.length,
+        n_flagged: rows.filter(r => (r.rule_hits || []).length).length,
+        max_risk: Math.max(0, ...rows.map(r => r.risk_score || 0)),
+        avg_risk: U.mean(rows.map(r => r.risk_score || 0)),
+        n_provinces: new Set(rows.map(r => r.province).filter(Boolean)).size,
+        n_districts: new Set(rows.map(r => r.district).filter(Boolean)).size,
+        hhi: h ? h.hhi : null,
+        cr5: h ? h.cr5 : null,
+        top_winner: scr ? scr.top_winner : (contractors[0] ? contractors[0].winner_name : ''),
+        top_winner_share: scr ? scr.top_winner_share
+          : (totalValue > 0 && contractors[0] ? contractors[0].total_value / totalValue : 0),
+        methods, types,
+        loyalty: newSupplierShare(rows),
+        contractors, rows,
+      });
+    }
+    return out.sort((a, b) => b.total_value - a.total_value);
+  }
+
+  /** จัดคิวตรวจสอบด้วย "คะแนน × มูลค่า" (exposure) แทนคะแนนอย่างเดียว
+   *  วัดกับชุดข้อมูลนี้แล้ว: 50 อันดับแรกด้วยคะแนนอย่างเดียวคุมมูลค่าได้ 2.62 พันล้าน
+   *  ส่วน 50 อันดับแรกด้วยคะแนน×มูลค่าคุมได้ 13.18 พันล้าน และซ้ำกันแค่ 19 เรื่อง
+   *
+   *  ข้อจำกัดที่ต้องรู้: สูตรเป็นการคูณตรง ๆ ไม่ทอนค่า (ไม่ log) เพื่อให้อธิบายง่าย
+   *  แต่แปลว่าสัญญาคะแนน 0 จะได้ exposure = 0 เสมอไม่ว่ามูลค่าจะสูงแค่ไหน — จุดนี้คือเหตุผลที่ต้องมี
+   *  "ชั้นมูลค่าสูงตรวจเสมอ" (materiality) แยกออกมาต่างหาก ไม่ใช่ให้สูตรคูณแก้ปัญหานี้เอง
+   *  (วัดแล้ว: 24 ใน 50 สัญญาใหญ่สุดของทั้งประเทศคะแนนอยู่ระดับ "ต่ำ"/"ไม่พบสัญญาณ")
+   */
+  function auditQueue(records, {
+    mode = 'exposure',        // 'exposure' | 'score' | 'value'
+    n = 40,
+    materiality = 0, // บาท — สัญญามูลค่า ≥ นี้ ติดคิวเสมอไม่ว่าคะแนนเท่าไร
+    capRender = 200,          // เพดานจำนวนแถวที่ส่งให้ UI วาดจริง (records อาจมีหลักหมื่น)
+  } = {}) {
+    const wrap = records.map(r => {
+      const score = r.risk_score || 0, value = r.contract_price_agree || 0;
+      return { r, score, value, exposure: score * value };
+    });
+    const key = mode === 'score' ? x => x.score : mode === 'value' ? x => x.value : x => x.exposure;
+    const sorted = [...wrap].sort((a, b) => key(b) - key(a) || b.value - a.value);
+
+    const ranked = sorted.slice(0, n);
+    ranked.forEach(x => { x.includedBy = 'rank'; });
+    const rankedSet = new Set(ranked);
+
+    const materialityOnly = materiality > 0
+      ? sorted.filter(x => x.value >= materiality && !rankedSet.has(x))
+          .sort((a, b) => b.value - a.value)
+      : [];
+    materialityOnly.forEach(x => { x.includedBy = 'materiality'; });
+
+    const logical = ranked.concat(materialityOnly);
+    const totalValue = U.sum(logical.map(x => x.value));
+    const datasetTotalValue = U.sum(wrap.map(x => x.value));
+    const items = logical.slice(0, capRender);
+
+    return {
+      mode, n, materiality, items,
+      totalItems: logical.length, totalValue, datasetTotalValue,
+      coveragePct: datasetTotalValue ? totalValue / datasetTotalValue : 0,
+      materialityOnlyCount: materialityOnly.length,
+      renderTruncated: logical.length > items.length,
+    };
+  }
+
+  /** หากรรมการที่ปรากฏในหลายบริษัทที่ต่างก็เป็นผู้ชนะงานในชุดข้อมูลจัดซื้อนี้
+   *  ข้อมูลกรรมการมาจากที่ผู้ใช้พิมพ์เข้ามาเอง (ดู js/directors.js) ไม่ใช่ข้อมูลที่แอปดึงมา
+   *
+   *  ข้อจำกัดสำคัญ: จับคู่ชื่อแบบตรงตัวอักษรทุกตัว (ตัดช่องว่างซ้ำแล้วเทียบ) ไม่ทำ fuzzy matching
+   *  จึงพลาดได้ทั้งสองทาง — สะกดต่างกันเล็กน้อยจะไม่นับเป็นคนเดียวกัน (false negative)
+   *  ส่วนชื่อสามัญที่พ้องกันโดยบังเอิญจะถูกนับเป็นคนเดียวกันผิด (false positive) ต้องเปิดดูรายละเอียดก่อนสรุป
+   *  ไม่ใช้เลขผู้เสียภาษีที่ถูกปิดบัง (มีตัวอักษร x ปน) เป็นตัวจับคู่เด็ดขาด เพราะไม่ใช่เลขจริง จับคู่ผิดบริษัทได้
+   */
+  function sharedDirectors(directorRows, records) {
+    // เลขผู้เสียภาษี (ที่ไม่ถูกปิดบัง) -> แถวสัญญาของผู้รับจ้างรายนั้นในชุดข้อมูลจัดซื้อ
+    const byTin = new Map();
+    for (const r of records) {
+      if (!r.winner_tin || r.tin_is_masked) continue;
+      let list = byTin.get(r.winner_tin);
+      if (!list) byTin.set(r.winner_tin, list = []);
+      list.push(r);
+    }
+
+    const byPerson = new Map();
+    for (const d of directorRows) {
+      let list = byPerson.get(d.person_name);
+      if (!list) byPerson.set(d.person_name, list = []);
+      list.push(d);
+    }
+
+    const out = [];
+    for (const [person, entries] of byPerson) {
+      const companies = entries.map(e => {
+        const rows = byTin.get(e.tax_id);
+        return {
+          tax_id: e.tax_id, company_name: e.company_name, role: e.role,
+          matched: !!rows,
+          winner_key: rows ? rows[0].winner_key : null,
+          winner_name: rows ? rows[0].winner_name : null,
+          n_contracts: rows ? rows.length : 0,
+          total_value: rows ? U.sum(rows.map(r => r.contract_price_agree)) : 0,
+          project_ids: rows ? new Set(rows.map(r => r.project_id)) : new Set(),
+        };
+      });
+      const matched = companies.filter(c => c.matched);
+      const distinctWinners = new Set(matched.map(c => c.winner_key));
+      if (distinctWinners.size < 2) continue;   // สนใจเฉพาะคนที่โยงผู้ชนะงาน ≥2 รายที่ต่างกัน
+
+      // เคยได้งานโครงการเดียวกันไหม (แบ่งล็อตเดียวกัน) — สัญญาณแรงกว่าการอยู่ในชุดข้อมูลเดียวกันเฉยๆ
+      let sameProject = false;
+      outer:
+      for (let i = 0; i < matched.length; i++) {
+        for (let j = i + 1; j < matched.length; j++) {
+          if (matched[i].winner_key === matched[j].winner_key) continue;   // บริษัทเดียวกันที่บันทึกซ้ำหลายบทบาท ไม่นับ
+          for (const pid of matched[i].project_ids) {
+            if (matched[j].project_ids.has(pid)) { sameProject = true; break outer; }
+          }
+        }
+      }
+
+      out.push({ person_name: person, companies, matchedCount: distinctWinners.size, sameProject });
+    }
+    return out.sort((a, b) => (b.sameProject - a.sameProject) || b.matchedCount - a.matchedCount);
+  }
+
+  /* ---------------------------------------------------------------
+     วิเคราะห์เชิงลึกวิธีจัดหา (กรอบ 3E + Integrity)
+     --------------------------------------------------------------- */
+
+  /** สรุปทุกตัวชี้วัดต่อวิธีจัดหาในรอบเดียว — เป็นแกนของส่วนภาพรวม/ประสิทธิภาพ/ความคุ้มค่า
+   *
+   *  ★ ข้อควรระวังที่ต้องอ่านคู่กันเสมอ: `announce_gap_days` (ประกาศ→ลงนาม) มีเฉพาะวิธีที่ต้องประกาศเชิญชวน
+   *  วัดกับชุดข้อมูลนี้แล้วมีเพียง 1,910 จาก 10,174 ระเบียน (18.8%) และเป็น e-bidding เกือบทั้งหมด
+   *  ส่วนเฉพาะเจาะจงกับคัดเลือกไม่มีวันประกาศในต้นทางเลย (0%) จึง "เทียบเวลากระบวนการข้ามวิธีจัดหาไม่ได้"
+   *  ทุกที่ที่แสดง gapMed ต้องแสดง gapCover กำกับ ไม่งั้นจะอ่านเป็นว่าเฉพาะเจาะจงเร็วกว่าทั้งที่ไม่มีข้อมูล
+   */
+  function methodBreakdown(records) {
+    const totalN = records.length;
+    const totalV = U.sum(records.map(r => r.contract_price_agree));
+    const out = [];
+    for (const [method, rows] of U.groupBy(records, r => r.purchase_method_name || '-')) {
+      const values = rows.map(r => r.contract_price_agree || 0);
+      const value = U.sum(values);
+      const disc = rows.map(ceilingDiscount).filter(d => d !== null);
+      const gaps = rows.map(r => r.announce_gap_days).filter(v => v !== null && v !== undefined);
+      const durs = rows.map(r => r.duration_days).filter(v => v !== null && v !== undefined);
+      out.push({
+        method, n: rows.length, value,
+        shareN: totalN ? rows.length / totalN : 0,
+        shareV: totalV ? value / totalV : 0,
+        mean: rows.length ? value / rows.length : 0,
+        median: values.length ? U.median(values) : 0,
+        discN: disc.length, discCover: rows.length ? disc.length / rows.length : 0,
+        discMed: disc.length ? U.median(disc) : null,
+        discZeroShare: disc.length ? disc.filter(d => Math.abs(d) < 1e-9).length / disc.length : null,
+        gapN: gaps.length, gapCover: rows.length ? gaps.length / rows.length : 0,
+        gapMed: gaps.length ? U.median(gaps) : null,
+        durN: durs.length, durCover: rows.length ? durs.length / rows.length : 0,
+        durMed: durs.length ? U.median(durs) : null,
+        rows,
+      });
+    }
+    return out.sort((a, b) => b.value - a.value);
+  }
+
+  /** ความเหมาะสมเชิงกลยุทธ์รายกลุ่มงาน (Kraljic: ความเสี่ยงด้านอุปทาน × สาระสำคัญ)
+   *
+   *  แกนความเสี่ยงด้านอุปทานใช้ HHI ที่คิดจาก "ส่วนแบ่งมูลค่า" ของผู้ขายแต่ละราย (นิยามมาตรฐาน
+   *  และตรงกับ Analytics.hhi ที่ใช้อยู่ทั้งแอป) ★ ห้ามคิดจากจำนวนสัญญาแทน เพราะให้ผลคนละเรื่องกัน:
+   *  วัดชุดข้อมูลนี้แบบนับจำนวนได้ HHI แค่ 17-219 ทุกกลุ่ม (ดูเหมือนแข่งขันดีหมด ไม่มีอะไรน่าสนใจ)
+   *  แต่แบบถ่วงมูลค่าได้ 58-5,228 ซึ่งแยกกลุ่มได้จริง — กลุ่ม repair ได้ถึง 5,228 (เกินเกณฑ์กระจุกตัวสูง 2,500)
+   *  ขณะที่ material 58 · road 170 · pipe 178 แข่งขันกันจริง ความต่างนี้คือสาระของแผนภาพทั้งใบ
+   *
+   *  specShareV (สัดส่วนมูลค่าที่จัดหาแบบไม่แข่งขัน) เป็นมิติที่สามซ้อนบนแผนภาพ ใช้ตอบว่า
+   *  "กลุ่มที่เงินเยอะและตลาดกระจุก ถูกจัดหาด้วยวิธีที่ไม่มีการแข่งขันด้วยหรือเปล่า"
+   *  (วัดแล้วต่างกันมาก: source 2.5% · leak 3.8% · pipe 17.9% · road 29.4% · energy 40.3%)
+   */
+  function methodStrategicFit(records) {
+    const totalV = U.sum(records.map(r => r.contract_price_agree));
+    const out = [];
+    for (const [group, rows] of U.groupBy(records, r => r.work_group || 'other')) {
+      const value = U.sum(rows.map(r => r.contract_price_agree));
+      const byWinner = U.groupBy(rows, r => r.winner_key);
+      let index = 0;
+      for (const [, wrows] of byWinner) {
+        const wv = U.sum(wrows.map(r => r.contract_price_agree));
+        if (value > 0) index += (wv / value * 100) ** 2;
+      }
+      const spec = rows.filter(r => r.purchase_method_name === SPECIFIC);
+      const specValue = U.sum(spec.map(r => r.contract_price_agree));
+      const disc = rows.map(ceilingDiscount).filter(d => d !== null);
+      out.push({
+        group, n: rows.length, value,
+        shareV: totalV ? value / totalV : 0,
+        suppliers: byWinner.size,
+        hhi: Math.round(index),
+        specShareN: rows.length ? spec.length / rows.length : 0,
+        specShareV: value > 0 ? specValue / value : 0,
+        discMed: disc.length ? U.median(disc) : null,
+        rows,
+      });
+    }
+    return out.sort((a, b) => b.value - a.value);
+  }
+
+  /** ตรวจการใช้วิธีจัดหาที่อาจไม่ตรงเงื่อนไขวงเงิน และการแตกสัญญาเลี่ยงเพดาน
+   *
+   *  กฎกระทรวงตาม พ.ร.บ.การจัดซื้อจัดจ้างฯ 2560 กำหนดวงเงินวิธีเฉพาะเจาะจงไว้ที่ 500,000 บาท
+   *  แต่มาตรา 56(2) มีข้อยกเว้นหลายกรณี (ผู้ขายรายเดียว ฉุกเฉิน ต่อเนื่องจากสัญญาเดิม ฯลฯ)
+   *  ผลลัพธ์ของฟังก์ชันนี้จึงเป็น "รายการที่ต้องขอเอกสารเหตุผลประกอบ" ไม่ใช่ข้อสรุปว่าผิดระเบียบ
+   *
+   *  คลัสเตอร์แตกสัญญาจัดกลุ่มตาม หน่วยงาน + วันทำสัญญาเดียวกัน โดยไม่สนใจว่าผู้รับจ้างเป็นใคร
+   *  ต่างจาก splitClusters ที่มีอยู่ ซึ่งบังคับว่าต้องเป็นผู้รับจ้างรายเดียวกันด้วย — การแตกสัญญา
+   *  กระจายไปหลายผู้ขายในวันเดียวเป็นรูปแบบที่ splitClusters จับไม่ได้ จึงต้องมีตัวนี้เพิ่ม
+   *  (วัดกับชุดข้อมูลนี้ได้ 713 คลัสเตอร์ รวม 768 ล้านบาท สูงสุดคือ 45 สัญญาในวันเดียวของหน่วยงานเดียว)
+   */
+  function thresholdEvasion(records, { ceiling = 500000, nearBand = 0.1 } = {}) {
+    const spec = records.filter(r => r.purchase_method_name === SPECIFIC);
+    const overCeiling = spec.filter(r => (r.contract_price_agree || 0) > ceiling)
+      .sort((a, b) => (b.contract_price_agree || 0) - (a.contract_price_agree || 0));
+    const nearLo = ceiling * (1 - nearBand);
+    const nearCeiling = spec.filter(r => {
+      const v = r.contract_price_agree || 0;
+      return v >= nearLo && v <= ceiling;
+    });
+
+    const clusters = [];
+    for (const [key, rows] of U.groupBy(spec, r => `${r.dept_key} ${r.contract_date || ''}`)) {
+      if (rows.length < 2 || !rows[0].contract_date) continue;
+      if (rows.some(r => (r.contract_price_agree || 0) > ceiling)) continue;   // มีฉบับเกินเพดานอยู่แล้ว ไม่ใช่การแตกเพื่อเลี่ยง
+      const total = U.sum(rows.map(r => r.contract_price_agree));
+      if (total <= ceiling) continue;
+      clusters.push({
+        dept_key: rows[0].dept_key, dept_name: rows[0].dept_name,
+        date: rows[0].contract_date, n: rows.length, total, rows,
+        winners: new Set(rows.map(r => r.winner_key)).size,
+      });
+    }
+    clusters.sort((a, b) => b.total - a.total);
+
+    return {
+      ceiling, nearLo,
+      overCeiling, overCeilingValue: U.sum(overCeiling.map(r => r.contract_price_agree)),
+      nearCeiling, nearCeilingValue: U.sum(nearCeiling.map(r => r.contract_price_agree)),
+      clusters, clusterValue: U.sum(clusters.map(c => c.total)),
+      specN: spec.length,
+    };
+  }
+
+  /** ราคาต่อหน่วยแบบนำร่อง — อ่านขนาดท่อและความยาวจาก "ชื่อโครงการ" แล้วคิดบาทต่อเมตร
+   *
+   *  ★ เป็นการประมาณจากชื่อโครงการ ไม่ใช่ BOQ จริง — สัญญาหนึ่งมักรวมงานอื่นนอกเหนือจากตัวท่อ
+   *  (งานดิน งานคืนผิวจราจร อุปกรณ์ข้อต่อ) ตัวเลขจึงสูงกว่าราคาท่อเปล่าเสมอ ใช้ได้แค่เทียบ
+   *  "ขนาดเดียวกันข้ามหน่วยงาน" แบบหยาบ ๆ ห้ามใช้อ้างอิงราคาต่อหน่วยที่แท้จริง
+   *  วัดกับชุดข้อมูลนี้แล้วมีเพียงหลักร้อยสัญญาที่ระบุครบทั้งขนาดและความยาว
+   *
+   *  ★ ต้องแปลงเลขไทยเป็นเลขอารบิกก่อนเสมอ — ชื่อโครงการในชุดนี้จำนวนมากพิมพ์ขนาด/ปริมาณเป็นเลขไทย
+   *  (เช่น "ขนาดเส้นผ่านศูนย์กลาง ๓๐๐") ซึ่ง \d ของ JavaScript ไม่รู้จัก วัดแล้วถ้าไม่แปลงก่อนจะจับได้
+   *  168 สัญญา แต่แปลงแล้วได้ 292 คือหายไป 42% ทั้งที่ข้อมูลมีอยู่จริง (ปัญหาเดียวกับที่แก้ไว้ใน dataio.js)
+   */
+  const PIPE_SIZE_RE = /(\d+)\s*(?:นิ้ว|มม\.|มิลลิเมตร)/;
+  const PIPE_LEN_RE = /(\d[\d,]*(?:\.\d+)?)\s*(?:เมตร|ม\.)/;
+  const THAI_DIGITS = '๐๑๒๓๔๕๖๗๘๙';
+  const thaiDigitsToArabic = v => String(v ?? '').replace(/[๐-๙]/g, ch => String(THAI_DIGITS.indexOf(ch)));
+
+  function unitPricePilot(records, { minPerSize = 5, minLength = 10 } = {}) {
+    const parsed = [];
+    for (const r of records) {
+      const name = thaiDigitsToArabic(r.project_name || '');
+      const s = PIPE_SIZE_RE.exec(name);
+      const l = PIPE_LEN_RE.exec(name);
+      const value = r.contract_price_agree || 0;
+      if (!s || !l || value <= 0) continue;
+      const length = Number(String(l[1]).replace(/,/g, ''));
+      const size = Number(s[1]);
+      // ขนาด 0 เกิดจากการอ่านชื่อผิด (เช่นเลขศูนย์โดด ๆ ในชื่อรุ่น) ไม่ใช่ท่อจริง ต้องตัดทิ้ง
+      if (!Number.isFinite(length) || length < minLength || !(size > 0)) continue;
+      parsed.push({ r, size, length, value, perMetre: value / length });
+    }
+    const bySize = [];
+    for (const [size, list] of U.groupBy(parsed, x => x.size)) {
+      if (list.length < minPerSize) continue;
+      const per = list.map(x => x.perMetre);
+      bySize.push({
+        size: Number(size), n: list.length,
+        medPerMetre: U.median(per),
+        minPerMetre: Math.min(...per), maxPerMetre: Math.max(...per),
+        items: list,
+      });
+    }
+    bySize.sort((a, b) => a.size - b.size);
+    return { bySize, parsedN: parsed.length, totalN: records.length, shownN: U.sum(bySize.map(b => b.n)) };
+  }
+
   return {
     hhi, screening, noncompete,
     benford, benfordByAgency, thresholdCliff, priceRatioHistogram,
     priceOutliers, durationOutliers,
-    splitClusters, tinMismatch, bidRotation,
+    splitClusters, tinMismatch, bidRotation, territoryPairs, stackedPoints, stackedExactKeys,
     marketStructure, concentrationRatio, BUYER_LEVELS, branchConcentration,
     agencyTotals, contractorTotals, repeatWinners, networkEdges, timeseries,
-    contractorProfiles, RISK_WEIGHTS,
+    contractorProfiles, RISK_WEIGHTS, riskWeights,
+    agencyProfiles, newSupplierShare, buyerKeyFn,
+    ceilingDiscount, marketBaselines, marketPlayers, multiLotProjects, contractorBehaviour,
+    jvGroups, jvPartners, underbidRanking,
+    fiscalYear, fiscalQuarter, fiscalCalendar, contractTiming,
+    auditQueue, sharedDirectors,
+    methodBreakdown, methodStrategicFit, thresholdEvasion, unitPricePilot,
   };
 })();
