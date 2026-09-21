@@ -1280,6 +1280,9 @@ const App = (() => {
     const id = activeTabId();
     CoT.syncBtn();   // ก่อน early-return: ต้องซิงก์ทุกครั้งที่สลับแท็บ แม้แท็บนั้นไม่ต้องวาดใหม่
     if (!state.dirty.has(id)) return;
+    // ตอนบูตที่ลิงก์ระบุแท็บ (เช่น #tab=rules) การสลับแท็บมาถึงก่อน applyFilters() ที่คำนวณ state.summary
+    // ตัววาดหลายแท็บอ่านค่านี้ตรง ๆ จึงพังครั้งเดียวตอนโหลด ปล่อยแท็บไว้สถานะ dirty แล้ว applyFilters() จะวาดให้เอง
+    if (!state.summary) return;
     try {
       TAB_RENDERERS[id]?.();
       state.dirty.delete(id);
@@ -7071,8 +7074,9 @@ ${placemarks.join('\n')}
   // ไม่รวม R21 เพราะทุกสัญญาของ R21 อยู่ใน R3 อยู่แล้ว ถ้าใช้เป็นป้าย R3 จะรั่วคำตอบให้คะแนนกฎ
   const PROXY_RULES = ['R4', 'R11', 'R20'];
 
-  function renderRuleQuality() {
-    const recs = state.records;
+  /** ความทับซ้อนของกฎที่ใช้ข้อมูลจริง — คืนค่าล้วน ไม่แตะหน้าจอ
+   *  ใช้ทั้งตารางในแท็บกฎและหน้าต่างไล่เหตุผล (CoT) เพื่อให้สองที่ได้ตัวเลขเดียวกันเสมอ */
+  function computeRuleOverlap(recs) {
     const real = Rules.DEFS.filter(d => d.source === 'real').map(d => d.id);
     const idx = Object.fromEntries(real.map(id => [id, new Set()]));
     recs.forEach((r, i) => (r.rule_hits || []).forEach(h => { if (idx[h.rule_id]) idx[h.rule_id].add(i); }));
@@ -7093,6 +7097,12 @@ ${placemarks.join('\n')}
     }));
     const notable = pairs.filter(p => p.jac >= 0.2 || (p.contain >= 0.95 && p.inter >= 20))
       .sort((x, y) => y.contain - x.contain || y.jac - x.jac).slice(0, 8);
+    return { real, active, pairs, matrix, notable };
+  }
+
+  function renderRuleQuality() {
+    const recs = state.records;
+    const { active, matrix, notable } = computeRuleOverlap(recs);
     U.$('ruleOverlapNote').textContent =
       `คะแนนความเสี่ยงคือผลรวมน้ำหนักของกฎ ถ้าสองกฎติดธงสัญญาชุดเดียวกัน สัญญานั้นถูกนับคะแนนซ้ำ ` +
       `ตารางแสดงคู่ที่ทับกันมาก (Jaccard ≥ 0.2 หรือกฎหนึ่งอยู่ในอีกกฎเกือบทั้งหมด) จาก ${active.length} กฎที่พบ ≥ 20 สัญญา`;
@@ -13864,6 +13874,20 @@ ${labVocabText()}`;
       labels: { workGroupLabel, bandLabel, peerGroupLabel, truncate },
       gotoTab, openDetail, openProfile, download: downloadBlob, toast: cartToast,
       setBand: setBandFilter, jumpTo: jumpToCard,
+      // แท็บอื่นของ CoT — ทุกตัวอ่านของเดิมในแอป ไม่คำนวณซ้ำ เพื่อให้เลขตรงกับที่แท็บนั้นแสดง
+      setRule: id => { U.$('gfRule').value = id; syncFiltersFromUI(); applyFilters(); },
+      settings: () => state.settings,
+      ruleOverlap: () => computeRuleOverlap(state.records),
+      coverageGaps: () => COVERAGE_GAPS,
+      contractorProfiles: () => profiles(),
+      agencyProfiles: () => agencyProfilesCached(),
+      agencyName: agencyDisplayName,
+      underbid: () => ({ rows: ubRows(), min: ub.min, value: ub.value }),
+      hasNetwork: () => hasNetworkData(),
+      netFilter: edges => netFilteredEdges(edges),
+      territory: () => ({ rows: terrCompute(), share: terr.share, market: terr.market }),
+      mapShown: () => mapGeoRows(),
+      stackGroups: () => stackGroups(),
       exportQueue: () => exportRecords(
         Analytics.auditQueue(state.filtered, { ...state.queue, capRender: Infinity }).items.map(x => x.r), 'คิวตรวจสอบ.csv'),
       // ai.cfg เป็น null จนกว่า renderAI() จะรันครั้งแรก และ aiConnReady() อ่าน ai.cfg.provider
