@@ -6801,9 +6801,17 @@ ${placemarks.join('\n')}
     const rows = state.filtered;
     const byGroup = U.groupBy(rows, r => r.work_group);
     const order = [...byGroup.entries()].sort((a, b) => b[1].length - a[1].length);
+    // ชื่อกลุ่มในแผนภูมิมาจากการจำแนกที่ใช้อยู่จริง (ชุดตั้งต้นของ ETL หรือพจนานุกรมที่ผู้ใช้ปรับเอง)
+    // หัวข้อจึงเป็นคำกลาง ๆ ไม่ผูกกับชุดข้อมูลใดชุดหนึ่ง และบอกที่มาของการจำแนกไว้ตรงนี้แทน
+    const prof = wg.custom ? Names.getProfile(Names.activeProfileId()) : null;
+    const source = wg.custom
+      ? `จำแนกตามพจนานุกรม${prof ? ` "${prof.name}"` : 'ที่ปรับเอง'}`
+      : 'จำแนกตามพจนานุกรมตั้งต้น';
+    const nTypes = U.countBy(state.records, r => r.project_type_name).size;
     U.$('wgNote').textContent =
-      `จัดจากคำในชื่อโครงการ ${wg.order.length - 1} กลุ่ม ครอบคลุม ${U.pct(wg.coverage)} ของสัญญาทั้งหมด · ` +
-      `ละเอียดกว่า "ประเภทโครงการ" ซึ่งมีเพียง 6 ประเภทและ 2 ใน 3 เป็นจ้างก่อสร้าง · ` +
+      `${source}จากคำในชื่อโครงการ ${wg.order.length - 1} กลุ่ม ครอบคลุม ${U.pct(wg.coverage)} ของสัญญาทั้งหมด · ` +
+      `สัญญาที่ไม่เข้ากลุ่มใดรวมอยู่ใน "อื่นๆ" · ` +
+      (nTypes ? `ละเอียดกว่า "ประเภทโครงการ" ซึ่งมี ${U.num(nTypes)} ประเภท · ` : '') +
       `ใช้เป็นกลุ่มเปรียบเทียบของโมเดลทุกตัวในแท็บความผิดปกติ`;
     Charts.bar('wgChart', order.map(([k]) => workGroupLabel(k)), order.map(([, v]) => v.length), {
       horizontal: true, color: Charts.C.teal, axisTitle: 'จำนวนสัญญา',
@@ -12496,6 +12504,7 @@ ${labVocabText()}`;
       counts,
       coverage: 1 - (counts.other || 0) / (state.records.length || 1),
       method: 'พจนานุกรมคำจากชื่อโครงการ ปรับในแท็บ AI · มุมมองชื่อโครงการ',
+      custom: true,   // renderWorkGroups() ใช้แยกชุดตั้งต้นของ ETL ออกจากพจนานุกรมที่ผู้ใช้ปรับ
     };
     return models.work_groups;
   }
