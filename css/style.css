@@ -2329,6 +2329,8 @@ h2.card-head-el {
   color: var(--chrome-ink-dim); font-size: var(--text-xs);
   white-space: normal; overflow: visible;
 }
+/* ป้ายบอกว่าเป็นเวอร์ชันสาธิต: ส้มสว่างบนพื้นเขียวเข้มของแถบข้าง (คอนทราสต์ ≈ 5:1 ทั้งโหมดสว่างและมืด) */
+.side-brand .brand-demo { color: #FFA94D; font-weight: 700; }
 
 .side-nav { padding: 10px 9px 18px; flex: 1; }
 .side-nav .tab-subnav {
