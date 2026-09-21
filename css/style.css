@@ -5566,3 +5566,151 @@ mark.ai-unverified { background: none; color: inherit; padding: 0; text-decorati
   .ag-views .ag-view { min-height: 44px; flex: 1 1 auto; }
   .method-scope .btn { min-height: 44px; }
 }
+
+/* =====================================================================
+   53. แท็บภาพรวม: กราฟชุดแรก + คิวตรวจสอบท้ายหน้า (พับได้)
+   ===================================================================== */
+
+/* ลิงก์ "ไปที่คิวตรวจสอบ" ในหัวหน้า — พื้นหลังเป็นแถบเขียวเข้มทั้งสองธีม จึงใช้สีขาวขีดเส้นใต้ให้เห็นว่ากดได้ */
+.ov-jump { color: #fff; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.ov-jump:hover, .ov-jump:focus-visible { color: #fff; text-decoration-thickness: 2px; }
+.ov-jump:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 3px; }
+
+/* จุดบนกราฟกดเปิดรายละเอียดได้ */
+.ov-chart-click .nsewdrag { cursor: pointer; }
+
+/* เรื่องที่ติดคิวเพราะมูลค่าสูง ซ่อนไว้จนกว่าจะกดดู เพื่อให้ค่าเริ่มต้นเห็นแค่ n เรื่องแรกจริง ๆ */
+.queue-more > summary {
+  cursor: pointer; color: var(--accent-bright); font-weight: 600; font-size: var(--text-sm);
+  padding: 4px 0;
+}
+.queue-more > summary:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: 6px; }
+
+@media (max-width: 767.98px) {
+  .queue-more > summary { min-height: 44px; display: flex; align-items: center; }
+  /* ลิงก์ในบรรทัดสูงแค่ ~21px ขยายพื้นที่กดเป็น 44px ด้วย padding แล้วหักด้วย margin ติดลบ
+     บรรทัดจึงไม่สูงขึ้นและตัวหนังสือไม่ขยับ */
+  .ov-jump { display: inline-block; padding: 13px 8px; margin: -13px -8px; }
+}
+
+/* =====================================================================
+   54. ปุ่มและหน้าต่าง "ไล่เหตุผล" (CoT)
+   ===================================================================== */
+
+/* แท็บที่ไม่มีการไล่เหตุผล: จางลงแต่ยังโฟกัสและกดได้ เพื่อให้ขึ้นข้อความบอกเหตุผล
+   (ไม่ใช้ disabled เพราะปุ่ม disabled โฟกัสไม่ได้ สกรีนรีดเดอร์จึงไม่อ่าน title) */
+.top-btn.is-off { opacity: .55; }
+
+.cot-sub { font-size: var(--text-sm); color: var(--text-soft); }
+
+/* ไทม์ไลน์แนวตั้ง กางทั้งหมด — ผู้ใช้กดปุ่มนี้เพราะอยากเห็นโซ่เหตุผล การพับซ่อนทำลายจุดประสงค์ */
+.cot-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.cot-step { position: relative; padding-left: 42px; min-width: 0; }
+.cot-step-n {
+  position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--sev-2-bg); color: var(--sev-2-ink); box-shadow: inset 0 0 0 1px var(--sev-2);
+  font-weight: 700; font-size: var(--text-sm); font-variant-numeric: tabular-nums;
+}
+/* เส้นเชื่อมระหว่างวงกลมเลขขั้น */
+.cot-step:not(:last-child)::before {
+  content: ''; position: absolute; left: 13px; top: 32px; bottom: -14px; width: 2px; background: var(--border);
+}
+.cot-step-h { font-size: var(--text-md); font-weight: 700; margin: 3px 0 2px; }
+.cot-why { font-size: var(--text-sm); color: var(--text-soft); margin: 0 0 8px; }
+/* บรรทัด "ทำไมต้องมีขั้นนี้" หายในโหมดกระชับ ตัวเลขและข้อสังเกตไม่หาย */
+.density-compact .cot-why { display: none; }
+
+.cot-list { margin: 0; padding-left: 1.1rem; font-size: var(--text-sm); }
+.cot-list li { margin-bottom: 4px; overflow-wrap: anywhere; }
+.cot-src { display: block; color: var(--text-soft); font-size: var(--text-xs); }
+.cot-empty { font-size: var(--text-sm); color: var(--text-soft); margin: 0; }
+
+.cot-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.cot-m { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface-soft); min-width: 0; }
+.cot-m-l { font-size: var(--text-xs); color: var(--text-soft); }
+.cot-m-v { font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cot-m-n { font-size: var(--text-xs); color: var(--text-soft); overflow-wrap: anywhere; }
+.cot-drop {
+  margin: 8px 0 0; padding: 6px 10px; font-size: var(--text-sm); color: var(--text-soft);
+  border-left: 3px solid var(--sev-3); background: var(--sev-3-bg); border-radius: 0 8px 8px 0;
+}
+
+/* ป้ายระดับ: มีตัวหนังสือกำกับเสมอ ไม่พึ่งสีอย่างเดียว */
+.cot-lv {
+  display: inline-block; font-style: normal; font-weight: 700; font-size: var(--text-xs);
+  padding: 0 7px; margin-bottom: 2px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text);
+}
+.cot-step .method-find div { min-width: 0; overflow-wrap: anywhere; }
+
+.cot-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.cot-foot { gap: 8px; flex-wrap: wrap; }
+.cot-foot-note { margin-right: auto; font-size: var(--text-sm); color: var(--text-soft); }
+
+@media (max-width: 767.98px) {
+  .cot-foot .btn, .cot-acts .btn { min-height: 44px; }
+  .cot-foot-note { flex: 1 0 100%; }
+  .cot-step { padding-left: 36px; }
+}
+
+/* .ma-note ไม่กำหนดขนาดตัวอักษรเอง (ปกติอยู่ในการ์ดที่ตั้งไว้แล้ว) ในหน้าต่างจึงได้ 15px ใหญ่กว่ารายการรอบข้าง */
+.cot-step .ma-note { font-size: var(--text-sm); }
+
+/* ปุ่ม Chain of Thought: ฟ้าพาสเทลพื้นทึบ ตัวอักษรน้ำเงินเข้ม
+   แถบบนเป็นเขียวเข้มทั้งสองธีม จึงใช้ชุดสีเดียวกันทั้งสว่างและมืด ไม่ต้องแยกตามธีม */
+.topbar .top-btn-cot {
+  --cot-bg: #B7DDF3; --cot-bg-hover: #A0D0EC; --cot-ink: #0A3A57;
+  background: var(--cot-bg); border-color: #8CC3E4; color: var(--cot-ink); font-weight: 600;
+  white-space: nowrap;
+}
+.topbar .top-btn-cot:hover { background: var(--cot-bg-hover); }
+
+/* ชื่อภาษาอังกฤษปรับตามพื้นที่แถบบน: กว้าง = "Chain of Thought" เต็ม, กลาง = "CoT", แคบ = ป้ายสั้นเดิม
+   ถ้าแสดงเต็มที่ความกว้างต่ำกว่า ~1300px "ส่งออก CSV" จะตกลงไปอีกบรรทัด (วัดแล้ว: 1240px ตก, 1280px พอดีแต่ไม่เหลือที่) */
+.cot-en-mid { display: none; }
+@media (max-width: 1359.98px) {
+  .cot-en-long { display: none; }
+  .cot-en-mid { display: inline; }
+}
+
+/* แถบบนบนมือถือ: เพิ่มปุ่ม CoT เป็นตัวที่ 8 ทำให้ "ส่งออก CSV" ตกลงไปแถวใหม่ที่ 375px
+   (แถวเดิมเหลือที่ว่างแค่ ~7px) ย่อ padding แนวนอนและช่องไฟให้กลับมาอยู่แถวเดียว
+   ความสูงยังเป็น 44px ตามเดิม ส่วนความกว้างปุ่มลดเหลือ ~40px */
+@media (max-width: 480px) {
+  .topbar { column-gap: 3px; }
+  .topbar .top-btn { padding-left: 6px; padding-right: 6px; min-width: 40px; }
+  .topbar .density-btn { padding-left: 4px; padding-right: 4px; }
+}
+
+/* =====================================================================
+   55. แผนที่: ป๊อปอัปสรุปเล็ก + ปุ่มล้างการเลือก
+   ===================================================================== */
+
+/* ป๊อปอัปเล็ก: ใช้โครง .mp ของการ์ดเต็มเดิม แต่แคบกว่าและไม่มี KPI / กฎ / ปุ่มรอง
+   ตอนกดปุ่ม "รายละเอียด" จะถอดคลาส map-mini-pop ออกแล้วกลับเป็นความกว้างการ์ดเต็ม */
+.map-mini-pop .leaflet-popup-content { width: 232px !important; }
+.mp-mini .mp-body { padding: 8px 11px 9px; }
+.mp-mini .mp-title { font-size: .82rem; }
+.mpm-money {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border); font-size: .76rem;
+}
+.mpm-money span { color: var(--muted); }
+.mpm-money b { font-size: .86rem; font-variant-numeric: tabular-nums; }
+.mp-mini .mp-actions { margin-top: 8px; }
+
+/* ปุ่มล้างการเลือก: อยู่บนแถบชิปตลอด (ไม่โผล่/หาย เพื่อไม่ให้ชิปอื่นขยับทุกครั้งที่กดหมุด)
+   ไม่มีอะไรถูกเลือก = ตัวอักษรสีจาง (พื้นยังทึบ ไม่ให้หมุดใต้ชิปทะลุออกมาบังตัวหนังสือ) กดแล้วมีข้อความบอก มีของถูกเลือก = เด่นด้วยสีหลัก */
+.mapchip-clear[aria-disabled="true"] { color: var(--muted); }
+.mapchip-clear.is-on { background: var(--primary-soft); border-color: var(--primary); color: var(--accent-bright); }
+@media (max-width: 575.98px) {
+  .map-mini-pop .leaflet-popup-content { width: 224px !important; }
+}
+
+/* วงรอบจุดที่เลือกถูกวาดใน markerPane ซึ่ง Leaflet สร้าง canvas เต็มแผนที่ขึ้นมาอีกใบ (z-index 600 สูงกว่า canvas
+   ของหมุดที่อยู่ overlayPane 400) canvas ใบนั้นรับเมาส์แทนของใต้มัน ผลที่วัดได้หลังเลือกจุดครั้งแรก:
+   - เมาส์ชี้หมุดแล้วเป็นรูปมือ grab (มือขาว) แทนนิ้วชี้ เพราะเคอร์เซอร์มาจาก canvas ใบบนที่ไม่ใช่ leaflet-interactive
+   - ไอคอนกลุ่มหมุดที่ถูกวาดก่อน canvas ใบนี้ถูกคลุม คลิกไม่ติด (วัดได้ 3 จาก 5 กลุ่มที่เห็น)
+   วงนี้ไม่ต้องรับเมาส์ (interactive: false) จึงปิดการรับเมาส์ของ canvas ใบนี้ทั้งใบ */
+.leaflet-marker-pane > canvas { pointer-events: none; }

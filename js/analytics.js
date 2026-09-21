@@ -1162,18 +1162,25 @@ const Analytics = (() => {
    *  "ชั้นมูลค่าสูงตรวจเสมอ" (materiality) แยกออกมาต่างหาก ไม่ใช่ให้สูตรคูณแก้ปัญหานี้เอง
    *  (วัดแล้ว: 24 ใน 50 สัญญาใหญ่สุดของทั้งประเทศคะแนนอยู่ระดับ "ต่ำ"/"ไม่พบสัญญาณ")
    */
+  /** ห่อระเบียนด้วยคะแนน มูลค่า และ exposure แล้วเรียงตามโหมดที่เลือก
+   *  แยกออกมาเพื่อให้ auditQueue กับ queueCoverage เรียงด้วยกติกาเดียวกันเสมอ
+   *  ไม่เช่นนั้นเส้นกราฟกับรายการในคิวอาจเรียงต่างกันโดยไม่มีใครรู้ */
+  function queueWrap(records, mode) {
+    const wrap = records.map(r => {
+      const score = r.risk_score || 0, value = r.contract_price_agree || 0;
+      return { r, score, value, exposure: score * value };
+    });
+    const key = mode === 'score' ? x => x.score : mode === 'value' ? x => x.value : x => x.exposure;
+    return { wrap, sorted: [...wrap].sort((a, b) => key(b) - key(a) || b.value - a.value) };
+  }
+
   function auditQueue(records, {
     mode = 'exposure',        // 'exposure' | 'score' | 'value'
     n = 40,
     materiality = 0, // บาท — สัญญามูลค่า ≥ นี้ ติดคิวเสมอไม่ว่าคะแนนเท่าไร
     capRender = 200,          // เพดานจำนวนแถวที่ส่งให้ UI วาดจริง (records อาจมีหลักหมื่น)
   } = {}) {
-    const wrap = records.map(r => {
-      const score = r.risk_score || 0, value = r.contract_price_agree || 0;
-      return { r, score, value, exposure: score * value };
-    });
-    const key = mode === 'score' ? x => x.score : mode === 'value' ? x => x.value : x => x.exposure;
-    const sorted = [...wrap].sort((a, b) => key(b) - key(a) || b.value - a.value);
+    const { wrap, sorted } = queueWrap(records, mode);
 
     const ranked = sorted.slice(0, n);
     ranked.forEach(x => { x.includedBy = 'rank'; });
@@ -1197,6 +1204,26 @@ const Analytics = (() => {
       materialityOnlyCount: materialityOnly.length,
       renderTruncated: logical.length > items.length,
     };
+  }
+
+  /** เส้นครอบคลุมมูลค่า: ถ้าตรวจไล่ตามลำดับ k เรื่องแรก จะครอบคลุมมูลค่ารวมกี่ %
+   *  คำนวณครบทั้งสามโหมดด้วยกติกาเดียวกับ auditQueue (ผ่าน queueWrap) เพื่อวางเทียบในกราฟเดียว
+   *
+   *  อ่านอย่างระวัง: โหมด "มูลค่าอย่างเดียว" คือเพดานทางทฤษฎีของการครอบคลุมเงินเสมอ (ไล่จากก้อนใหญ่สุด)
+   *  ไม่มีโหมดไหนสูงกว่านี้ได้ แต่ไม่ได้ดูสัญญาณความเสี่ยงเลย ส่วนโหมดคะแนนอย่างเดียวดูแต่ความเสี่ยงโดยไม่สนขนาด
+   *  จึงเป็นการเทียบว่าแต่ละวิธีแลกเงินที่ครอบคลุมกับความเสี่ยงที่จับไว้อย่างไร ไม่ใช่การพิสูจน์ว่าวิธีใดถูกต้อง
+   *  คืนค่าอาเรย์ยาว maxN+1 (จุดแรกคือ k=0 ที่ 0%) */
+  function queueCoverage(records, { maxN = 100 } = {}) {
+    const total = U.sum(records.map(r => r.contract_price_agree || 0));
+    const N = Math.min(maxN, records.length);
+    const curve = mode => {
+      const { sorted } = queueWrap(records, mode);
+      const out = [0];
+      let acc = 0;
+      for (let k = 0; k < N; k++) { acc += sorted[k].value; out.push(total ? acc / total : 0); }
+      return out;
+    };
+    return { total, maxN: N, exposure: curve('exposure'), score: curve('score'), value: curve('value') };
   }
 
   /** หากรรมการที่ปรากฏในหลายบริษัทที่ต่างก็เป็นผู้ชนะงานในชุดข้อมูลจัดซื้อนี้
@@ -1440,7 +1467,7 @@ const Analytics = (() => {
     ceilingDiscount, marketBaselines, marketPlayers, multiLotProjects, contractorBehaviour,
     jvGroups, jvPartners, underbidRanking,
     fiscalYear, fiscalQuarter, fiscalCalendar, contractTiming,
-    auditQueue, sharedDirectors,
+    auditQueue, queueCoverage, sharedDirectors,
     methodBreakdown, methodStrategicFit, thresholdEvasion, unitPricePilot,
   };
 })();

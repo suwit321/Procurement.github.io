@@ -272,5 +272,131 @@ const Charts = (() => {
     }], { margin: { t: 10, l: 10, r: 10, b: 10 } });
   }
 
-  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, waterfall, radar, radarCompare, treemap, CONFIG, baseLayout, refreshTheme };
+  /* ---------- กราฟชุดหน้าภาพรวม ---------- */
+
+  /** ป้ายแกนมูลค่าแบบไทย ใช้กับแกน log (ค่าดิบ 1e6 อ่านยากกว่า "1 ล้าน") */
+  const MONEY_TICKS = [
+    [1e4, '1 หมื่น'], [1e5, '1 แสน'], [1e6, '1 ล้าน'], [1e7, '10 ล้าน'],
+    [1e8, '100 ล้าน'], [1e9, '1 พันล้าน'], [1e10, '10 พันล้าน'],
+  ];
+
+  /** จุดกระจาย มูลค่า × คะแนนความเสี่ยง — หนึ่งจุดคือหนึ่งสัญญา
+   *  groups = [{ name, color, points:[{x, y, label, id}] }] เรียงจากที่ต้องการวาดก่อน (ใต้สุด) ไปหลังสุด
+   *  ring   = { name, points } วงกลมกลวงครอบจุดที่ติดคิวตรวจสอบ
+   *  xRef/yRef = { value, label } เส้นอ้างอิง วาดเป็น trace ไม่ใช่ shape เพราะ shape บนแกน log
+   *  ตีความพิกัดไม่ตรงกันในแต่ละเวอร์ชัน แต่ trace ใช้ค่าจริงเสมอ
+   *  สัญญาที่ไม่มีมูลค่า (≤0) วาดบนแกน log ไม่ได้ ผู้เรียกต้องกรองออกและแจ้งจำนวนเอง */
+  function riskValue(id, groups, { ring, xRef, yRef } = {}) {
+    const all = groups.flatMap(g => g.points);
+    // ไม่มีจุดเลยต้องจบตรงนี้ ไม่เช่นนั้น Math.min/max ของอาเรย์ว่างได้ ±Infinity
+    // และเส้นอ้างอิงยังทำให้ draw() เห็นว่า "มีข้อมูล" จึงวาดกราฟเปล่าพิสดารแทนข้อความว่าง
+    if (!all.length) { draw(id, [], {}, 'ไม่มีสัญญาที่มีมูลค่าตามเงื่อนไขนี้'); return; }
+    const gl = all.length > 3000;   // SVG หนักเมื่อจุดเกินสองสามพัน สลับเป็น WebGL
+    const type = gl ? 'scattergl' : 'scatter';
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const xMin = Math.min(...xs), xMax = Math.max(...xs), yMax = Math.max(1, ...ys);
+
+    const traces = groups.filter(g => g.points.length).map(g => ({
+      type, mode: 'markers', name: g.name,
+      x: g.points.map(p => p.x), y: g.points.map(p => p.y),
+      customdata: g.points.map(p => p.id), text: g.points.map(p => p.label),
+      marker: { color: g.color, size: 7, opacity: 0.78, line: { width: 0 } },
+      hovertemplate: '%{text}<extra>' + g.name + '</extra>',
+    }));
+    if (ring && ring.points.length) {
+      traces.push({
+        type, mode: 'markers', name: ring.name,
+        x: ring.points.map(p => p.x), y: ring.points.map(p => p.y),
+        customdata: ring.points.map(p => p.id), text: ring.points.map(p => p.label),
+        marker: { symbol: 'circle-open', size: 16, color: T().ink, line: { color: T().ink, width: 2 } },
+        hovertemplate: '%{text}<extra>' + ring.name + '</extra>',
+      });
+    }
+    const refStyle = { color: T().dim, width: 1.2, dash: 'dot' };
+    if (xRef && xRef.value >= xMin && xRef.value <= xMax * 1.5) {
+      // ป้ายอยู่ "ใต้" จุดบนสุดของเส้น (bottom left) — ถ้าอยู่เหนือจุดจะทะลุขอบบนของกราฟแล้วถูกตัด
+      traces.push({ type: 'scatter', mode: 'lines+text', x: [xRef.value, xRef.value], y: [0, yMax * 1.07],
+        text: ['', xRef.label], textposition: 'bottom left', textfont: { size: 10, color: T().dim },
+        line: refStyle, showlegend: false, hoverinfo: 'skip' });
+    }
+    if (yRef) {
+      traces.push({ type: 'scatter', mode: 'lines+text', x: [xMin / 1.4, xMax * 1.4], y: [yRef.value, yRef.value],
+        text: [yRef.label, ''], textposition: 'top right', textfont: { size: 10, color: T().dim },
+        line: refStyle, showlegend: false, hoverinfo: 'skip' });
+    }
+
+    const ticks = MONEY_TICKS.filter(([v]) => v >= xMin / 3 && v <= xMax * 3);
+    draw(id, traces, {
+      margin: { t: 12, l: 48, r: 16, b: 78 },
+      hovermode: 'closest',
+      xaxis: {
+        type: 'log', title: { text: 'มูลค่าสัญญา (บาท)', font: { size: 11 } }, gridcolor: T().grid,
+        tickvals: ticks.map(t => t[0]), ticktext: ticks.map(t => t[1]),
+        range: [Math.log10(xMin / 1.6), Math.log10(xMax * 1.6)],
+      },
+      yaxis: { title: { text: 'คะแนนความเสี่ยง', font: { size: 11 } }, gridcolor: T().grid, range: [-yMax * 0.04, yMax * 1.1] },
+      legend: { orientation: 'h', y: -0.3, font: { size: 10.5 } },
+    });
+  }
+
+  /** เส้นครอบคลุมมูลค่าของคิว (ดู Analytics.queueCoverage)
+   *  cov = { maxN, exposure[], score[], value[] } · mode = โหมดที่ผู้ใช้เลือกอยู่ · n = จำนวนเรื่องที่แสดง */
+  function coverage(id, cov, { mode = 'exposure', n = 5 } = {}) {
+    const xs = Array.from({ length: cov.maxN + 1 }, (_, i) => i);
+    const defs = [
+      { key: 'exposure', name: 'คะแนน × มูลค่า', color: C.teal, dash: 'solid', width: 3 },
+      { key: 'score', name: 'คะแนนอย่างเดียว', color: C.orange, dash: 'dash', width: 2 },
+      { key: 'value', name: 'มูลค่าอย่างเดียว (เพดาน)', color: C.grey, dash: 'dot', width: 2 },
+    ];
+    const traces = defs.map(d => ({
+      type: 'scatter', mode: 'lines', name: d.name, x: xs, y: cov[d.key],
+      line: { color: d.color, width: d.width, dash: d.dash },
+      hovertemplate: '%{fullData.name}<br>ตรวจ %{x} เรื่อง ครอบคลุม %{y:.1%}<extra></extra>',
+    }));
+    const k = Math.min(n, cov.maxN), cur = defs.find(d => d.key === mode) || defs[0];
+    if (k > 0) {
+      traces.push({
+        type: 'scatter', mode: 'markers+text', showlegend: false, x: [k], y: [cov[cur.key][k]],
+        // ป้ายอยู่ใต้ขวาของจุด: เส้นสะสมชันขึ้นทางซ้ายบน ด้านนั้นว่างเสมอ ส่วน top left จะชนแกนตั้งเมื่อ k เล็ก
+        text: [(cov[cur.key][k] * 100).toFixed(1) + '%'], textposition: 'bottom right',
+        textfont: { size: 11, color: T().ink },
+        marker: { size: 10, color: cur.color, line: { color: T().surface, width: 2 } },
+        hovertemplate: `ตรวจ ${k} เรื่อง (ที่เลือกอยู่) ครอบคลุม %{y:.1%}<extra></extra>`,
+      });
+    }
+    draw(id, traces, {
+      margin: { t: 12, l: 50, r: 16, b: 78 },
+      hovermode: 'x unified',
+      xaxis: { title: { text: 'จำนวนสัญญาที่ตรวจ (เรียงตามลำดับที่เลือก)', font: { size: 11 } }, gridcolor: T().grid, range: [0, cov.maxN] },
+      yaxis: { title: { text: 'สัดส่วนมูลค่ารวมที่ครอบคลุม', font: { size: 11 } }, gridcolor: T().grid, tickformat: '.0%', rangemode: 'tozero' },
+      legend: { orientation: 'h', y: -0.3, font: { size: 10.5 } },
+    });
+  }
+
+  /** ตัวอักษรขาวหรือดำ ตามความสว่างของพื้น — พื้นเทาอ่อนของ "ไม่พบสัญญาณ" อ่านตัวขาวไม่ออก */
+  function inkOn(hex) {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return T().ink;
+    const [r, g, b] = [1, 2, 3].map(i => parseInt(m[i], 16) / 255)
+      .map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#132420' : '#ffffff';
+  }
+
+  /** ทรีแมปแบบลำดับชั้น (ids/parents ชัดเจน เพราะชื่อชั้นล่างซ้ำกันข้ามชั้นบนได้ เช่น "วิกฤต" ในทุกวิธีจัดหา)
+   *  nodes = [{ id, parent, label, value, color }] — โหนดแม่ให้ value = 0 ระบบรวมจากลูกเอง (branchvalues 'remainder') */
+  function treemapTree(id, nodes, { valueLabel = 'บาท' } = {}) {
+    const rows = nodes.filter(n => n.value > 0 || nodes.some(c => c.parent === n.id));
+    draw(id, [{
+      type: 'treemap', branchvalues: 'remainder',
+      ids: rows.map(n => n.id), labels: rows.map(n => n.label), parents: rows.map(n => n.parent || ''),
+      values: rows.map(n => n.value),
+      marker: { colors: rows.map(n => n.color || T().line), line: { color: T().surface, width: 2 } },
+      textfont: { color: rows.map(n => (n.color ? inkOn(n.color) : T().ink)), size: 12 },
+      textinfo: 'label+percent root', textposition: 'top left',
+      pathbar: { visible: false }, tiling: { pad: 3 },
+      hovertemplate: '%{label}<br>%{value:,.0f} ' + valueLabel + ' (%{percentRoot:.1%} ของทั้งหมด)<extra></extra>',
+    }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
+  }
+
+  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme };
 })();

@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="css/style.css?v=136">
+<link rel="stylesheet" href="css/style.css?v=149">
 </head>
 <body>
 
@@ -144,9 +144,9 @@
     <span class="top-spacer"></span>
 
     <div class="density-switch" role="group" aria-label="โหมดการแสดงผล">
-      <button type="button" class="density-btn" data-density="compact" aria-pressed="false"
-              title="ซ่อนคำอธิบายทั้งหมด เหลือเฉพาะตัวเลขและกราฟ · ระบบจะจำค่านี้ไว้">กระชับ</button>
-      <button type="button" class="density-btn active" data-density="explain" aria-pressed="true"
+      <button type="button" class="density-btn active" data-density="compact" aria-pressed="true"
+              title="ซ่อนคำอธิบายทั้งหมด เหลือเฉพาะตัวเลขและกราฟ (ค่าเริ่มต้น) · ระบบจะจำค่านี้ไว้">กระชับ</button>
+      <button type="button" class="density-btn" data-density="explain" aria-pressed="false"
               title="แสดงคำอธิบายประกอบทุกส่วน เหมาะกับผู้ใช้ครั้งแรก">อธิบาย</button>
     </div>
     <!-- โผล่มาเฉพาะตอนซ่อนแถบตัวกรองทั้งหมดไว้ (ดูปุ่ม ✕ ในแถบตัวกรอง) เป็นทางเดียวที่เรียกกลับได้
@@ -154,6 +154,8 @@
     <button class="top-btn" id="filterShowBtn" type="button" hidden
             title="แสดงแถบตัวกรองอีกครั้ง" aria-label="แสดงแถบตัวกรอง">
       <span aria-hidden="true">⚲</span> <span class="lbl-full">ตัวกรอง</span><span class="lbl-short" aria-hidden="true">กรอง</span><b class="top-btn-n" id="filterShowN" hidden>0</b></button>
+    <button class="top-btn top-btn-cot" id="cotBtn" type="button" aria-haspopup="dialog" aria-controls="cotModal"
+            title="ไล่เหตุผลทีละขั้นจากตัวเลขของแท็บที่กำลังดู (Chain of Thought)" aria-label="ไล่เหตุผล Chain of Thought ของแท็บที่กำลังดู"><span class="lbl-full">ไล่เหตุผล<span class="cot-en-long"> · Chain of Thought</span><span class="cot-en-mid"> · CoT</span></span><span class="lbl-short" aria-hidden="true">CoT</span></button>
     <button class="top-btn" id="provenanceBtn" type="button"
             title="ดูที่มาของข้อมูล ขอบเขต และข้อจำกัดของชุดข้อมูล"
             aria-label="ดูที่มาและข้อจำกัดของข้อมูล"><span class="lbl-full">ที่มาของข้อมูล</span><span class="lbl-short" aria-hidden="true">ที่มา</span></button>
@@ -258,48 +260,12 @@
 
       <!-- ============ Overview / ภาพรวม ============ -->
       <div class="tab-pane fade show active" id="tab-overview" role="tabpanel" aria-labelledby="pill-overview" tabindex="0">
-        <!-- คิวตรวจสอบวันนี้: จัดด้วยคะแนน × มูลค่า ไม่ใช่คะแนนอย่างเดียว -->
-        <section class="cardx p-3 mb-3 section-block" aria-labelledby="ovQueueHeading">
-          <h2 class="visually-hidden" id="ovQueueHeading">คิวตรวจสอบวันนี้</h2>
-          <div class="row g-2 align-items-end mb-2">
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="ovQueueMode">จัดลำดับด้วย</label>
-              <select class="form-select form-select-sm" id="ovQueueMode">
-                <option value="exposure" selected>คะแนน × มูลค่า (แนะนำ)</option>
-                <option value="score">คะแนนความเสี่ยงอย่างเดียว</option>
-                <option value="value">มูลค่าสัญญาอย่างเดียว</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="ovQueueN">จำนวนเรื่อง</label>
-              <select class="form-select form-select-sm" id="ovQueueN">
-                <option value="20">20</option><option value="40" selected>40</option><option value="100">100</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="ovQueueMateriality">ตรวจเสมอถ้ามูลค่า ≥ (ล้านบาท)</label>
-              <input class="form-control form-control-sm" id="ovQueueMateriality" type="number" min="0" step="5">
-            </div>
-            <div class="col-6 col-md-3">
-              <button class="btn btn-sm btn-outline-secondary w-100" id="ovQueueExport" type="button">ส่งออก CSV ของคิวนี้</button>
-            </div>
-          </div>
-          <div class="small-muted mb-2" id="ovQueueSummary" aria-live="polite"></div>
-          <div class="queue-list" id="ovQueueList" role="list"></div>
-          <details class="ma-how mt-2"><summary>"คะแนน × มูลค่า" คืออะไร ทำไมไม่ใช้คะแนนอย่างเดียว</summary>
-            คะแนนความเสี่ยงบอกว่า "ผิดปกติแค่ไหน" ส่วนมูลค่าบอกว่า "ถ้าผิดจริงเสียหายเท่าไร" สองอย่างนี้ต้องดูคู่กัน
-            การจัดลำดับนี้จึงคูณสองค่าเข้าด้วยกัน (ไม่ได้ทอนด้วย log เพื่อให้อธิบายง่าย) ข้อจำกัด: สัญญาที่คะแนน 0
-            จะไม่ติดคิวจากการคูณเลยไม่ว่ามูลค่าจะสูงแค่ไหน — จึงมีเงื่อนไข "ตรวจเสมอถ้ามูลค่า ≥" แยกไว้ต่างหาก
-            เพื่อจับสัญญาก้อนใหญ่ที่กฎยังไม่จับสัญญาณ ไม่ใช่สรุปว่าสัญญาที่ไม่ติดคิวไม่มีปัญหา
-          </details>
-        </section>
-
         <div class="section-label mb-2">ภาพรวมเชิงสถิติทั้งชุดข้อมูล</div>
 
         <section class="ov-hero mb-3" aria-labelledby="ovHeroTitle">
           <div class="ov-hero-main">
             <h1 id="ovHeroTitle">ภาพรวมความเสี่ยงการจัดซื้อจัดจ้าง</h1>
-            <div class="ov-hero-kicker">มูลค่าตามระดับความเสี่ยง (ภาพรวมทั้งชุด — คิวตรวจสอบที่แนะนำอยู่ด้านบนสุดของหน้า)</div>
+            <div class="ov-hero-kicker">มูลค่าตามระดับความเสี่ยง (ภาพรวมทั้งชุด · <a href="#ovQueueCard" class="ov-jump" data-jump="ovQueueCard">ไปที่คิวตรวจสอบ ↓</a>)</div>
             <div class="ov-hero-value" id="ovHeroValue"></div>
             <div class="ov-hero-sub" id="ovHeroSub"></div>
             <div class="ov-hero-bar" id="ovHeroBar" role="img"></div>
@@ -310,6 +276,46 @@
 
         <!-- ขอบเขตของชุดข้อมูล: ทุกตัวเลขในระบบอธิบายได้เฉพาะภายในขอบเขตนี้ -->
         <div class="scope-note mb-3" id="scopeNote" role="note"></div>
+
+        <!-- กราฟภาพรวมที่เปิดไว้เป็นค่าเริ่มต้น: เห็นทันทีว่าเงินและความเสี่ยงอยู่ตรงไหน -->
+        <div class="row g-3 mb-3" id="ovInsights">
+          <div class="col-lg-7">
+            <section class="cardx p-3 h-100" aria-labelledby="ovRiskValueHeading"
+                     data-collapse-id="ovRiskValueCard" data-collapse-default="open">
+              <div class="card-title-row"><h2 class="h6 mb-0" id="ovRiskValueHeading">สัญญาแต่ละฉบับอยู่ตรงไหน · มูลค่า × คะแนนความเสี่ยง</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">หนึ่งจุดคือหนึ่งสัญญา ยิ่งอยู่ขวาบนยิ่งควรตรวจก่อน วงกลมกลวงคือเรื่องที่ติดคิวตรวจสอบ · คลิกจุดเพื่อเปิดรายละเอียด</p>
+              <div id="ovRiskValue" class="ov-chart-click" style="height:310px" role="img"
+                   aria-label="แผนภาพจุดกระจาย แกนนอนคือมูลค่าสัญญา แกนตั้งคือคะแนนความเสี่ยง หนึ่งจุดคือหนึ่งสัญญา"></div>
+              <div class="small-muted" id="ovRiskValueNote"></div>
+            </section>
+          </div>
+          <div class="col-lg-5">
+            <section class="cardx p-3 h-100" aria-labelledby="ovCoverageHeading"
+                     data-collapse-id="ovCoverageCard" data-collapse-default="open">
+              <div class="card-title-row"><h2 class="h6 mb-0" id="ovCoverageHeading">ตรวจกี่เรื่อง ครอบคลุมเงินเท่าไร</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">ไล่ตรวจตามลำดับ แล้วดูว่าสะสมมูลค่าได้กี่ % ของทั้งหมด จุดบนเส้นคือจำนวนเรื่องที่แสดงในคิวอยู่ตอนนี้</p>
+              <div id="ovCoverage" style="height:310px" role="img"
+                   aria-label="กราฟเส้นสัดส่วนมูลค่าสะสมที่ครอบคลุม เมื่อตรวจสัญญาตามลำดับสามวิธี"></div>
+              <details class="ma-how mt-1"><summary>อ่านกราฟนี้อย่างไร</summary>
+                เส้นจุดสีเทาคือเพดาน: ถ้าเรียงตามมูลค่าอย่างเดียวจะครอบคลุมเงินได้มากที่สุดเท่าที่เป็นไปได้ แต่ไม่ได้ดูสัญญาณเสี่ยงเลย
+                ส่วนเส้นประสีส้มดูแต่คะแนนโดยไม่สนขนาดเงิน เส้นทึบสีเขียวอมฟ้า (คะแนน × มูลค่า) อยู่ระหว่างสองแบบ
+                กราฟนี้บอกว่าแต่ละวิธีแลกเงินที่ครอบคลุมกับความเสี่ยงที่จับไว้อย่างไร ไม่ได้พิสูจน์ว่าวิธีใดถูกต้อง
+              </details>
+            </section>
+          </div>
+          <div class="col-12">
+            <section class="cardx p-3" aria-labelledby="ovTreeHeading"
+                     data-collapse-id="ovTreemapCard" data-collapse-default="open">
+              <div class="card-title-row"><h2 class="h6 mb-0" id="ovTreeHeading">เงินอยู่ที่วิธีจัดหาไหน และเสี่ยงระดับใด</h2>
+                <span class="badge badge-real">ข้อมูลจริง</span></div>
+              <p class="small-muted mb-2">ขนาดกล่องคือมูลค่าสัญญา กล่องใหญ่คือวิธีจัดหา ส่วนย่อยข้างในคือระดับความเสี่ยง (สีเดียวกับแถบด้านบน)</p>
+              <div id="ovTreemap" style="height:290px" role="img"
+                   aria-label="ทรีแมปมูลค่าสัญญาแยกตามวิธีจัดหา แล้วแยกย่อยตามระดับความเสี่ยง"></div>
+            </section>
+          </div>
+        </div>
 
         <!-- กรณีศึกษา: ทางเข้าสำหรับคนที่ยังไม่รู้ว่าจะเริ่มดูอะไร -->
         <section class="cardx p-3 mb-3" aria-labelledby="casesHeading" data-collapse-id="ovCases" data-collapse-default="open">
@@ -405,6 +411,52 @@
             </div>
           </div>
         </div>
+
+        <!-- คิวตรวจสอบ: อยู่ท้ายหน้า พับได้ และแสดง 5 เรื่องแรกเป็นค่าเริ่มต้น
+             จัดด้วยคะแนน × มูลค่า ไม่ใช่คะแนนอย่างเดียว (ดู Analytics.auditQueue) -->
+        <section class="cardx p-3 mt-3 section-block" id="ovQueueCard" aria-labelledby="ovQueueHeading"
+                 data-collapse-id="ovQueueCard" data-collapse-default="open">
+          <div class="card-title-row">
+            <h2 class="h6 mb-0" id="ovQueueHeading">คิวตรวจสอบ · เรื่องที่ควรตรวจก่อน</h2>
+            <span class="badge badge-derived">คำนวณ</span>
+          </div>
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="ovQueueMode">จัดลำดับด้วย</label>
+              <select class="form-select form-select-sm" id="ovQueueMode">
+                <option value="exposure" selected>คะแนน × มูลค่า (แนะนำ)</option>
+                <option value="score">คะแนนความเสี่ยงอย่างเดียว</option>
+                <option value="value">มูลค่าสัญญาอย่างเดียว</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="ovQueueN">จำนวนเรื่องที่แสดง</label>
+              <select class="form-select form-select-sm" id="ovQueueN">
+                <option value="5" selected>5</option><option value="10">10</option><option value="20">20</option>
+                <option value="40">40</option><option value="100">100</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="ovQueueMateriality">ตรวจเสมอถ้ามูลค่า ≥ (ล้านบาท)</label>
+              <input class="form-control form-control-sm" id="ovQueueMateriality" type="number" min="0" step="5">
+            </div>
+            <div class="col-6 col-md-3">
+              <button class="btn btn-sm btn-outline-secondary w-100" id="ovQueueExport" type="button">ส่งออก CSV ของคิวนี้</button>
+            </div>
+          </div>
+          <div class="small-muted mb-2" id="ovQueueSummary" aria-live="polite"></div>
+          <div class="queue-list" id="ovQueueList" role="list"></div>
+          <details class="queue-more mt-2" id="ovQueueMore" hidden>
+            <summary id="ovQueueMoreSummary"></summary>
+            <div class="queue-list mt-2" id="ovQueueMoreList" role="list"></div>
+          </details>
+          <details class="ma-how mt-2"><summary>"คะแนน × มูลค่า" คืออะไร ทำไมไม่ใช้คะแนนอย่างเดียว</summary>
+            คะแนนความเสี่ยงบอกว่า "ผิดปกติแค่ไหน" ส่วนมูลค่าบอกว่า "ถ้าผิดจริงเสียหายเท่าไร" สองอย่างนี้ต้องดูคู่กัน
+            การจัดลำดับนี้จึงคูณสองค่าเข้าด้วยกัน (ไม่ได้ทอนด้วย log เพื่อให้อธิบายง่าย) ข้อจำกัด: สัญญาที่คะแนน 0
+            จะไม่ติดคิวจากการคูณเลยไม่ว่ามูลค่าจะสูงแค่ไหน — จึงมีเงื่อนไข "ตรวจเสมอถ้ามูลค่า ≥" แยกไว้ต่างหาก
+            เพื่อจับสัญญาก้อนใหญ่ที่กฎยังไม่จับสัญญาณ ไม่ใช่สรุปว่าสัญญาที่ไม่ติดคิวไม่มีปัญหา
+          </details>
+        </section>
       </div>
 
       <!-- ============ GIS / รายโครงการ + แผนที่ ============ -->
@@ -423,6 +475,7 @@
                 <div class="mapbar" role="toolbar" aria-label="ตัวควบคุมแผนที่">
                   <button type="button" class="mapchip" id="mapChipFilter" title="แก้ตัวกรองข้อมูล มีผลกับทุกแท็บ">
                     <span aria-hidden="true">⚲</span> ตัวกรอง<b class="mapchip-n" id="mapChipFilterN" hidden></b></button>
+                  <button type="button" class="mapchip mapchip-clear" id="mapChipClear" aria-disabled="true" title="ยังไม่มีอะไรถูกเลือกบนแผนที่"><span aria-hidden="true">✕</span> ล้างการเลือก</button>
                   <div class="mapseg" id="mapMode" role="group" aria-label="รูปแบบหมุด">
                     <button class="mapseg-btn active" data-mapmode="cluster" type="button" aria-pressed="true" title="รวมหมุดที่อยู่ใกล้กันเป็นกลุ่ม">กลุ่ม</button>
                     <button class="mapseg-btn" data-mapmode="points" type="button" aria-pressed="false" title="แสดงทุกจุดแยกกัน">จุด</button>
@@ -2469,6 +2522,29 @@
   </div>
 </div>
 
+<!-- ไล่เหตุผล (CoT): แยกจาก #detailModal โดยตั้งใจ เพราะตัวดักคลิก .detail-clickable อยู่ระดับ document
+     และ openDetail เขียนทับ #detailModalBody ถ้าใช้ร่วมกัน เนื้อหาไล่เหตุผลจะถูกล้างทันทีที่กดชื่อโครงการ -->
+<div class="modal fade" id="cotModal" tabindex="-1" aria-labelledby="cotModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="cotModalTitle">ไล่เหตุผล</h5>
+          <div class="cot-sub" id="cotModalSub"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิดหน้าต่างไล่เหตุผล" title="ปิด"></button>
+      </div>
+      <div class="modal-body" id="cotModalBody" tabindex="0"></div>
+      <div class="modal-footer cot-foot">
+        <span class="cot-foot-note" id="cotAiNote"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="cotCopy">คัดลอกข้อความ</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="cotSave">บันทึกเป็นไฟล์</button>
+        <button type="button" class="btn btn-sm btn-primary" id="cotAi">ให้ AI ขยายความ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -2477,8 +2553,8 @@
 <!-- ?v= บังคับให้เบราว์เซอร์โหลดไฟล์ใหม่หลังแก้โค้ด ให้เพิ่มเลขนี้เมื่อแก้ไฟล์ในโฟลเดอร์ js/ -->
 <script src="js/util.js?v=16"></script>
 <script src="js/rules.js?v=21"></script>
-<script src="js/analytics.js?v=32"></script>
-<script src="js/charts.js?v=19"></script>
+<script src="js/analytics.js?v=33"></script>
+<script src="js/charts.js?v=22"></script>
 <script src="js/tablesort.js?v=15"></script>
 <script src="js/diagrams.js?v=4"></script>
 <script src="js/learn.js?v=6"></script>
@@ -2490,7 +2566,8 @@
 <script src="js/datasets.js?v=2"></script>
 <script src="js/importui.js?v=6"></script>
 <script src="js/directors.js?v=2"></script>
-<script src="js/app.js?v=140"></script>
+<script src="js/cot.js?v=5"></script>
+<script src="js/app.js?v=148"></script>
   <!-- ใบสรุปผู้รับจ้าง 1 หน้า: อยู่นอกสายตาตอนปกติ และเป็นสิ่งเดียวที่ถูกพิมพ์เมื่อสั่งพิมพ์ -->
   <div id="printSheet" aria-hidden="true"></div>
 </body>

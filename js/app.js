@@ -27,7 +27,7 @@ const App = (() => {
       view: 'overview', methodScope: 'auto' },   // แท็บย่อยและขอบเขตของ "วิเคราะห์เชิงลึกวิธีจัดหา"
     agencyProfiles: null, agencyProfilesLevel: null,
     ts: { dimension: 'purchase_method_name', metric: 'counts' },
-    queue: { mode: 'exposure', n: 40, materiality: 0 },  // materiality คำนวณจริงใน activateDataset()
+    queue: { mode: 'exposure', n: 5, materiality: 0 },  // แสดง 5 เรื่องแรกเป็นค่าเริ่มต้น · materiality คำนวณจริงใน activateDataset()
     selectedRecord: null,
     map: {
       mode: 'cluster', colorBy: 'band', basemap: 'light', sizeByValue: true, baseOpacity: 1,
@@ -134,7 +134,7 @@ const App = (() => {
     // ต้องคำนวณใหม่ทุกครั้งที่สลับชุดข้อมูล เพราะสเกลมูลค่าของแต่ละชุดต่างกัน
     const pricedForQueue = state.records.map(r => r.contract_price_agree).filter(v => v > 0).sort((a, b) => a - b);
     const p99Queue = pricedForQueue.length ? U.quantile(pricedForQueue, 0.99) : 0;
-    state.queue = { mode: 'exposure', n: 40, materiality: Math.round(p99Queue / 5e6) * 5e6 };
+    state.queue = { mode: 'exposure', n: 5, materiality: Math.round(p99Queue / 5e6) * 5e6 };
 
     // ★ ล้างแคชทุกตัวที่ถือระเบียนของชุดเก่าไว้ ก่อนที่อะไรจะวาด
     state.profiles = null;
@@ -1278,6 +1278,7 @@ const App = (() => {
   /** วาดเฉพาะแท็บที่เปิดอยู่และยังล้าสมัย — ของเดิมวาดทุกกราฟทุกแท็บตอนโหลด */
   function renderActiveTab() {
     const id = activeTabId();
+    CoT.syncBtn();   // ก่อน early-return: ต้องซิงก์ทุกครั้งที่สลับแท็บ แม้แท็บนั้นไม่ต้องวาดใหม่
     if (!state.dirty.has(id)) return;
     try {
       TAB_RENDERERS[id]?.();
@@ -1362,16 +1363,15 @@ const App = (() => {
      แท็บภาพรวม
      ========================================================= */
 
-  /** คิวตรวจสอบวันนี้ — จัดด้วย Analytics.auditQueue() (คะแนน × มูลค่า เป็นค่าเริ่มต้น)
-   *  แสดงเป็นรายการเดียวกับโครง .item ของแท็บผู้รับจ้าง/หน่วยงาน แต่ไม่จำกัด max-height
-   *  เพราะเป็นเนื้อหาหลักของหน้านี้ ไม่ใช่แผงข้างเล็ก ๆ */
-  function renderOverviewQueue() {
-    const q = Analytics.auditQueue(state.filtered, state.queue);
-
-    U.setHTML('ovQueueList', q.items.map((x, i) => `
-      <div class="item" data-idx="${i}">
+  /** คิวตรวจสอบ — จัดด้วย Analytics.auditQueue() (คะแนน × มูลค่า เป็นค่าเริ่มต้น)
+   *  อยู่ท้ายหน้าภาพรวม พับได้ และแสดงเฉพาะ n เรื่องแรก (ค่าเริ่มต้น 5)
+   *  เรื่องที่ติดคิวเพราะ "มูลค่าสูงแม้คะแนนต่ำ" (materiality) ไม่ใช่ลำดับที่แท้จริง จึงแยกไว้ใน <details>
+   *  ที่ปิดอยู่ ไม่เช่นนั้นค่าเริ่มต้น "5 เรื่อง" จะโผล่มาเป็น 5 บวกเรื่องมูลค่าสูงอีกเป็นสิบ */
+  function queueItemHtml(x, idx, badge) {
+    return `
+      <div class="item" data-idx="${idx}">
         <div class="d-flex justify-content-between gap-2">
-          <span class="small"><span class="rank-badge">${i + 1}</span>
+          <span class="small"><span class="rank-badge">${badge}</span>
             ${clickable('project', x.r.project_id, truncate(x.r.project_name, 44))}</span>
           <span class="d-flex align-items-center gap-1 flex-shrink-0">
             ${cartBtn(x.r)}
@@ -1380,14 +1380,49 @@ const App = (() => {
         </div>
         <div class="small-muted">${U.esc(truncate(x.r.dept_name, 30))} · ${U.esc(truncate(x.r.winner_name, 30))} · ${U.money(x.value)}</div>
         <div class="con-row-tags">${x.includedBy === 'materiality' ? '<span class="con-tag is-materiality">มูลค่าสูง แม้คะแนนต่ำ</span>' : ''}</div>
-      </div>`).join('') || U.emptyState('ไม่มีสัญญาตามเงื่อนไขนี้'));
+      </div>`;
+  }
 
-    U.setHTML('ovQueueSummary',
-      `แผนนี้ ${U.num(q.items.length)} เรื่อง${q.renderTruncated ? ` (จากทั้งหมด ${U.num(q.totalItems)})` : ''} ` +
-      `ครอบคลุมมูลค่า ${U.money(q.totalValue)} บาท (${U.pct(q.coveragePct)} ของมูลค่ารวมในตัวกรองนี้)` +
-      (q.materialityOnlyCount ? ` · ${U.num(q.materialityOnlyCount)} เรื่องติดคิวเพราะมูลค่าสูงแม้คะแนนต่ำ` : ''));
+  /** ตัวควบคุมของคิวเป็น HTML ตายตัว แต่ค่าจริงอยู่ใน state.queue ซึ่งถูกตั้งใหม่ทุกครั้งที่สลับชุดข้อมูล
+   *  ถ้าไม่ซิงก์ ช่องจะโชว์ค่าของชุดเก่าทั้งที่คิวคำนวณด้วยค่าใหม่ */
+  function syncQueueControls() {
+    const mode = U.$('ovQueueMode'), n = U.$('ovQueueN'), mat = U.$('ovQueueMateriality');
+    if (mode.value !== state.queue.mode) mode.value = state.queue.mode;
+    if (n.value !== String(state.queue.n)) n.value = String(state.queue.n);
+    if (document.activeElement !== mat) {   // ห้ามเขียนทับช่องที่ผู้ใช้กำลังพิมพ์
+      const v = String(state.queue.materiality / 1e6);
+      if (mat.value !== v) mat.value = v;
+    }
+  }
 
-    U.$('ovQueueList').querySelectorAll('.item').forEach(el => {
+  function renderOverviewQueue(q = Analytics.auditQueue(state.filtered, state.queue)) {
+    syncQueueControls();
+    const ranked = [], extra = [];
+    q.items.forEach((x, i) => (x.includedBy === 'materiality' ? extra : ranked).push([x, i]));
+
+    U.setHTML('ovQueueList', ranked.map(([x, i]) => queueItemHtml(x, i, i + 1)).join('')
+      || U.emptyState('ไม่มีสัญญาตามเงื่อนไขนี้'));
+
+    const more = U.$('ovQueueMore');
+    more.hidden = !extra.length;
+    if (extra.length) {
+      U.setHTML('ovQueueMoreSummary',
+        `ดูเพิ่มอีก ${U.num(q.materialityOnlyCount)} เรื่อง — ติดคิวเพราะมูลค่าสูง แม้คะแนนต่ำ` +
+        (q.renderTruncated ? ` (แสดง ${U.num(extra.length)} เรื่องแรก)` : ''));
+      U.setHTML('ovQueueMoreList', extra.map(([x, i]) => queueItemHtml(x, i, '★')).join(''));
+    } else {
+      more.open = false;
+    }
+
+    const rankedValue = U.sum(ranked.map(([x]) => x.value));
+    U.setHTML('ovQueueSummary', ranked.length
+      ? `${U.num(ranked.length)} เรื่องแรก ครอบคลุมมูลค่า ${U.money(rankedValue)} บาท ` +
+        `(${U.pct(q.datasetTotalValue ? rankedValue / q.datasetTotalValue : 0)} ของมูลค่ารวมในตัวกรองนี้)`
+      : '');
+    // เรื่องมูลค่าสูงที่ติดคิวเพิ่มบอกไว้ที่หัว <details> "ดูเพิ่ม" แล้ว ไม่ซ้ำในบรรทัดนี้
+    // เพราะประโยคยาวเกินสองบรรทัดบนมือถือและถูกตัดด้วย note-clamp จนอ่านไม่จบ
+
+    U.$('ovQueueCard').querySelectorAll('.item').forEach(el => {
       el.addEventListener('click', e => {
         if (e.target.closest('.cart-btn, .detail-clickable')) return;
         openProfile(q.items[Number(el.dataset.idx)].r.project_id);
@@ -1395,8 +1430,105 @@ const App = (() => {
     });
   }
 
+  /** กราฟภาพรวม 3 ชุดที่เปิดไว้เป็นค่าเริ่มต้น — ทั้งหมดคำนวณจากระเบียนที่กรองแล้วเท่านั้น ไม่มีค่าที่แต่งเอง
+   *  q ส่งมาจาก renderOverview เพื่อไม่ต้องเรียงข้อมูลซ้ำสองรอบ */
+  function renderOverviewInsights(q) {
+    const rows = state.filtered;
+    const highMin = Rules.BANDS.find(b => b.key === 'high').min;
+
+    // 1) จุดกระจาย มูลค่า × คะแนน — แกน log วาดสัญญาที่ไม่มีมูลค่าไม่ได้ จึงตัดออกและบอกจำนวนไว้
+    const priced = rows.filter(r => (r.contract_price_agree || 0) > 0);
+    const rankOf = new Map(q.items.map((x, i) => [x.r.project_id, x.includedBy === 'materiality' ? null : i + 1]));
+    const pointOf = r => ({
+      x: r.contract_price_agree, y: r.risk_score || 0, id: r.project_id,
+      label: `${U.esc(truncate(r.project_name, 50))}<br>${U.esc(truncate(r.dept_name, 30))} · ${U.esc(truncate(r.winner_name, 30))}` +
+        `<br>มูลค่า ${U.money(r.contract_price_agree)} บาท · คะแนน ${U.num(r.risk_score || 0)}` +
+        (rankOf.get(r.project_id) ? `<br><b>คิวตรวจสอบอันดับ ${rankOf.get(r.project_id)}</b>` : ''),
+    });
+    // เรียงจากไม่พบสัญญาณไปวิกฤต ให้จุดที่ร้ายแรงถูกวาดทับบนสุด
+    const groups = [...Rules.BANDS].reverse().map(b => ({
+      name: b.label, color: b.color,
+      points: priced.filter(r => (r.risk_band || 'none') === b.key).map(pointOf),
+    }));
+    const pricedIds = new Set(priced.map(r => r.project_id));
+    Charts.riskValue('ovRiskValue', groups, {
+      ring: { name: 'ติดคิวตรวจสอบ', points: q.items.filter(x => pricedIds.has(x.r.project_id)).map(x => pointOf(x.r)) },
+      xRef: state.queue.materiality > 0 ? { value: state.queue.materiality, label: 'ตรวจเสมอ ≥ ' + U.money(state.queue.materiality) } : null,
+      yRef: { value: highMin, label: 'ระดับสูงขึ้นไป' },
+    });
+    const plot = U.$('ovRiskValue');
+    if (plot && typeof plot.on === 'function' && plot.dataset.plotted) {
+      plot.removeAllListeners('plotly_click');   // วาดซ้ำทุกครั้งที่กรองเปลี่ยน ต้องไม่สะสมตัวฟัง
+      plot.on('plotly_click', ev => {
+        const id = ev.points && ev.points[0] && ev.points[0].customdata;
+        if (id) openProfile(id);
+      });
+    }
+    const dropped = rows.length - priced.length;
+    U.setHTML('ovRiskValueNote', dropped
+      ? `ไม่แสดง ${U.num(dropped)} สัญญาที่ไม่มีมูลค่าในกราฟนี้ (แกนมูลค่าเป็นสเกล log)` : '');
+
+    // 2) เส้นครอบคลุมมูลค่า
+    if (rows.length) {
+      Charts.coverage('ovCoverage', Analytics.queueCoverage(rows, { maxN: 100 }),
+        { mode: state.queue.mode, n: state.queue.n });
+    } else {
+      Charts.draw('ovCoverage', [], {}, 'ไม่มีสัญญาตามเงื่อนไขนี้');
+    }
+
+    // 3) ทรีแมป วิธีจัดหา → ระดับความเสี่ยง (ถ่วงด้วยมูลค่า) วิธีที่เล็กกว่า 8 อันดับแรกรวมเป็น "วิธีอื่น ๆ"
+    const byMethod = [...U.groupBy(priced, r => r.purchase_method_name || 'ไม่ระบุวิธี')]
+      .map(([name, list]) => ({ name, list, total: U.sum(list.map(r => r.contract_price_agree)) }))
+      .sort((a, b) => b.total - a.total);
+    const TOP = 8;
+    const shown = byMethod.slice(0, TOP);
+    if (byMethod.length > TOP) {
+      const rest = byMethod.slice(TOP).flatMap(m => m.list);
+      shown.push({ name: 'วิธีอื่น ๆ', list: rest, total: U.sum(rest.map(r => r.contract_price_agree)) });
+    }
+    const nodes = [];
+    for (const m of shown) {
+      const mid = 'm:' + m.name;
+      const kids = Rules.BANDS.map(b => ({
+        id: `${mid}|${b.key}`, parent: mid, label: b.label, color: b.color,
+        value: U.sum(m.list.filter(r => (r.risk_band || 'none') === b.key).map(r => r.contract_price_agree)),
+      })).filter(k => k.value > 0);
+      if (!kids.length) continue;
+      nodes.push({ id: mid, parent: '', label: m.name, value: 0, color: null }, ...kids);
+    }
+    if (nodes.length) Charts.treemapTree('ovTreemap', nodes);
+    else Charts.draw('ovTreemap', [], {}, 'ไม่มีสัญญาที่มีมูลค่าตามเงื่อนไขนี้');
+  }
+
+  /** เลื่อนไปที่การ์ดที่พับได้ — ถ้าการ์ดพับอยู่ต้องกางก่อน ไม่เช่นนั้นเลื่อนไปแล้วเจอแต่หัวการ์ด
+   *  ใช้ทั้งลิงก์ในหัวหน้าและปุ่ม "ไปที่คิวตรวจสอบ" ในหน้าต่างไล่เหตุผล (CoT) */
+  function jumpToCard(id) {
+    const card = U.$(id);
+    if (!card) return;
+    if (card.classList.contains('is-collapsed')) {
+      const btn = card.querySelector('.card-collapse-btn');
+      if (btn) btn.click();
+    }
+    card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  }
+
+  /** ตั้งตัวกรองระดับความเสี่ยงเป็นค่านี้ (ต่างจาก applyShortcut ที่กดซ้ำแล้วยกเลิก)
+   *  ปุ่มในหน้าต่างไล่เหตุผลต้องได้ผลเหมือนเดิมทุกครั้งที่กด */
+  function setBandFilter(kind) {
+    state.filters.band = kind;
+    U.$('gfBand').value = kind;
+    applyFilters();
+  }
+
   function wireOverviewQueue() {
-    U.$('ovQueueMateriality').value = state.queue.materiality / 1e6;
+    syncQueueControls();
+    // ลิงก์ "ไปที่คิวตรวจสอบ" ในหัวหน้า
+    document.addEventListener('click', e => {
+      const a = e.target.closest('[data-jump]');
+      if (!a || !U.$(a.dataset.jump)) return;
+      e.preventDefault();
+      jumpToCard(a.dataset.jump);
+    });
     U.$('ovQueueMode').addEventListener('change', e => {
       state.queue.mode = e.target.value; state.dirty.add('tab-overview'); renderActiveTab();
     });
@@ -1416,7 +1548,9 @@ const App = (() => {
   function renderOverview() {
     const s = state.summary;
     const rows = state.filtered;
-    renderOverviewQueue();
+    const queue = Analytics.auditQueue(rows, state.queue);
+    renderOverviewQueue(queue);
+    renderOverviewInsights(queue);
     renderScopeNote();
     renderWorkGroups();
     renderOverviewHero();
@@ -2196,6 +2330,7 @@ const App = (() => {
       ? `กำลังแสดงรอยเท้า${fp.kind === 'dept' ? 'หน่วยงาน' : 'ผู้รับจ้าง'} ${fp.name}${more ? ` และอีก ${more} ราย` : ''} · กดเพื่อเปลี่ยนหรือล้าง`
       : 'ดูรอยเท้าผู้รับจ้าง: พิมพ์หรือเลือกชื่อผู้รับจ้าง เพื่อดูทุกงานของรายนั้นบนแผนที่';
     syncSheetMode();
+    syncClearBtn();
   }
 
   /* แผงตัวเลือก */
@@ -2240,28 +2375,135 @@ const App = (() => {
   let mapSelLayer = null;
   function highlightRecord(r) {
     if (mapSelLayer) { map.removeLayer(mapSelLayer); mapSelLayer = null; }
-    if (!r || r.lat === null || r.lon === null) return;
-    mapSelLayer = L.circleMarker([r.lat, r.lon], {
-      radius: radiusOf(r) + 6, color: '#1d4ed8', weight: 3, fill: false, interactive: false, pane: 'markerPane',
-    }).addTo(map);
+    if (r && r.lat !== null && r.lon !== null) {
+      mapSelLayer = L.circleMarker([r.lat, r.lon], {
+        radius: radiusOf(r) + 6, color: '#1d4ed8', weight: 3, fill: false, interactive: false, pane: 'markerPane',
+      }).addTo(map);
+    }
+    syncClearBtn();
+  }
+
+  /* ---------- ป๊อปอัปสรุปเล็กตอนกดจุด + ปุ่มล้างการเลือก ----------
+     กดหมุดครั้งไหนก็ขึ้นป๊อปอัปเล็กครั้งนั้น ทุกขนาดจอ (เดิมจอกว้างได้การ์ดใหญ่ ส่วนจอแคบไม่ขึ้นป๊อปอัปเลย
+     ต้องเลื่อนแผ่นข้อมูลล่างขึ้นมาเอง) รายละเอียดเต็มอยู่หลังปุ่ม "รายละเอียด" */
+
+  function miniPopupHTML(r) {
+    const band = Rules.band(r.risk_score);
+    const hasValue = r.contract_price_agree !== null && r.contract_price_agree !== undefined;
+    return `
+      <div class="mp mp-mini">
+        <div class="mp-band" style="--band:${band.color}">
+          <span class="mp-band-label">${U.esc(band.label)}</span>
+          <span class="mp-score" title="คะแนนความเสี่ยง 0-100">${U.num(r.risk_score)}</span>
+        </div>
+        <div class="mp-body">
+          <div class="mp-title">${U.esc(r.project_name)}</div>
+          <div class="mp-who">
+            <span>🏛 ${U.esc(truncate(r.dept_name, 40))}</span>
+            <span>🏗 ${U.esc(truncate(r.winner_name, 40))}</span>
+          </div>
+          <div class="mpm-money"><span>มูลค่า</span><b>${hasValue ? `${U.money(r.contract_price_agree)} บาท` : 'ไม่ระบุ'}</b></div>
+          <div class="mp-actions">
+            <button type="button" class="mp-btn is-primary" data-map-more="${U.esc(cartKey(r))}" title="ดูรายละเอียดเต็มของสัญญานี้">รายละเอียด ▸</button>
+            <button type="button" class="mp-btn detail-clickable" data-type="project" data-id="${U.esc(r.project_id)}" title="เปิดโปรไฟล์สัญญาแบบเต็ม">🔎 โปรไฟล์</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function showMiniPopup(r, latlng, offset) {
+    // จอแคบมีแผ่นข้อมูลพับโผล่ที่ขอบล่าง 80px ต้องกันไม่ให้ป๊อปอัปเลื่อนไปจมใต้แผ่นนั้น
+    const bottom = L.point(56, isSheetMode() ? SHEET_PEEK + 20 : 20);
+    // เปิดป๊อปอัปก่อนแล้วค่อยวาดวง เพราะการเปิดป๊อปอัปใหม่จะปิดอันเดิมและลบวงของอันเดิมทิ้ง
+    L.popup(mapPopupOpts({ className: 'map-popup-wrap map-mini-pop', offset, autoPanPaddingBottomRight: bottom }))
+      .setLatLng(latlng).setContent(miniPopupHTML(r)).openOn(map);
+    highlightRecord(r);
+  }
+
+  /** ขยายป๊อปอัปเล็กเป็นการ์ดเต็ม (จอกว้าง) หรือเปิดแผ่นข้อมูลล่าง (จอแคบ) */
+  function expandMiniPopup(r) {
+    if (isSheetMode()) {
+      // เปิดแผ่นก่อนปิดป๊อปอัป: popupclose จะลบวงถ้าแผ่นยังไม่อยู่มุมมองรายการ
+      openSheetRecord(r);
+      map.closePopup();
+      if (r.lat !== null && r.lon !== null) keepAboveSheet(L.latLng(r.lat, r.lon));
+      return;
+    }
+    const pop = map._popup;
+    if (!pop) return;
+    if (pop._container) pop._container.classList.remove('map-mini-pop');   // กลับไปกว้างเท่าการ์ดเต็ม
+    pop.setContent(popupHTML(r, colorOf(r)));
+    // การ์ดเต็มสูงกว่าป๊อปอัปเล็กมาก และป๊อปอัปโตขึ้นจากปลายหมุดไปทางบน Leaflet ไม่เลื่อนแผนที่ให้ตอน setContent
+    // (วัดแล้ว: หัวการ์ดจมใต้ขอบบนของแผนที่ ~70px) จึงเลื่อนเองให้พ้นแถบชิปด้านบนและปุ่มด้านขวา
+    requestAnimationFrame(() => {
+      const box = pop._container && pop._container.getBoundingClientRect();
+      if (!box || !map) return;
+      const m = map.getContainer().getBoundingClientRect();
+      const dy = (m.top + 64) - box.top;
+      const dx = box.right > m.right - 56 ? box.right - (m.right - 56) : (box.left < m.left + 12 ? box.left - (m.left + 12) : 0);
+      if (dy > 0 || dx) map.panBy([dx, -Math.max(dy, 0)], { duration: 0.35 });
+    });
+  }
+
+  /** มีอะไรถูกเลือกบนแผนที่อยู่หรือไม่ — พื้นที่ที่ถูกใช้เป็นตัวกรองข้อมูลอยู่ไม่นับ
+   *  เพราะปุ่มนี้สัญญาไว้ว่าไม่แตะตัวกรอง ถ้านับแล้วล้างไม่ได้ ปุ่มจะกดแล้วไม่เกิดอะไร */
+  function mapHasSelection() {
+    const m = state.map;
+    return !!(m.popupOpen || mapSelLayer || m.tool || (m.draft && m.draft.length) ||
+      (isSheetMode() && sheet.view !== 'list') || (m.area && !state.filters.area) || m.footprint);
+  }
+
+  function syncClearBtn() {
+    const b = U.$('mapChipClear');
+    if (!b) return;
+    const on = mapHasSelection();
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-disabled', String(!on));
+    b.title = on
+      ? 'ล้างสิ่งที่เลือกบนแผนที่: จุดและป๊อปอัป พื้นที่ที่วาด รอยเท้าผู้รับจ้าง (ไม่เปลี่ยนตัวกรองข้อมูล)'
+      : 'ยังไม่มีอะไรถูกเลือกบนแผนที่';
+  }
+
+  function clearFootprintSelection() {
+    fpStopPlay();
+    state.map.footprint = null; state.map.fpMore = [];
+    drawFootprint();
+    updateMapLayers(mapRowsForDisplay());   // คืนหมุดที่ซ่อนไว้ตอนโหมดเน้นรอยเท้า
+    renderAnalysisPanel(); updateMapChrome();
+  }
+
+  function clearMapSelection() {
+    const AREA_FILTER_NOTE = 'พื้นที่ที่วาดอยู่ใช้กรองข้อมูลอยู่ ปุ่มนี้ไม่แตะตัวกรอง ล้างได้ที่ปุ่ม "ล้าง" ในแถบตัวกรอง';
+    if (!mapHasSelection()) {
+      // มีพื้นที่ที่วาดค้างอยู่แต่เป็นตัวกรอง ห้ามบอกว่า "ไม่มีอะไรถูกเลือก" เพราะผู้ใช้เห็นพื้นที่นั้นอยู่บนแผนที่
+      mapToast(state.map.area && state.filters.area ? AREA_FILTER_NOTE : 'ยังไม่มีอะไรถูกเลือกบนแผนที่', 4500);
+      return;
+    }
+    let note = '';
+    if (state.map.tool || (state.map.draft && state.map.draft.length)) stopDrawing();
+    map.closePopup();
+    highlightRecord(null);
+    state.map.activeCluster = null;
+    if (isSheetMode() && sheet.view !== 'list') { sheet.view = 'list'; sheet.record = null; renderSheet(); }
+    if (state.map.area) {
+      if (state.filters.area) note = AREA_FILTER_NOTE;
+      else { state.map.area = null; drawArea(); }
+    }
+    if (state.map.footprint) clearFootprintSelection();
+    renderAnalysisPanel();
+    syncClearBtn();
+    if (note) mapToast(note, 4500);
+    // ปุ่มยังอยู่ที่เดิม แต่คืนโฟกัสให้แผนที่ไว้ ผู้ใช้แป้นพิมพ์จะได้ไม่หลงตำแหน่ง
+    map.getContainer().focus({ preventScroll: true });
   }
 
   function onMarkerClick(marker, r, g) {
     showRecord(r);
-    // ป๊อปอัปบนแผนที่โชว์ข้อมูลหลักอยู่แล้ว แต่กฎที่พบและที่มาของคะแนนอยู่ในแผงด้านล่าง
-    // ถ้าไม่สลับแท็บให้ ข้อมูลจะเปลี่ยนไปเงียบ ๆ โดยผู้ใช้ไม่เห็น
+    // แผงรายละเอียดใต้แผนที่ตามจุดที่กดเสมอ ไม่เช่นนั้นข้อมูลจะเปลี่ยนไปเงียบ ๆ โดยผู้ใช้ไม่เห็น
     if (typeof setGisPane === 'function') setGisPane('detail');
-    if (isSheetMode()) {
-      map.closePopup();
-      highlightRecord(r);
-      openSheetRecord(r);
-      keepAboveSheet(marker.getLatLng());
-      return;
-    }
-    // เปิดป๊อปอัปก่อนแล้วค่อยวาดวง เพราะการเปิดป๊อปอัปใหม่จะปิดอันเดิมและลบวงของอันเดิมทิ้ง
-    L.popup(mapPopupOpts({ offset: L.point(0, -Math.round(radiusOf(r) * 0.6)) }))
-      .setLatLng(marker.getLatLng()).setContent(popupHTML(r, g)).openOn(map);
-    highlightRecord(r);
+    // แผ่นข้อมูลล่างเปิดอยู่ที่รายการอื่น ต้องตามจุดที่เพิ่งกด (ไม่ดันแผ่นให้เด้งขึ้นมาเอง)
+    if (isSheetMode() && sheet.view === 'record') { sheet.record = r; renderSheet(); }
+    showMiniPopup(r, marker.getLatLng(), L.point(0, -Math.round(radiusOf(r) * 0.6)));
   }
 
   /** เลือกสัญญาจากรายการ (ในกลุ่มหมุดหรือแผ่นข้อมูล) — เลื่อนแผนที่ไปหาแล้วเปิดการ์ด */
@@ -2281,8 +2523,7 @@ const App = (() => {
     const open = () => {
       if (opened) return;
       opened = true;
-      L.popup(mapPopupOpts({ offset: L.point(0, -4) })).setLatLng(ll).setContent(popupHTML(r, colorOf(r))).openOn(map);
-      highlightRecord(r);
+      showMiniPopup(r, ll, L.point(0, -4));
     };
     if (!fly) { open(); return; }
     map.closePopup();
@@ -2466,6 +2707,7 @@ const App = (() => {
     renderSheet();
     U.$('mapSheetBody').scrollTop = 0;
     setSheetState('half');
+    syncClearBtn();
   }
 
   function openSheetCluster() {
@@ -2473,6 +2715,7 @@ const App = (() => {
     renderSheet();
     U.$('mapSheetBody').scrollTop = 0;
     setSheetState('half');
+    syncClearBtn();
   }
 
   function openSheetList() {
@@ -2480,6 +2723,7 @@ const App = (() => {
     sheet.record = null;
     renderSheet();
     setSheetState(sheet.state === 'peek' ? 'half' : sheet.state);
+    syncClearBtn();
   }
 
   /** ถ้าจุดที่เลือกไปตกอยู่ใต้แผ่นข้อมูลครึ่งจอ เลื่อนแผนที่ขึ้นให้เห็น */
@@ -2557,7 +2801,15 @@ const App = (() => {
       if (e.key === 'Escape' && !U.$('mapPanel').hidden && !state.map.tool) closeMapPanel({ restoreFocus: true });
     });
     map.on('click', () => closeMapPanel());
-    map.on('popupclose', () => { if (!isSheetMode()) highlightRecord(null); });
+    // จอแคบ: วงรอบจุดต้องอยู่ต่อเมื่อแผ่นข้อมูลกำลังแสดงจุดนั้น ไม่เช่นนั้นลบพร้อมป๊อปอัป
+    map.on('popupopen', () => { state.map.popupOpen = true; syncClearBtn(); });
+    map.on('popupclose', () => {
+      state.map.popupOpen = false;
+      if (!isSheetMode() || sheet.view !== 'record') highlightRecord(null);
+      syncClearBtn();
+    });
+    U.$('mapChipClear').addEventListener('click', clearMapSelection);
+    syncClearBtn();
 
     U.$('mapChipFilter').addEventListener('click', () => {
       applyFilterHidden(false);   // เผื่อผู้ใช้ซ่อนทั้งแถบไว้ ต้องเรียกกลับมาก่อนจึงจะย่อ/แก้ได้
@@ -2906,6 +3158,12 @@ ${placemarks.join('\n')}
 
     // ปุ่มในป๊อปอัปและแผ่นข้อมูลล่างถูกสร้างทีหลัง จึงดักที่กล่องแผนที่และแผ่นข้อมูล
     const onCardAction = e => {
+      const more = e.target.closest('[data-map-more]');
+      if (more) {
+        const rec = recordByCartKey(more.dataset.mapMore);
+        if (rec) expandMiniPopup(rec);
+        return;
+      }
       const zoom = e.target.closest('[data-map-zoom]');
       if (zoom) {
         const [lat, lon] = zoom.dataset.mapZoom.split(',').map(Number);
@@ -3192,6 +3450,7 @@ ${placemarks.join('\n')}
   function drawArea() {
     if (areaLayer) { areaLayer.remove(); areaLayer = null; }
     const a = state.map.area;
+    syncClearBtn();
     if (!a) return;
     const style = { color: '#7A3FB8', weight: 2, dashArray: '6 4', fillColor: '#7A3FB8', fillOpacity: 0.08, interactive: false };
     areaLayer = (a.kind === 'circle' ? L.circle([a.lat, a.lon], { ...style, radius: a.radiusKm * 1000 }) : L.polygon(a.points, style)).addTo(map);
@@ -3212,6 +3471,7 @@ ${placemarks.join('\n')}
     map.getContainer().classList.remove('is-drawing');
     map.doubleClickZoom.enable();
     document.querySelectorAll('[data-map-tool]').forEach(b => { b.classList.remove('is-on'); b.setAttribute('aria-pressed', 'false'); });
+    syncClearBtn();
   }
 
   function startDrawing(tool) {
@@ -3226,6 +3486,7 @@ ${placemarks.join('\n')}
     const btn = document.querySelector(`[data-map-tool="${tool}"]`);
     btn.classList.add('is-on'); btn.setAttribute('aria-pressed', 'true');
     renderAnalysisPanel();
+    syncClearBtn();
   }
 
   function redrawDraft() {
@@ -4450,11 +4711,7 @@ ${placemarks.join('\n')}
         else try { localStorage.setItem('pa_ai_opts_v1', JSON.stringify({ ...JSON.parse(localStorage.getItem('pa_ai_opts_v1') || '{}'), scope: 'filter' })); } catch (err) { /* ไม่สำคัญ */ }
         openAITask('brief');
       } else if ('fpClear' in d) {
-        fpStopPlay();
-        state.map.footprint = null; state.map.fpMore = [];
-        drawFootprint();
-        updateMapLayers(mapRowsForDisplay());   // คืนหมุดที่ซ่อนไว้ตอนโหมดเน้นรอยเท้า
-        renderAnalysisPanel(); updateMapChrome();
+        clearFootprintSelection();
       }
       else if ('fpFit' in d) { if (footprintLayer) map.flyToBounds(footprintLayer.getBounds(), { padding: [30, 30], maxZoom: 12, duration: 0.7 }); }
       else if ('fpCart' in d) addManyToCart(fpAll().flatMap(f => f.all));
@@ -13233,13 +13490,14 @@ ${labVocabText()}`;
      จึงแยกเนื้อหาออกเป็นสองชั้น: ตัวเลขและกราฟคือชั้นหลัก ส่วนคำอธิบายเป็นชั้นรอง
      ที่ปิดได้ทั้งระบบด้วยปุ่มเดียว และจำค่าไว้ถาวรจนกว่าผู้ใช้จะเปลี่ยนเอง
 
-     ตั้งค่าเริ่มต้นเป็น "อธิบาย" เพราะผู้ใช้ครั้งแรกยังไม่รู้ว่าจะปิดอะไรได้บ้าง */
+     ค่าเริ่มต้นเป็น "กระชับ" ตามที่ผู้ใช้ต้องการ (เดิมเป็น "อธิบาย" เพราะผู้ใช้ครั้งแรกยังไม่รู้ว่าจะปิดอะไรได้)
+     ผู้ที่เคยกด "อธิบาย" ไว้ยังคงได้ค่านั้นต่อ เพราะค่าที่เลือกเองถูกจำไว้ก่อนแล้ว */
 
   const DENSITY_KEY = 'pa_density';
 
   function loadDensity() {
-    try { return localStorage.getItem(DENSITY_KEY) === 'compact' ? 'compact' : 'explain'; }
-    catch (e) { return 'explain'; }
+    try { return localStorage.getItem(DENSITY_KEY) === 'explain' ? 'explain' : 'compact'; }
+    catch (e) { return 'compact'; }
   }
 
   function applyDensity(mode, { persist = true } = {}) {
@@ -13594,6 +13852,30 @@ ${labVocabText()}`;
       exportRecords(state.filtered.filter(r => (r.rule_hits || []).length), 'procurement-redflags.csv'));
 
     U.$('provenanceBtn').addEventListener('click', showProvenance);
+
+    // ไล่เหตุผล (CoT) — ดู js/cot.js · สื่อสารผ่าน api นี้เท่านั้น
+    CoT.init({
+      rows: () => state.filtered, allRows: () => state.records,
+      summary: () => state.summary, meta: () => (state.payload && state.payload.meta) || {},
+      models, datasetName: () => state.dataset.name,
+      tabId: activeTabId, filterSummary: () => activeFilterSummary(),
+      tabOpts: () => ({ net: state.net, contractor: state.contractor, agency: state.agency,
+        ts: state.ts, queue: state.queue, map: state.map }),   // อ่านอย่างเดียว
+      labels: { workGroupLabel, bandLabel, peerGroupLabel, truncate },
+      gotoTab, openDetail, openProfile, download: downloadBlob, toast: cartToast,
+      setBand: setBandFilter, jumpTo: jumpToCard,
+      exportQueue: () => exportRecords(
+        Analytics.auditQueue(state.filtered, { ...state.queue, capRender: Infinity }).items.map(x => x.r), 'คิวตรวจสอบ.csv'),
+      // ai.cfg เป็น null จนกว่า renderAI() จะรันครั้งแรก และ aiConnReady() อ่าน ai.cfg.provider
+      // การเรียกก่อนหน้านั้นจึง throw ไม่ใช่คืน false — ต้องเช็ค ai.cfg ก่อนและครอบ try เสมอ
+      aiReady: () => { try { return !!ai.cfg && aiConnReady().ok; } catch (e) { return false; } },
+      aiScopeText: () => aiContextScope(state.filtered),
+      // ลำดับสำคัญ: สลับแท็บ → renderAI() (lazy-init ai.cfg / ai.opts / Patterns) → ค่อยส่ง
+      // data เป็นฟังก์ชัน ประเมินหลัง renderAI() เพราะ aiContext* ทุกตัวอ่านสถานะ AI ที่ยังไม่ถูกตั้งก่อนหน้านั้น
+      aiSend: (label, prompt, dataFn) => { gotoTab('pill-ai'); renderAI(); labSendToAssistant(label, prompt, dataFn()); },
+    });
+    U.$('cotBtn').addEventListener('click', () => CoT.open());
+    CoT.syncBtn();
 
     // คลิกที่ชื่อเพื่อเปิดรายละเอียด — ใช้ event delegation แทน inline onclick
     // รวม .term ไว้ด้วย เพื่อให้ศัพท์เทคนิคที่ฝังในเนื้อหาเปิดอภิธานศัพท์ได้โดยไม่ต้องผูก listener เพิ่ม
