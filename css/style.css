@@ -1883,6 +1883,23 @@ button.detail-clickable { text-decoration: none; }
 .density-btn.active { background: var(--primary); color: #fff; }
 .density-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); position: relative; z-index: 1; }
 
+/* ---------- 25b) แท็บย่อยภายในกลุ่มที่ยุบรวมกัน (เช่น สัญญาณเสี่ยง = ทุจริต+ผิดปกติ+เชิงลึก) ---------- */
+.subtab-strip {
+  display: flex; flex-wrap: wrap; gap: 6px; list-style: none;
+  padding: 0; margin: 0 0 14px;
+}
+.subtab-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  background: var(--surface); color: var(--muted);
+  padding: 6px 14px; font-size: var(--text-sm); font-weight: 500;
+  cursor: pointer; transition: background-color .14s ease, color .14s ease, border-color .14s ease;
+}
+.subtab-btn:hover { background: var(--surface-hover); border-color: var(--primary); color: var(--text); }
+.subtab-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.subtab-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); position: relative; z-index: 1; }
+.subtab-btn .nav-count:empty { display: none; }
+
 /* ---- โหมดกระชับ: ซ่อนชั้นคำอธิบาย เหลือตัวเลขและกราฟ ----
    ซ่อนเฉพาะข้อความประกอบ ไม่ซ่อนตัวควบคุม ตาราง กราฟ หรือค่าใดๆ
    ผู้ใช้จึงยังทำงานได้ครบเหมือนเดิม ต่างแค่ไม่มีคำอธิบายกำกับ */
@@ -2226,7 +2243,7 @@ h2.card-head-el {
 /* โหมดพิมพ์: ผู้ตรวจสอบต้องแนบผลในรายงาน
    ตัดส่วนควบคุมออก และกางการ์ดที่พับไว้ให้เห็นเนื้อหาครบ */
 @media print {
-  .topbar, .filter-bar, .quick-filters, .tab-groupnav, .tab-subnav,
+  .topbar, .filter-bar, .quick-filters, .tab-groupnav, .tab-subnav, .subtab-strip,
   .card-collapse-btn, .density-switch, .case-note { display: none !important; }
   .cardx.is-collapsed > *:not(.card-head-el) { display: revert !important; }
   .cardx { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }

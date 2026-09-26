@@ -250,7 +250,14 @@ const App = (() => {
 
   function gotoTab(pillId) {
     const pill = U.$(pillId);
-    if (pill && !pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
+    if (!pill) return;
+    // แท็บที่ถูกยุบเข้ากลุ่มแล้วอยู่ใต้ .tab-pane อีกชั้น ต้องเปิดแท็บกลุ่มนอกก่อนแท็บย่อยข้างใน
+    const outerPane = pill.closest('.tab-pane');
+    if (outerPane) {
+      const outerPill = document.querySelector(`[data-bs-target="#${outerPane.id}"]`);
+      if (outerPill && !outerPill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(outerPill).show();
+    }
+    if (!pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
   }
 
   function renderDatasetBar() {
@@ -780,7 +787,18 @@ const App = (() => {
   }
 
   function activeTabId() {
-    return document.querySelector('.tab-pane.active')?.id || 'tab-overview';
+    // แท็บที่ยุบรวมกันซ้อน .tab-pane ไว้สองชั้น (กลุ่ม -> แท็บย่อยในกลุ่ม)
+    // ไล่ลงตามชั้นที่ active จริงของ "เส้นทางที่กำลังเห็นอยู่" เท่านั้น
+    // ห้ามหยิบ .tab-pane.active ตัวสุดท้ายในเอกสารเฉยๆ เพราะกลุ่มอื่นที่ปิดอยู่แล้ว
+    // ยังมี .active ค้างอยู่บนแท็บย่อยล่าสุดที่เคยเปิดของกลุ่มนั้น
+    let scope = document.querySelector('.tab-content');
+    let pane = null;
+    while (scope) {
+      pane = scope.querySelector(':scope > .tab-pane.active');
+      if (!pane) break;
+      scope = pane.querySelector(':scope > .tab-content');
+    }
+    return pane?.id || 'tab-overview';
   }
 
   /* ---------- นำทางสองระดับ: กลุ่มงาน -> แท็บย่อย ----------
@@ -4738,8 +4756,7 @@ ${placemarks.join('\n')}
       else if ('fpAi' in d) {
         // ผู้รับจ้างรายนี้อาจไม่อยู่ในรายชื่อของแท็บ AI (ซึ่งคิดจากตัวกรอง) จึงเติมตัวเลือกก่อนสั่งงาน
         const k = state.map.footprint.key;
-        const pill = U.$('pill-ai');
-        if (!pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
+        gotoTab('pill-ai');
         renderAI();
         const sel = U.$('aiTargetContractor');
         if (![...sel.options].some(o => o.value === k)) sel.insertAdjacentHTML('afterbegin', `<option value="${U.esc(k)}">${U.esc(truncate(k, 55))}</option>`);
@@ -4750,8 +4767,7 @@ ${placemarks.join('\n')}
       else if (d.mapFootprint) {
         map.closePopup();
         getModal().hide();
-        const pill = U.$('pill-explain');
-        if (!pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
+        gotoTab('pill-explain');
         setTimeout(() => { map.invalidateSize(); showFootprint(d.mapFootprint); U.$('mapCard').scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 350);
       }
     };
@@ -5495,8 +5511,7 @@ ${placemarks.join('\n')}
       if (!p) return;
       if (t.dataset.terrCart !== undefined) { addManyToCart(p.rows); return; }
       // เปิดแท็บแผนที่แล้ววางรอยเท้าทั้งคู่ซ้อนกัน — ต้องรอให้แผนที่คำนวณขนาดใหม่ก่อนจึงจะ fit ได้ถูก
-      const pill = U.$('pill-explain');
-      if (!pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
+      gotoTab('pill-explain');
       setTimeout(() => {
         map.invalidateSize();
         showFootprint(p.a.key, { fit: false });
@@ -10423,8 +10438,7 @@ ${placemarks.join('\n')}
 
   /** เปิดแท็บ AI แล้วสั่งงาน — ใช้จากปุ่มในหน้าโปรไฟล์และตะกร้า */
   function openAITask(id, record) {
-    const pill = U.$('pill-ai');
-    if (!pill.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(pill).show();
+    gotoTab('pill-ai');
     renderAI();
     if (record) { ai.lastRecord = record; ai.pickedKey = cartKey(record); renderAITargets(); }
     selectAITask(id);
@@ -13618,10 +13632,7 @@ ${labVocabText()}`;
     applyFilters();
 
     // เปิดกลุ่มและแท็บปลายทาง
-    const pill = U.$('pill-' + c.tab);
-    if (pill && !pill.classList.contains('active')) {
-      bootstrap.Tab.getOrCreateInstance(pill).show();
-    }
+    gotoTab('pill-' + c.tab);
 
     showCaseNote(c, pickExample(c));
   }
@@ -14081,8 +14092,7 @@ ${labVocabText()}`;
     syncFiltersFromUI();
 
     const tab = params.get('tab');
-    const btn = tab && U.$('pill-' + tab);
-    if (btn && !btn.classList.contains('active')) bootstrap.Tab.getOrCreateInstance(btn).show();
+    if (tab) gotoTab('pill-' + tab);
   }
 
   document.addEventListener('DOMContentLoaded', boot);
