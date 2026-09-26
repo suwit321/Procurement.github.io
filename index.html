@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="css/style.css?v=151">
+<link rel="stylesheet" href="css/style.css?v=152">
 </head>
 <body>
 
@@ -81,6 +81,10 @@
           <button class="nav-link anomaly-active" id="pill-anomaly" data-bs-toggle="pill" data-bs-target="#tab-anomaly"
                   type="button" role="tab" aria-controls="tab-anomaly" aria-selected="false"
                   title="ความผิดปกติเชิงสถิติ"><span class="nav-icon" aria-hidden="true">🔍</span><span class="nav-text">ความผิดปกติ<em>Anomaly Detection</em></span></button></li>
+        <li class="nav-item" role="presentation" data-group="screening" data-cat="screening">
+          <button class="nav-link" id="pill-deep" data-bs-toggle="pill" data-bs-target="#tab-deep"
+                  type="button" role="tab" aria-controls="tab-deep" aria-selected="false"
+                  title="สัญญาณจาก Autoencoder — คำนวณล่วงหน้าแยกจากข้อมูลหลัก โหลดเฉพาะตอนเปิดแท็บนี้"><span class="nav-icon" aria-hidden="true">🧬</span><span class="nav-text">รูปแบบเชิงลึก<em>Deep Pattern</em></span></button></li>
         <li class="nav-head" data-cat="deepdive" role="presentation"><span class="nav-step" aria-hidden="true">3</span>ผู้เล่นรายนี้เป็นอย่างไร</li>
         <li class="nav-item" role="presentation" data-group="deepdive" data-cat="deepdive">
           <button class="nav-link contractor-active" id="pill-contractor" data-bs-toggle="pill" data-bs-target="#tab-contractor"
@@ -954,6 +958,90 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- ============ Deep Pattern (Autoencoder) ============
+           คำนวณล่วงหน้าด้วย tools/build_deep_pattern.py เป็น data/deep_pattern.json
+           ไฟล์นี้ "ไม่" ถูกโหลดตอนเปิดแอป — js/deeppattern.js + data/deep_pattern.json โหลดเฉพาะตอนเปิดแท็บนี้ (ดู renderDeep ใน app.js)
+           โครง DOM เป็น static ทั้งหมด (รวม data-collapse-id ถ้ามี) เพราะสคริปต์ที่ผูก event ตอนบูตทำงานครั้งเดียว -->
+      <div class="tab-pane fade" id="tab-deep" role="tabpanel" aria-labelledby="pill-deep" tabindex="0">
+        <div class="hero-anomaly mb-3">
+          <h1 class="h5 mb-2">รูปแบบเชิงลึก · Autoencoder</h1>
+          <div class="small">โมเดลอีกตัวที่ไม่ใช้กฎ R1-R22 และไม่ใช้ผลของ Isolation Forest เลย
+            ฝึกด้วยปัจจัย 12 ตัวชุดเดียวกับ Isolation Forest แต่หาความสัมพันธ์แบบไม่เป็นเส้นตรงที่โมเดลอื่นมองไม่เห็น
+            คำนวณล่วงหน้าด้วยสคริปต์ Python แยกไฟล์ โหลดเฉพาะตอนเปิดแท็บนี้ ผลเป็นสัญญาณให้ตรวจสอบเพิ่มเติม ไม่ใช่ข้อสรุปว่ามีการกระทำผิด</div>
+        </div>
+
+        <div class="ma-note mb-3" id="deepLoadError" hidden></div>
+
+        <section class="cardx p-3 mb-3" id="deepStatusCard">
+          <div class="card-title-row">
+            <h2 class="h6 mb-0">สถานะโมเดล</h2>
+            <span class="badge badge-derived">โมเดล</span>
+          </div>
+          <div id="deepStatusBody"><p class="small-muted mb-0">กำลังตรวจสอบ...</p></div>
+        </section>
+
+        <div id="deepBody" hidden>
+          <section class="cardx p-3 mb-3" data-collapse-id="deepOverviewCard" data-collapse-default="open">
+            <div class="card-title-row"><h2 class="h6 mb-0">ภาพรวมโมเดล</h2></div>
+            <div class="ma-kpis" id="deepOverviewKpis"></div>
+            <p class="small-muted mb-0" id="deepOverviewNote"></p>
+          </section>
+
+          <section class="cardx p-3 mb-3" data-collapse-id="deepSummaryCard" data-collapse-default="open">
+            <div class="card-title-row"><h2 class="h6 mb-0">สรุปตามตัวกรองที่ใช้อยู่ตอนนี้</h2></div>
+            <div class="ma-kpis" id="deepSummaryKpis"></div>
+            <p class="small-muted mb-0" id="deepSummaryNote"></p>
+          </section>
+
+          <section class="cardx p-3 mb-3" data-collapse-id="deepTableCard" data-collapse-default="open">
+            <div class="card-title-row"><h2 class="h6 mb-0">รายการที่โมเดลให้คะแนน</h2></div>
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+              <select class="form-select form-select-sm w-auto" id="deepFilterLevel" aria-label="กรองระดับสัญญาณ">
+                <option value="all">ทุกระดับ</option>
+                <option value="ge99">Unusual Pattern (deep_score ≥ 99)</option>
+                <option value="ge95">Requires Further Review (≥ 95)</option>
+                <option value="agree">ทุก engine เห็นตรงกัน</option>
+                <option value="onlydeep">Deep จับได้ตัวเดียว (กฎ/IF ไม่เห็น)</option>
+              </select>
+              <span class="small-muted" id="deepTableCount"></span>
+            </div>
+            <div class="table-wrap"><table class="table table-sm mini-table mb-0">
+              <caption class="visually-hidden">สัญญาเรียงตามคะแนนความผิดปกติจาก Autoencoder</caption>
+              <thead><tr>
+                <th scope="col" data-nosort>โครงการ</th>
+                <th scope="col" class="text-end" data-nosort>deep_score</th>
+                <th scope="col" class="text-end" data-nosort>คะแนนกฎ</th>
+                <th scope="col" class="text-end" data-nosort>IF (ml_pct)</th>
+                <th scope="col" data-nosort>เห็นตรงกัน</th>
+              </tr></thead>
+              <tbody id="deepTableBody"></tbody>
+            </table></div>
+            <nav class="d-flex justify-content-between align-items-center mt-2 gap-2" aria-label="เปลี่ยนหน้าตาราง">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="deepPagerPrev">‹ ก่อนหน้า</button>
+              <span class="small-muted" id="deepPagerLabel"></span>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="deepPagerNext">ถัดไป ›</button>
+            </nav>
+          </section>
+
+          <section class="cardx p-3 mb-3" id="deepDetailCard" hidden>
+            <div class="card-title-row"><h2 class="h6 mb-0">รายละเอียดสัญญาที่เลือก</h2>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="deepDetailClose">ปิด</button></div>
+            <div id="deepDetailBody"></div>
+          </section>
+
+          <details class="method-note mb-3" id="deepValidationDetails">
+            <summary>การตรวจสอบโมเดล (Validation)</summary>
+            <div class="mt-2" id="deepValidationBody"></div>
+          </details>
+        </div>
+
+        <section class="cardx p-3" id="deepHowToCard">
+          <div class="card-title-row"><h2 class="h6 mb-0">สร้างผลใหม่ / อัปเดตให้ตรงกับชุดข้อมูลปัจจุบัน</h2></div>
+          <p class="small-muted mb-1">ต้องรันบนเครื่องที่มีไฟล์ <code>raw_data.csv</code> ต้นทาง (ใช้เพียง numpy / pandas / scipy ที่โปรเจกต์มีอยู่แล้ว ไม่ต้องติดตั้งเพิ่ม) สคริปต์จะตรวจสอบว่าผลตรงกับ <code>data/data.json</code> ปัจจุบันก่อนเขียนไฟล์เสมอ</p>
+          <code class="d-block small">python tools/build_deep_pattern.py --input raw_data.csv</code>
+        </section>
       </div>
 
       <!-- ============ Network Analysis ============ -->
@@ -2566,8 +2654,8 @@
 <script src="js/datasets.js?v=2"></script>
 <script src="js/importui.js?v=6"></script>
 <script src="js/directors.js?v=2"></script>
-<script src="js/cot.js?v=8"></script>
-<script src="js/app.js?v=151"></script>
+<script src="js/cot.js?v=9"></script>
+<script src="js/app.js?v=152"></script>
   <!-- ใบสรุปผู้รับจ้าง 1 หน้า: อยู่นอกสายตาตอนปกติ และเป็นสิ่งเดียวที่ถูกพิมพ์เมื่อสั่งพิมพ์ -->
   <div id="printSheet" aria-hidden="true"></div>
 </body>

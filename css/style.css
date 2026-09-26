@@ -5728,3 +5728,17 @@ mark.ai-unverified { background: none; color: inherit; padding: 0; text-decorati
   #mapFullscreen { order: -2; }
   #mapChipFootprint { order: -1; }
 }
+
+/* =====================================================================
+   57. แท็บรูปแบบเชิงลึก (Deep Pattern / Autoencoder)
+   ===================================================================== */
+
+/* แบนเนอร์สถานะโมเดล — ใช้ชุดสีเดียวกับ severity ที่มีอยู่แล้ว ไม่เพิ่มโทนสีใหม่
+   is-warn = ล้าสมัย/ไม่ผ่านเกณฑ์ที่ตั้งเอง (เตือนแต่ไม่ใช่ error) · is-good = ยืนยันว่าไม่ซ้ำโมเดลอื่น */
+.ma-note.is-warn { padding: 6px 10px; background: var(--sev-3-bg); color: var(--warning-text); border-radius: 0 8px 8px 0; border-left: 3px solid var(--sev-3); }
+.ma-note.is-good { padding: 6px 10px; background: var(--success-soft); color: var(--success); border-radius: 0 8px 8px 0; border-left: 3px solid var(--success); }
+
+/* ฮิสโทแกรมมินิของ reconstruction error ในส่วนตรวจสอบโมเดล — แท่งสูงตามสัดส่วน ไม่ต้องพึ่ง Plotly สำหรับกราฟเล็กนี้ */
+.hx-bars { display: flex; align-items: flex-end; gap: 1px; height: 90px; border-bottom: 1px solid var(--border); }
+.hx-bar { flex: 1 1 0; min-width: 2px; background: var(--primary); border-radius: 2px 2px 0 0; opacity: .8; }
+.hx-bar:hover { opacity: 1; }

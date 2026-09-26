@@ -31,7 +31,7 @@ const CoT = (() => {
     'tabOpts', 'labels', 'gotoTab', 'openDetail', 'openProfile', 'download', 'toast',
     'setBand', 'jumpTo', 'exportQueue', 'aiReady', 'aiScopeText', 'aiSend',
     'setRule', 'settings', 'ruleOverlap', 'coverageGaps', 'contractorProfiles', 'agencyProfiles', 'agencyName',
-    'underbid', 'hasNetwork', 'netFilter', 'territory', 'mapShown', 'stackGroups'];
+    'underbid', 'hasNetwork', 'netFilter', 'territory', 'mapShown', 'stackGroups', 'deepPattern'];
 
   function init(a) {
     const missing = REQUIRED.filter(k => !(k in a));
@@ -1115,6 +1115,93 @@ const CoT = (() => {
         };
       },
     },
+
+    'tab-deep': {
+      title: 'รูปแบบเชิงลึก',
+      question: 'Autoencoder เห็นอะไรที่ Isolation Forest ยังไม่เห็น และผลนี้เชื่อถือได้แค่ไหน',
+      build(c) {
+        const { rows, L, deepPattern: dp } = c;
+        // availability() กันไว้แล้วว่า dp.status ไม่ใช่ idle/loading/unavailable ก่อนจะมาถึงนี่
+        // แต่ถ้าสถานะหลุดกลางทาง (เช่น เปลี่ยนชุดข้อมูลพอดีตอนกด) ให้ตอบแบบไม่มีข้อมูลแทนที่จะพัง
+        const sn = dp && dp.summarize ? dp.summarize(rows) : null;
+        if (!sn) {
+          return {
+            measure: [], dropped: [], baseline: [], finds: [],
+            acts: [{ label: 'ไปที่แท็บรูปแบบเชิงลึก', kind: 'goto', arg: 'pill-deep' }],
+            limits: ['ยังไม่มีข้อมูลจาก Autoencoder ให้ไล่เหตุผลตอนนี้ — เปิดแท็บนั้นให้โหลดเสร็จก่อน'],
+          };
+        }
+        const m = sn.meta, v = m.verdict, flagPct = sn.flagPct;
+        const ge99 = sn.matched.filter(x => x.s >= m.thresholds.strong_pct);
+        const ge95 = sn.matched.filter(x => x.s >= flagPct);
+        const agree = sn.matched.filter(x => x.agreeCount >= 2);
+        const deepOnly = sn.matched.filter(x => x.deepOnly);
+
+        const measure = [
+          F.m('สัญญาที่มีคะแนนในขอบเขตนี้', `${U.num(sn.n)} จาก ${U.num(sn.nTotal)}`, ''),
+          F.m(`Unusual Pattern (≥ P${m.thresholds.strong_pct})`, U.num(ge99.length), `มูลค่า ${money(sumV(ge99.map(x => x.record)))} บาท`),
+          F.m(`Requires Further Review (≥ P${flagPct})`, U.num(ge95.length), ''),
+          F.m('ทุก engine เห็นตรงกัน (≥ 2 จาก 3)', U.num(agree.length), 'กฎ ≥ 40 · IF ≥ P95 · Deep ≥ P95'),
+          F.m('Deep จับได้ตัวเดียว', U.num(deepOnly.length), 'กฎและ Isolation Forest ไม่เห็น'),
+        ];
+
+        const baseline = [
+          { label: 'เกณฑ์ระดับ', value: `≥ P${m.thresholds.strong_pct} = Unusual Pattern · ≥ P${flagPct} = Requires Further Review`,
+            source: 'เปอร์เซ็นไทล์ของ reconstruction error ทั้งชุดข้อมูล (สูตรเดียวกับ ml_pct ของ Isolation Forest)' },
+          { label: '"เห็นตรงกัน"', value: 'กฎ ≥ 40 · IF ≥ P95 · Deep ≥ P95 (อย่างน้อย 2 ใน 3)',
+            source: 'เกณฑ์ที่หน้าต่างนี้ตั้งเอง ไม่มีการถ่วงน้ำหนักระหว่าง engine' },
+          { label: 'ซ้ำกับ Isolation Forest?', value: v.duplicates_if ? 'ใช่' : 'ไม่ใช่',
+            source: `Spearman ${m.vs_isolation_forest.spearman} · 5% บนซ้ำกัน ${pct(m.vs_isolation_forest.top5pct_overlap, 0)}` },
+          { label: 'เสถียรข้ามการแบ่งข้อมูลฝึก/ทดสอบ?', value: v.stable ? 'ผ่านเกณฑ์' : 'ต่ำกว่าเกณฑ์เล็กน้อย',
+            source: `Spearman ${m.stability.vs_alt_fold_split.spearman} (เกณฑ์ ≥ 0.9)` },
+        ];
+
+        const finds = [];
+        if (ge99.length) {
+          const top = [...ge99].sort((a, b) => b.s - a.s)[0];
+          finds.push(F.find('high', sumV(ge99.map(x => x.record)),
+            `${U.num(ge99.length)} สัญญาอยู่ในระดับ Unusual Pattern (deep_score ≥ P${m.thresholds.strong_pct}) รวม ${money(sumV(ge99.map(x => x.record)))} บาท สูงสุดคือ "${L.truncate(top.record.project_name, 40)}" (${top.s.toFixed(1)})`,
+            'เปิดรายละเอียดในแท็บรูปแบบเชิงลึกเพื่อดูปัจจัยที่ทำให้ผิดปกติ แล้วเทียบกับคะแนนกฎและ Isolation Forest ของสัญญาเดียวกัน'));
+        }
+        if (agree.length) {
+          finds.push(F.find('high', sumV(agree.map(x => x.record)),
+            `${U.num(agree.length)} สัญญาที่ทั้ง 3 engine เห็นตรงกันอย่างน้อย 2 ใน 3 รวม ${money(sumV(agree.map(x => x.record)))} บาท`,
+            'สัญญาณจากหลายมุมมองพร้อมกัน ควรตรวจก่อน แต่กฎ Isolation Forest และ Autoencoder ใช้ปัจจัยทับซ้อนกันบางส่วน จึงไม่ใช่หลักฐานอิสระสามชิ้นเต็ม ๆ'));
+        }
+        if (deepOnly.length) {
+          finds.push(F.find('mid', sumV(deepOnly.map(x => x.record)),
+            `${U.num(deepOnly.length)} สัญญาที่ Autoencoder เห็นผิดปกติ (≥ P${flagPct}) แต่กฎและ Isolation Forest ไม่เห็นเลย มูลค่า ${money(sumV(deepOnly.map(x => x.record)))} บาท`,
+            'จุดบอดของกฎและ Isolation Forest ที่ Autoencoder ช่วยเติมเต็มได้ — ตรวจปัจจัยที่ทำให้ผิดปกติในรายละเอียดก่อนตัดสินใจ เพราะไม่มีข้อมูลยืนยันจริงว่าโมเดลนี้แม่นแค่ไหน'));
+        }
+        if (v.duplicates_if) {
+          finds.push(F.find('low', 0, 'ผลของ Autoencoder ใกล้เคียงกับ Isolation Forest มาก',
+            'อ่านเป็นการยืนยันซ้ำมากกว่ามุมมองใหม่ ดูตัวเลขเปรียบเทียบเต็มในส่วนการตรวจสอบโมเดลของแท็บ'));
+        }
+        if (!v.stable) {
+          finds.push(F.find('low', 0, 'ความเสถียรเมื่อเปลี่ยนวิธีแบ่งข้อมูลฝึก/ทดสอบยังต่ำกว่าเกณฑ์ที่ตั้งไว้เล็กน้อย',
+            'อันดับต้น ๆ อาจขยับถ้าฝึกใหม่ด้วยการสุ่มแบ่งชุดอื่น ใช้ผลนี้เป็นแนวโน้ม ไม่ใช่อันดับตายตัว'));
+        }
+
+        const acts = [{ label: 'ไปที่แท็บรูปแบบเชิงลึก', kind: 'goto', arg: 'pill-deep' }];
+        if (ge99.length) {
+          const top = [...ge99].sort((a, b) => b.s - a.s)[0];
+          acts.push({ label: `เปิดโปรไฟล์: ${L.truncate(top.record.project_name, 28)}`, kind: 'profile', arg: top.record.project_id });
+        }
+
+        return {
+          measure,
+          dropped: [F.dropped(sn.n, sn.nTotal, ' ไม่มีคะแนน (ราคาเป็นศูนย์หรือไม่มีราคากลาง ถูกตัดออกตั้งแต่ตอนฝึก)')],
+          baseline, finds: F.sortFinds(finds), acts,
+          limits: [
+            'ปัจจัยที่ Autoencoder และ Isolation Forest ใช้เป็นชุดเดียวกันทั้ง 12 ตัว การเห็นตรงกันของสองโมเดลนี้จึงไม่ใช่หลักฐานอิสระ',
+            'ชุดข้อมูลนี้ไม่มีผลตรวจสอบจริง (ground truth) จึงวัดความแม่นยำของ deep_score ไม่ได้เลย ใช้จัดลำดับความสำคัญเท่านั้น',
+            v.stable ? 'ความเสถียรของอันดับเมื่อเปลี่ยนวิธีแบ่งข้อมูลฝึก/ทดสอบผ่านเกณฑ์ที่ตั้งไว้'
+              : 'ความเสถียรของอันดับเมื่อเปลี่ยนวิธีแบ่งข้อมูลฝึก/ทดสอบยังต่ำกว่าเกณฑ์เล็กน้อย (ดูตัวเลขในแท็บ)',
+            'ตัวชี้วัดเทียบกับความผิดพลาดที่รู้แน่ (R4/R11/R20) อาจดูดีเกินจริง เพราะฟีเจอร์บางตัวคำนวณย้อนจากเงื่อนไขของกฎนั้นได้บางส่วน',
+          ],
+        };
+      },
+    },
   };
 
   /* ---------- ปิดปุ่มในแท็บที่ไม่มีการไล่เหตุผล ---------- */
@@ -1130,6 +1217,13 @@ const CoT = (() => {
     if (OFF_REASON[tabId]) return { ok: false, reason: OFF_REASON[tabId] };
     if (!TABS[tabId]) return { ok: false, reason: 'การไล่เหตุผลของแท็บนี้ยังไม่พร้อมใช้งาน' };
     if (!api.summary() || !api.rows()) return { ok: false, reason: 'ยังโหลดข้อมูลไม่เสร็จ' };
+    if (tabId === 'tab-deep') {
+      const dp = api.deepPattern();
+      if (!dp || dp.status === 'idle' || dp.status === 'loading') {
+        return { ok: false, reason: 'เปิดแท็บนี้ให้โหลดข้อมูลก่อน แล้วกดปุ่มนี้อีกครั้ง' };
+      }
+      if (dp.status === 'unavailable') return { ok: false, reason: dp.error || 'ยังไม่มีผลจาก Autoencoder ในชุดข้อมูลนี้' };
+    }
     return { ok: true };
   }
 
@@ -1174,7 +1268,8 @@ const CoT = (() => {
       return Object.assign(model, { measure: [], dropped: [], baseline: [], finds: [], acts: [],
         empty: true, limits: ['ไม่มีสัญญาตามตัวกรองที่เปิดอยู่ จึงไม่มีตัวเลขให้ไล่เหตุผล — ล้างตัวกรองแล้วลองใหม่'] });
     }
-    const built = def.build({ rows, allRows: api.allRows(), summary: api.summary(), meta: api.meta(), opts: api.tabOpts(), L: api.labels });
+    const built = def.build({ rows, allRows: api.allRows(), summary: api.summary(), meta: api.meta(), opts: api.tabOpts(),
+      L: api.labels, deepPattern: api.deepPattern() });
     model.scope = scopeLines(rows, built.scopeExtra);
     return Object.assign(model, built);
   }

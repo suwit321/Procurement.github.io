@@ -64,6 +64,7 @@ const App = (() => {
     'tab-explain': renderExplain,
     'tab-fraud': renderFraud,
     'tab-anomaly': renderAnomaly,
+    'tab-deep': renderDeep,
     'tab-network': renderNetwork,
     'tab-contractor': renderContractor,
     'tab-agency': renderAgency,
@@ -7108,6 +7109,29 @@ ${placemarks.join('\n')}
     return { real, active, pairs, matrix, notable };
   }
 
+  /** วัดว่าคะแนน (scoreFn) จัดลำดับสัญญาที่ label(r)=true ไว้ต้น ๆ ได้ดีกว่าสุ่มแค่ไหน
+   *  แยกออกจาก renderRuleQuality (F2) เพื่อให้แท็บ "รูปแบบเชิงลึก" เรียกวัด deep_score ด้วยตรรกะเดียวกัน
+   *  ไม่คัดลอกสูตร — ผลของ F2 เดิมต้องไม่เปลี่ยนแม้แต่ตัวอักษรเดียว */
+  function evaluateProxyScore(recs, scoreFn, label) {
+    // ค่าเท่ากันเรียงด้วยลำดับคงที่ ผลจึงไม่แกว่งทุกครั้งที่วาดใหม่
+    const arr = [];
+    recs.forEach((r, i) => { const s = scoreFn(r); if (s !== null && s !== undefined) arr.push([s, label(r), i]); });
+    arr.sort((x, y) => y[0] - x[0] || x[2] - y[2]);
+    const prec = k => arr.slice(0, k).filter(x => x[1]).length / Math.min(k, arr.length);
+    // AUC แบบ Mann–Whitney โดยให้ค่าที่เท่ากันได้อันดับเฉลี่ย
+    const asc = arr.slice().sort((x, y) => x[0] - y[0]);
+    let i = 0, rankSum = 0, pos = 0;
+    while (i < asc.length) {
+      let j = i;
+      while (j + 1 < asc.length && asc[j + 1][0] === asc[i][0]) j++;
+      const avg = (i + j + 2) / 2;
+      for (let t = i; t <= j; t++) if (asc[t][1]) { rankSum += avg; pos++; }
+      i = j + 1;
+    }
+    const neg = asc.length - pos;
+    return { p100: prec(100), p500: prec(500), auc: pos && neg ? (rankSum - pos * (pos + 1) / 2) / (pos * neg) : null };
+  }
+
   function renderRuleQuality() {
     const recs = state.records;
     const { active, matrix, notable } = computeRuleOverlap(recs);
@@ -7142,25 +7166,7 @@ ${placemarks.join('\n')}
     const positives = recs.filter(label).length;
     const base = positives / recs.length;
 
-    function evaluateScore(scoreFn) {
-      // ค่าเท่ากันเรียงด้วยลำดับคงที่ ผลจึงไม่แกว่งทุกครั้งที่วาดใหม่
-      const arr = [];
-      recs.forEach((r, i) => { const s = scoreFn(r); if (s !== null && s !== undefined) arr.push([s, label(r), i]); });
-      arr.sort((x, y) => y[0] - x[0] || x[2] - y[2]);
-      const prec = k => arr.slice(0, k).filter(x => x[1]).length / Math.min(k, arr.length);
-      // AUC แบบ Mann–Whitney โดยให้ค่าที่เท่ากันได้อันดับเฉลี่ย
-      const asc = arr.slice().sort((x, y) => x[0] - y[0]);
-      let i = 0, rankSum = 0, pos = 0;
-      while (i < asc.length) {
-        let j = i;
-        while (j + 1 < asc.length && asc[j + 1][0] === asc[i][0]) j++;
-        const avg = (i + j + 2) / 2;
-        for (let t = i; t <= j; t++) if (asc[t][1]) { rankSum += avg; pos++; }
-        i = j + 1;
-      }
-      const neg = asc.length - pos;
-      return { p100: prec(100), p500: prec(500), auc: pos && neg ? (rankSum - pos * (pos + 1) / 2) / (pos * neg) : null };
-    }
+    const evaluateScore = fn => evaluateProxyScore(recs, fn, label);
     const rows = [
       { name: `คะแนนกฎ (ตัด ${enabledProxy.join(' ')} ออก)`, ...evaluateScore(leaveOut) },
       { name: 'Isolation Forest', ...evaluateScore(r => r.ml_score) },
@@ -7187,6 +7193,43 @@ ${placemarks.join('\n')}
       `· ป้ายชุดนี้คือความผิดพลาดของข้อมูล ไม่ใช่การทุจริต จึงวัดได้เพียงส่วนหนึ่ง ` +
       `การยืนยันจริงต้องใช้ผลการตรวจสอบของผู้ตรวจสอบมาเป็นป้าย ` +
       `ตัวชี้วัดชุดนี้วางไว้ให้ใช้วัดทันทีเมื่อมีป้ายนั้น และใช้เทียบก่อน-หลังทุกครั้งที่ปรับน้ำหนักกฎ`);
+  }
+
+  /* =========================================================
+     แท็บรูปแบบเชิงลึก (Deep Pattern) — Autoencoder
+     คำนวณล่วงหน้าด้วย tools/build_deep_pattern.py เป็น data/deep_pattern.json
+     โหลดเฉพาะตอนเปิดแท็บนี้เท่านั้น (lazy) แท็บอื่นต้องไม่มี request ไปไฟล์นี้เลย
+     ========================================================= */
+
+  function deepPatternApi() {
+    return {
+      rows: () => state.filtered, allRows: () => state.records,
+      meta: () => (state.payload && state.payload.meta) || {}, dataset: () => state.dataset,
+      tabId: activeTabId, markDirty: () => state.dirty.add('tab-deep'),
+      syncCot: () => CoT.syncBtn(),
+      gotoTab, openDetail, openProfile, cartKey,
+      clickable, cartBtn, workGroupLabel, truncate, mlReasonText,
+      // ใช้ตรรกะเดียวกับ F2 ในแท็บกฎ (evaluateProxyScore) ไม่คำนวณ AUC/precision ซ้ำ
+      proxyEval: scoreFn => {
+        const enabledProxy = PROXY_RULES.filter(id => state.settings[id]?.enabled !== false);
+        if (!enabledProxy.length) return null;
+        const label = r => (r.rule_hits || []).some(h => enabledProxy.includes(h.rule_id));
+        const positives = state.records.filter(label).length;
+        return { ...evaluateProxyScore(state.records, scoreFn, label),
+                 proxyRules: enabledProxy, positives, base: positives / state.records.length };
+      },
+    };
+  }
+
+  function renderDeep() {
+    loadScriptOnce('js/deeppattern.js?v=1', 'DeepPattern').then(DP => {
+      if (!DP.__wired) { DP.init(deepPatternApi()); DP.__wired = true; }
+      DP.render();
+    }).catch(err => {
+      console.error('โหลดแท็บรูปแบบเชิงลึกไม่สำเร็จ', err);
+      U.setHTML('deepLoadError', `<div class="ma-note">โหลดสคริปต์ของแท็บนี้ไม่สำเร็จ: ${U.esc(err.message)} · ลองรีเฟรชหน้า</div>`);
+      U.$('deepLoadError').hidden = false;
+    });
   }
 
   /* ---------- ส่วนเสริมในหน้าต่างรายละเอียดโครงการ ---------- */
@@ -13897,6 +13940,8 @@ ${labVocabText()}`;
       territory: () => ({ rows: terrCompute(), share: terr.share, market: terr.market }),
       mapShown: () => mapGeoRows(),
       stackGroups: () => stackGroups(),
+      // ให้ปุ่ม CoT บนแท็บรูปแบบเชิงลึกอ่านสถานะเดียวกับที่แท็บนั้นแสดง (ไม่คำนวณซ้ำ ไม่สั่งโหลดเอง)
+      deepPattern: () => (window.DeepPattern && window.DeepPattern.__wired ? window.DeepPattern.snapshot() : null),
       exportQueue: () => exportRecords(
         Analytics.auditQueue(state.filtered, { ...state.queue, capRender: Infinity }).items.map(x => x.r), 'คิวตรวจสอบ.csv'),
       // ai.cfg เป็น null จนกว่า renderAI() จะรันครั้งแรก และ aiConnReady() อ่าน ai.cfg.provider
