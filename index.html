@@ -74,48 +74,24 @@
                   title="นำเข้าข้อมูลจากไฟล์ของคุณเองหรือจาก e-GP Open Data"><span class="nav-icon" aria-hidden="true">📥</span><span class="nav-text">นำเข้าข้อมูล<em>Data Import</em></span></button></li>
         <li class="nav-head" data-cat="screening" role="presentation"><span class="nav-step" aria-hidden="true">2</span>ควรตรวจสัญญาไหนก่อน</li>
         <li class="nav-item" role="presentation" data-group="screening" data-cat="screening">
-          <button class="nav-link fraud-active" id="pill-fraud" data-bs-toggle="pill" data-bs-target="#tab-fraud"
-                  type="button" role="tab" aria-controls="tab-fraud" aria-selected="false"
-                  title="สัญญาณเตือนความเสี่ยงและสัญญาที่ควรตรวจสอบก่อน"><span class="nav-icon" aria-hidden="true">🚩</span><span class="nav-text">สัญญาณเสี่ยง<em>Red Flags</em></span><span class="nav-count" id="navCountFraud" aria-hidden="true"></span></button></li>
-        <li class="nav-item" role="presentation" data-group="screening" data-cat="screening">
-          <button class="nav-link anomaly-active" id="pill-anomaly" data-bs-toggle="pill" data-bs-target="#tab-anomaly"
-                  type="button" role="tab" aria-controls="tab-anomaly" aria-selected="false"
-                  title="ความผิดปกติเชิงสถิติ"><span class="nav-icon" aria-hidden="true">🔍</span><span class="nav-text">ความผิดปกติ<em>Anomaly Detection</em></span></button></li>
-        <li class="nav-item" role="presentation" data-group="screening" data-cat="screening">
-          <button class="nav-link" id="pill-deep" data-bs-toggle="pill" data-bs-target="#tab-deep"
-                  type="button" role="tab" aria-controls="tab-deep" aria-selected="false"
-                  title="สัญญาณจาก Autoencoder — คำนวณล่วงหน้าแยกจากข้อมูลหลัก โหลดเฉพาะตอนเปิดแท็บนี้"><span class="nav-icon" aria-hidden="true">🧬</span><span class="nav-text">รูปแบบเชิงลึก<em>Deep Pattern</em></span></button></li>
+          <button class="nav-link" id="pill-screening" data-bs-toggle="pill" data-bs-target="#tab-screening"
+                  type="button" role="tab" aria-controls="tab-screening" aria-selected="false"
+                  title="สัญญาณเตือนความเสี่ยง ความผิดปกติเชิงสถิติ และรูปแบบเชิงลึกจากโมเดล · 3 มุมมองย่อยในแท็บเดียว"><span class="nav-icon" aria-hidden="true">🚩</span><span class="nav-text">สัญญาณเสี่ยง<em>Risk Signals</em></span></button></li>
         <li class="nav-head" data-cat="deepdive" role="presentation"><span class="nav-step" aria-hidden="true">3</span>ผู้เล่นรายนี้เป็นอย่างไร</li>
         <li class="nav-item" role="presentation" data-group="deepdive" data-cat="deepdive">
-          <button class="nav-link contractor-active" id="pill-contractor" data-bs-toggle="pill" data-bs-target="#tab-contractor"
-                  type="button" role="tab" aria-controls="tab-contractor" aria-selected="false"
-                  title="การจัดลำดับความเสี่ยงผู้รับจ้าง"><span class="nav-icon" aria-hidden="true">🏗️</span><span class="nav-text">ผู้รับจ้าง<em>Contractors</em></span></button></li>
-        <li class="nav-item" role="presentation" data-group="deepdive" data-cat="deepdive">
-          <button class="nav-link" id="pill-agency" data-bs-toggle="pill" data-bs-target="#tab-agency"
-                  type="button" role="tab" aria-controls="tab-agency" aria-selected="false"
-                  title="โปรไฟล์และการจัดอันดับหน่วยงานจัดซื้อ"><span class="nav-icon" aria-hidden="true">🏛️</span><span class="nav-text">หน่วยงาน<em>Agencies</em></span></button></li>
-        <li class="nav-item" role="presentation" data-group="deepdive" data-cat="deepdive">
-          <button class="nav-link" id="pill-network" data-bs-toggle="pill" data-bs-target="#tab-network"
-                  type="button" role="tab" aria-controls="tab-network" aria-selected="false"
-                  title="เครือข่ายความสัมพันธ์หน่วยงานกับผู้รับจ้าง"><span class="nav-icon" aria-hidden="true">🕸️</span><span class="nav-text">เครือข่ายความสัมพันธ์<em>Network Analysis</em></span></button></li>
+          <button class="nav-link" id="pill-players" data-bs-toggle="pill" data-bs-target="#tab-players"
+                  type="button" role="tab" aria-controls="tab-players" aria-selected="false"
+                  title="จัดลำดับความเสี่ยงผู้รับจ้าง หน่วยงาน และเครือข่ายความสัมพันธ์ระหว่างกัน · 3 มุมมองย่อยในแท็บเดียว"><span class="nav-icon" aria-hidden="true">🏗️</span><span class="nav-text">ผู้รับจ้าง/หน่วยงาน<em>Players</em></span></button></li>
         <li class="nav-head" data-cat="context" role="presentation"><span class="nav-step" aria-hidden="true">4</span>เกิดที่ไหน เกิดเมื่อไร</li>
         <li class="nav-item" role="presentation" data-group="context" data-cat="context">
-          <button class="nav-link" id="pill-explain" data-bs-toggle="pill" data-bs-target="#tab-explain"
-                  type="button" role="tab" aria-controls="tab-explain" aria-selected="false"
-                  title="รายโครงการพร้อมแผนที่เชิงพื้นที่"><span class="nav-icon" aria-hidden="true">🗺️</span><span class="nav-text">แผนที่รายโครงการ<em>GIS</em></span></button></li>
-        <li class="nav-item" role="presentation" data-group="context" data-cat="context">
-          <button class="nav-link" id="pill-time" data-bs-toggle="pill" data-bs-target="#tab-time"
-                  type="button" role="tab" aria-controls="tab-time" aria-selected="false"
-                  title="แนวโน้มตามช่วงเวลา"><span class="nav-icon" aria-hidden="true">📅</span><span class="nav-text">แนวโน้มตามเวลา<em>Time Series</em></span></button></li>
+          <button class="nav-link" id="pill-context" data-bs-toggle="pill" data-bs-target="#tab-context"
+                  type="button" role="tab" aria-controls="tab-context" aria-selected="false"
+                  title="แผนที่รายโครงการเชิงพื้นที่ และแนวโน้มตามช่วงเวลา · 2 มุมมองย่อยในแท็บเดียว"><span class="nav-icon" aria-hidden="true">🗺️</span><span class="nav-text">พื้นที่และเวลา<em>Place · Time</em></span></button></li>
         <li class="nav-head" data-cat="about" role="presentation"><span class="nav-step" aria-hidden="true">5</span>ระบบคิดคะแนนอย่างไร</li>
         <li class="nav-item" role="presentation" data-group="about" data-cat="about">
-          <button class="nav-link" id="pill-rules" data-bs-toggle="pill" data-bs-target="#tab-rules"
-                  type="button" role="tab" aria-controls="tab-rules" aria-selected="false"
-                  title="ตารางอธิบายกฎและการปรับเงื่อนไข"><span class="nav-icon" aria-hidden="true">⚖️</span><span class="nav-text">กฎการตรวจจับ<em>Rules</em></span><span class="nav-count" id="navCountRules" aria-hidden="true"></span></button></li>
-        <li class="nav-item" role="presentation" data-group="about" data-cat="about">
-          <button class="nav-link demo-active" id="pill-demo" data-bs-toggle="pill" data-bs-target="#tab-demo"
-                  type="button" role="tab" aria-controls="tab-demo" aria-selected="false"
-                  title="ส่วนสาธิตที่ใช้ข้อมูลสังเคราะห์"><span class="nav-icon" aria-hidden="true">🧪</span><span class="nav-text">ตัวอย่างสาธิต<em>Demo</em></span></button></li>
+          <button class="nav-link" id="pill-about" data-bs-toggle="pill" data-bs-target="#tab-about"
+                  type="button" role="tab" aria-controls="tab-about" aria-selected="false"
+                  title="ตารางอธิบายกฎ ปรับเงื่อนไข และตัวอย่างสาธิตด้วยข้อมูลสังเคราะห์ · 2 มุมมองย่อยในแท็บเดียว"><span class="nav-icon" aria-hidden="true">⚖️</span><span class="nav-text">กฎการตรวจจับ<em>Rules · Demo</em></span></button></li>
         <li class="nav-head" data-cat="ai" role="presentation"><span class="nav-step" aria-hidden="true">6</span>ให้ AI ช่วยวิเคราะห์</li>
         <li class="nav-item" role="presentation" data-group="ai" data-cat="ai">
           <button class="nav-link" id="pill-ai" data-bs-toggle="pill" data-bs-target="#tab-ai"
@@ -463,8 +439,14 @@
         </section>
       </div>
 
-      <!-- ============ GIS / รายโครงการ + แผนที่ ============ -->
-      <div class="tab-pane fade" id="tab-explain" role="tabpanel" aria-labelledby="pill-explain" tabindex="0">
+      <!-- ============ Context: แผนที่รายโครงการ / แนวโน้มตามเวลา ============ -->
+      <div class="tab-pane fade" id="tab-context" role="tabpanel" aria-labelledby="pill-context" tabindex="0">
+        <ul class="nav subtab-strip" role="tablist" aria-label="มุมมองย่อยของพื้นที่และเวลา">
+          <li class="nav-item" role="presentation"><button class="subtab-btn active" id="pill-explain" data-bs-toggle="pill" data-bs-target="#tab-explain" type="button" role="tab" aria-controls="tab-explain" aria-selected="true" title="รายโครงการพร้อมแผนที่เชิงพื้นที่"><span aria-hidden="true">🗺️</span> แผนที่รายโครงการ</button></li>
+          <li class="nav-item" role="presentation"><button class="subtab-btn" id="pill-time" data-bs-toggle="pill" data-bs-target="#tab-time" type="button" role="tab" aria-controls="tab-time" aria-selected="false" title="แนวโน้มตามช่วงเวลา"><span aria-hidden="true">📅</span> แนวโน้มตามเวลา</button></li>
+        </ul>
+        <div class="tab-content">
+<div class="tab-pane fade show active" id="tab-explain" role="tabpanel" aria-labelledby="pill-explain" tabindex="0">
         <div class="row g-3">
 
           <!-- แผนที่กว้างเต็มแถว ตัวควบคุมลอยอยู่บนแผนที่ ตัวเลือกที่ใช้น้อยอยู่ในแผงที่เปิดเมื่อกด -->
@@ -684,8 +666,60 @@
         </div>
       </div>
 
-      <!-- ============ Red Flags ============ -->
-      <div class="tab-pane fade" id="tab-fraud" role="tabpanel" aria-labelledby="pill-fraud" tabindex="0">
+<div class="tab-pane fade" id="tab-time" role="tabpanel" aria-labelledby="pill-time" tabindex="0">
+        <div class="cardx p-3 mb-3 section-block">
+          <h2 class="visually-hidden">ตัวเลือกการแสดงแนวโน้ม</h2>
+          <div class="section-label" aria-hidden="true">ตัวเลือกการแสดงผล</div>
+          <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="tsDimension">แยกตาม</label>
+              <select class="form-select form-select-sm" id="tsDimension">
+                <option value="purchase_method_name">วิธีจัดหา</option>
+                <option value="project_type_name">ประเภทโครงการ</option>
+                <option value="risk_band">ระดับความเสี่ยง</option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label" for="tsMetric">แสดงค่า</label>
+              <select class="form-select form-select-sm" id="tsMetric">
+                <option value="counts">จำนวนสัญญา</option>
+                <option value="values">มูลค่าสัญญา</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="cardx p-3 mb-3">
+          <div class="card-title-row"><h2 class="h6 mb-0">แนวโน้มรายเดือน</h2>
+            <span class="badge badge-real">ข้อมูลจริง</span></div>
+          <div class="small-muted mb-2" id="tsNote"></div>
+          <div id="timeChart" style="height:420px" role="img"
+               aria-label="กราฟเส้นแนวโน้มรายเดือนตามมิติที่เลือก"></div>
+        </div>
+        <div class="cardx p-3" data-collapse-id="timeTableCard" data-collapse-default="closed">
+          <div class="card-title-row"><h2 class="h6 mb-0">สรุปรายเดือน</h2>
+            <span class="badge badge-derived">คำนวณ</span></div>
+          <p class="small-muted mb-2">แถวที่ไฮไลต์คือเดือนที่มีจำนวนสัญญาสูงสุด</p>
+          <div class="table-wrap"><table class="table table-sm mini-table mb-0">
+            <caption class="visually-hidden">สรุปจำนวนและมูลค่าสัญญารายเดือน</caption>
+            <thead><tr><th scope="col">เดือน</th><th scope="col" class="text-end">สัญญา</th>
+              <th scope="col" class="text-end">มูลค่า</th><th scope="col" class="text-end">เข้าเงื่อนไข</th>
+              <th scope="col" class="text-end">คะแนนเฉลี่ย</th></tr></thead>
+            <tbody id="tsMonthBody"></tbody></table></div>
+        </div>
+      </div>
+        </div>
+      </div>
+
+
+      <!-- ============ Screening: สัญญาณเสี่ยง / ความผิดปกติ / รูปแบบเชิงลึก ============ -->
+      <div class="tab-pane fade" id="tab-screening" role="tabpanel" aria-labelledby="pill-screening" tabindex="0">
+        <ul class="nav subtab-strip" role="tablist" aria-label="มุมมองย่อยของสัญญาณเสี่ยง">
+          <li class="nav-item" role="presentation"><button class="subtab-btn active" id="pill-fraud" data-bs-toggle="pill" data-bs-target="#tab-fraud" type="button" role="tab" aria-controls="tab-fraud" aria-selected="true" title="สัญญาณเตือนความเสี่ยงและสัญญาที่ควรตรวจสอบก่อน"><span aria-hidden="true">🚩</span> สัญญาณเสี่ยง<span class="nav-count" id="navCountFraud" aria-hidden="true"></span></button></li>
+          <li class="nav-item" role="presentation"><button class="subtab-btn" id="pill-anomaly" data-bs-toggle="pill" data-bs-target="#tab-anomaly" type="button" role="tab" aria-controls="tab-anomaly" aria-selected="false" title="ความผิดปกติเชิงสถิติ"><span aria-hidden="true">🔍</span> ความผิดปกติ</button></li>
+          <li class="nav-item" role="presentation"><button class="subtab-btn" id="pill-deep" data-bs-toggle="pill" data-bs-target="#tab-deep" type="button" role="tab" aria-controls="tab-deep" aria-selected="false" title="สัญญาณจาก Autoencoder — คำนวณล่วงหน้าแยกจากข้อมูลหลัก โหลดเฉพาะตอนเปิดแท็บนี้"><span aria-hidden="true">🧬</span> รูปแบบเชิงลึก</button></li>
+        </ul>
+        <div class="tab-content">
+<div class="tab-pane fade show active" id="tab-fraud" role="tabpanel" aria-labelledby="pill-fraud" tabindex="0">
         <div class="hero-fraud mb-3">
           <h1 class="h5 mb-2">สัญญาณเตือนความเสี่ยงทุจริต</h1>
           <div class="small">จัดกลุ่มตามมิติของสัญญาณ ทุกตัวเลขคำนวณสดจากชุดข้อมูลที่กรองอยู่
@@ -796,8 +830,7 @@
         </div>
       </div>
 
-      <!-- ============ Anomaly Detection ============ -->
-      <div class="tab-pane fade" id="tab-anomaly" role="tabpanel" aria-labelledby="pill-anomaly" tabindex="0">
+<div class="tab-pane fade" id="tab-anomaly" role="tabpanel" aria-labelledby="pill-anomaly" tabindex="0">
         <div class="hero-anomaly mb-3">
           <h1 class="h5 mb-2">ความผิดปกติเชิงสถิติ</h1>
           <div class="small">โมเดลที่ไม่ใช้กฎ R1-R22 เลย เพื่อหาสิ่งที่ชุดกฎมองไม่เห็น
@@ -960,11 +993,7 @@
         </div>
       </div>
 
-      <!-- ============ Deep Pattern (Autoencoder) ============
-           คำนวณล่วงหน้าด้วย tools/build_deep_pattern.py เป็น data/deep_pattern.json
-           ไฟล์นี้ "ไม่" ถูกโหลดตอนเปิดแอป — js/deeppattern.js + data/deep_pattern.json โหลดเฉพาะตอนเปิดแท็บนี้ (ดู renderDeep ใน app.js)
-           โครง DOM เป็น static ทั้งหมด (รวม data-collapse-id ถ้ามี) เพราะสคริปต์ที่ผูก event ตอนบูตทำงานครั้งเดียว -->
-      <div class="tab-pane fade" id="tab-deep" role="tabpanel" aria-labelledby="pill-deep" tabindex="0">
+<div class="tab-pane fade" id="tab-deep" role="tabpanel" aria-labelledby="pill-deep" tabindex="0">
         <div class="hero-anomaly mb-3">
           <h1 class="h5 mb-2">รูปแบบเชิงลึก · Autoencoder</h1>
           <div class="small">โมเดลอีกตัวที่ไม่ใช้กฎ R1-R22 และไม่ใช้ผลของ Isolation Forest เลย
@@ -1043,9 +1072,325 @@
           <code class="d-block small">python tools/build_deep_pattern.py --input raw_data.csv</code>
         </section>
       </div>
+        </div>
+      </div>
 
-      <!-- ============ Network Analysis ============ -->
-      <div class="tab-pane fade" id="tab-network" role="tabpanel" aria-labelledby="pill-network" tabindex="0">
+
+      <!-- ============ Anomaly Detection ============ -->
+      
+
+      <!-- ============ Deep Pattern (Autoencoder) ============
+           คำนวณล่วงหน้าด้วย tools/build_deep_pattern.py เป็น data/deep_pattern.json
+           ไฟล์นี้ "ไม่" ถูกโหลดตอนเปิดแอป — js/deeppattern.js + data/deep_pattern.json โหลดเฉพาะตอนเปิดแท็บนี้ (ดู renderDeep ใน app.js)
+           โครง DOM เป็น static ทั้งหมด (รวม data-collapse-id ถ้ามี) เพราะสคริปต์ที่ผูก event ตอนบูตทำงานครั้งเดียว -->
+      
+
+      <!-- ============ Players: ผู้รับจ้าง / หน่วยงาน / เครือข่ายความสัมพันธ์ ============ -->
+      <div class="tab-pane fade" id="tab-players" role="tabpanel" aria-labelledby="pill-players" tabindex="0">
+        <ul class="nav subtab-strip" role="tablist" aria-label="มุมมองย่อยของผู้เล่นในตลาด">
+          <li class="nav-item" role="presentation"><button class="subtab-btn active" id="pill-contractor" data-bs-toggle="pill" data-bs-target="#tab-contractor" type="button" role="tab" aria-controls="tab-contractor" aria-selected="true" title="การจัดลำดับความเสี่ยงผู้รับจ้าง"><span aria-hidden="true">🏗️</span> ผู้รับจ้าง</button></li>
+          <li class="nav-item" role="presentation"><button class="subtab-btn" id="pill-agency" data-bs-toggle="pill" data-bs-target="#tab-agency" type="button" role="tab" aria-controls="tab-agency" aria-selected="false" title="โปรไฟล์และการจัดอันดับหน่วยงานจัดซื้อ"><span aria-hidden="true">🏛️</span> หน่วยงาน</button></li>
+          <li class="nav-item" role="presentation"><button class="subtab-btn" id="pill-network" data-bs-toggle="pill" data-bs-target="#tab-network" type="button" role="tab" aria-controls="tab-network" aria-selected="false" title="เครือข่ายความสัมพันธ์หน่วยงานกับผู้รับจ้าง"><span aria-hidden="true">🕸️</span> เครือข่ายความสัมพันธ์</button></li>
+        </ul>
+        <div class="tab-content">
+<div class="tab-pane fade show active" id="tab-contractor" role="tabpanel" aria-labelledby="pill-contractor" tabindex="0">
+        <div class="hero-contractor mb-3">
+          <h1 class="h5 mb-2">การจัดลำดับความเสี่ยงผู้รับจ้าง</h1>
+          <div class="small" id="contractorWeightNote">ประเมิน 5 มิติ ทุกมิติอยู่บนสเกล 0-100 เท่ากัน
+            ถ่วงน้ำหนัก เครือข่าย 30% · ราคา 20% · การแข่งขัน 20% · สัญญา 20% · การกระจุกตัว 10%</div>
+        </div>
+        <div class="warn-note mb-3" role="note">
+          คะแนนนี้ใช้เพื่อจัดลำดับความสำคัญในการตรวจสอบเท่านั้น ไม่ใช่ข้อสรุปว่ามีการกระทำผิด
+          ทุกกรณีต้องตรวจสอบเอกสารประกอบก่อน
+        </div>
+
+        <section aria-labelledby="contractorKpiHeading" class="mb-3">
+          <h2 class="visually-hidden" id="contractorKpiHeading">ตัวชี้วัดผู้รับจ้าง</h2>
+          <div class="row g-3 analytics-kpi-grid" id="contractorKpis"></div>
+        </section>
+
+        <div class="row g-3">
+          <div class="col-xl-4">
+            <div class="cardx p-3 h-100">
+              <div class="section-label" aria-hidden="true">ตัวกรองผู้รับจ้าง</div>
+              <div class="row g-2 mb-2">
+                <div class="col-12">
+                  <label class="form-label" for="contractorSearch">ค้นหาผู้รับจ้าง</label>
+                  <input class="form-control form-control-sm" id="contractorSearch" type="search" placeholder="ชื่อผู้รับจ้าง">
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="contractorRiskMin">คะแนน ≥ <span id="contractorRiskMinLabel">0</span></label>
+                  <input class="form-range" id="contractorRiskMin" type="range" min="0" max="80" step="5" value="0"
+                         aria-describedby="contractorRiskMinLabel">
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="contractorContractMin">สัญญา ≥ <span id="contractorContractMinLabel">1</span></label>
+                  <input class="form-range" id="contractorContractMin" type="range" min="1" max="50" step="1" value="1"
+                         aria-describedby="contractorContractMinLabel">
+                </div>
+              </div>
+              <div class="card-title-row"><h2 class="h6 mb-0">ลำดับที่ควรตรวจสอบ</h2>
+                <span class="small-muted" id="contractorCount"></span></div>
+              <div id="contractorRankList" class="list-box contractor-list" role="list"
+                   aria-label="ผู้รับจ้างเรียงตามคะแนนความเสี่ยง"></div>
+            </div>
+          </div>
+          <div class="col-xl-8">
+            <div class="row g-3">
+              <div class="col-md-7">
+                <div class="cardx p-3 h-100">
+                  <div class="card-title-row"><h2 class="h6 mb-0">ข้อมูลผู้รับจ้าง</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="contractorProfile"></div>
+                </div>
+              </div>
+              <div class="col-md-5">
+                <div class="cardx p-3 h-100" data-collapse-id="conRadarCard" data-collapse-default="closed">
+                  <h2 class="h6">องค์ประกอบคะแนน 5 มิติ</h2>
+                  <p class="small-muted mb-2">ทุกแกนอยู่บนสเกล 0-100 เท่ากัน</p>
+                  <div id="contractorRiskChart" style="height:300px" role="img"
+                       aria-label="แผนภูมิเรดาร์องค์ประกอบคะแนนความเสี่ยง 5 มิติ"></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="cardx p-3 h-100" data-collapse-id="conAgenciesCard" data-collapse-default="closed">
+                  <h2 class="h6">หน่วยงานที่ทำสัญญาด้วย</h2>
+                  <div class="table-wrap"><table class="table table-sm mini-table mb-0">
+                    <caption class="visually-hidden">หน่วยงานที่ผู้รับจ้างรายนี้ทำสัญญาด้วย</caption>
+                    <thead><tr><th scope="col">หน่วยงาน</th><th scope="col" class="text-end">มูลค่า</th>
+                      <th scope="col" class="text-end">สัญญา</th><th scope="col" class="text-end">สัดส่วน</th></tr></thead>
+                    <tbody id="contractorPairBody"></tbody></table></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="cardx p-3 h-100" data-collapse-id="conContractsCard" data-collapse-default="closed">
+                  <h2 class="h6">สัญญาที่ควรตรวจสอบ</h2>
+                  <div class="table-wrap"><table class="table table-sm mini-table mb-0">
+                    <caption class="visually-hidden">สัญญาของผู้รับจ้างรายนี้เรียงตามคะแนนความเสี่ยง</caption>
+                    <thead><tr><th scope="col">โครงการ</th><th scope="col" class="text-end">มูลค่า</th>
+                      <th scope="col" class="text-end">คะแนน</th></tr></thead>
+                    <tbody id="contractorCaseBody"></tbody></table></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="cardx p-3" data-collapse-id="conTypeCard" data-collapse-default="open">
+                  <div class="card-title-row"><h2 class="h6 mb-0">ประเภทงานและความถนัด</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="contractorTypes"></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="cardx p-3" data-collapse-id="conTimingCard" data-collapse-default="open">
+                  <div class="card-title-row"><h2 class="h6 mb-0">จังหวะเวลาของสัญญา (เทียบปีงบประมาณ)</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="contractorTiming"></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="cardx p-3" data-collapse-id="conBidCard" data-collapse-default="open">
+                  <div class="card-title-row"><h2 class="h6 mb-0">สัญญาณการแข่งขัน</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="contractorBids"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mt-0">
+          <div class="col-lg-7">
+            <div class="cardx p-3 h-100" data-collapse-id="conUnderbidCard" data-collapse-default="closed">
+              <div class="card-title-row"><h2 class="h6 mb-0">ลดราคาน้อยกว่าสนามของตัวเองมากที่สุด</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">"สนาม" คือสัญญาที่วิธีจัดหาและประเภทโครงการเดียวกัน
+                รายการนี้ดูทั้งชุดข้อมูลให้เลย ไม่ต้องเปิดดูทีละราย · กดที่แถวเพื่อเปิดข้อมูลรายนั้นด้านบน</p>
+              <div class="terr-controls">
+                <label>สัญญาที่เทียบได้ ≥
+                  <select class="form-select form-select-sm" id="ubMin">
+                    <option value="3" selected>3</option><option value="5">5</option><option value="10">10</option>
+                  </select></label>
+                <label>มูลค่ารวม ≥
+                  <select class="form-select form-select-sm" id="ubValue">
+                    <option value="0" selected>ไม่จำกัด</option><option value="10000000">10 ล้าน</option>
+                    <option value="50000000">50 ล้าน</option><option value="100000000">100 ล้าน</option>
+                  </select></label>
+                <label>เรียงตาม
+                  <select class="form-select form-select-sm" id="ubSort">
+                    <option value="rel" selected>ต่ำกว่าสนามมากสุด</option>
+                    <option value="gap">ส่วนต่างเป็นเงิน</option>
+                    <option value="value">มูลค่ารวม</option>
+                  </select></label>
+              </div>
+              <div id="conUnderbid"></div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="cardx p-3 h-100" data-collapse-id="conJvCard" data-collapse-default="closed">
+              <div class="card-title-row"><h2 class="h6 mb-0">กิจการค้าร่วม (JV)</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <div id="conJv"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- เปรียบเทียบผู้รับจ้าง 2 ราย: ฝังตรงในแท็บให้เห็นทันทีที่เปิด ไม่ต้องกดปุ่มเข้าไปดูใน modal อีกต่อไป -->
+        <div class="row g-3 mt-0">
+          <div class="col-12">
+            <div class="cardx p-3">
+              <div class="card-title-row"><h2 class="h6 mb-0">เปรียบเทียบผู้รับจ้าง 2 ราย</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">ค่าเริ่มต้นคือสองอันดับแรกตามคะแนนความเสี่ยงภายใต้ตัวกรองปัจจุบัน
+                เปลี่ยนได้จากช่องเลือกด้านล่าง</p>
+              <div class="row g-2 compare-picker mb-2">
+                <div class="col-6">
+                  <label class="form-label" for="ccSelectA">รายการที่ 1</label>
+                  <select class="form-select form-select-sm" id="ccSelectA"></select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="ccSelectB">รายการที่ 2</label>
+                  <select class="form-select form-select-sm" id="ccSelectB"></select>
+                </div>
+              </div>
+              <div id="ccCompareBody"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<div class="tab-pane fade" id="tab-agency" role="tabpanel" aria-labelledby="pill-agency" tabindex="0">
+        <nav class="ag-views" aria-label="มุมมองของแท็บหน่วยงาน">
+          <button type="button" class="ag-view is-on" data-ag-view="overview" aria-pressed="true">🏛️ ภาพรวมหน่วยงาน</button>
+          <button type="button" class="ag-view" data-ag-view="method" aria-pressed="false">🔎 วิเคราะห์เชิงลึกวิธีจัดหา</button>
+        </nav>
+
+        <div data-ag-pane="overview">
+        <div class="hero mb-3">
+          <h1 class="h5 mb-2">โปรไฟล์และการจัดอันดับหน่วยงานจัดซื้อ</h1>
+          <div class="small" id="agencyLevelNote">นับที่ระดับกรม (รวมทุกสาขาเข้าด้วยกัน) — สลับเป็นระดับสาขาได้จากตัวกรองด้านซ้าย</div>
+        </div>
+        <div class="warn-note mb-3" role="note">
+          ตัวเลขในหน้านี้เป็นการสรุปข้อมูลที่มีอยู่จริง ไม่ใช่คะแนนความเสี่ยงหรือข้อสรุปว่าหน่วยงานใดกระทำผิด
+          ชุดข้อมูลนี้ไม่มีจำนวนผู้เสนอราคา จึงตอบได้เพียงว่า "ให้ใครได้งานด้วยวิธีอะไร" ไม่ใช่ "เหตุใดรายนั้นจึงชนะ"
+        </div>
+
+        <section aria-labelledby="agencyKpiHeading" class="mb-3">
+          <h2 class="visually-hidden" id="agencyKpiHeading">ตัวชี้วัดหน่วยงาน</h2>
+          <div class="row g-3 analytics-kpi-grid" id="agencyKpis"></div>
+        </section>
+
+        <div class="row g-3">
+          <div class="col-xl-4">
+            <div class="cardx p-3 h-100">
+              <div class="section-label" aria-hidden="true">ตัวกรองหน่วยงาน</div>
+              <div class="row g-2 mb-2">
+                <div class="col-12">
+                  <label class="form-label" for="agencySearch">ค้นหาหน่วยงาน</label>
+                  <input class="form-control form-control-sm" id="agencySearch" type="search" placeholder="ชื่อหน่วยงาน">
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="agencyLevel">นับที่ระดับ</label>
+                  <select class="form-select form-select-sm" id="agencyLevel">
+                    <option value="agency" selected>กรม/หน่วยงานต้นสังกัด</option>
+                    <option value="sub">หน่วยงานย่อย/สาขา</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="agencyContractMin">สัญญา ≥ <span id="agencyContractMinLabel">1</span></label>
+                  <input class="form-range" id="agencyContractMin" type="range" min="1" max="50" step="1" value="1"
+                         aria-describedby="agencyContractMinLabel">
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="agencyHhiMin">HHI ≥ <span id="agencyHhiMinLabel">0</span></label>
+                  <input class="form-range" id="agencyHhiMin" type="range" min="0" max="10000" step="500" value="0"
+                         aria-describedby="agencyHhiMinLabel">
+                </div>
+              </div>
+              <div class="card-title-row"><h2 class="h6 mb-0">เรียงตามมูลค่ารวม</h2>
+                <span class="small-muted" id="agencyCount"></span></div>
+              <div id="agencyRankList" class="list-box contractor-list" role="list"
+                   aria-label="หน่วยงานเรียงตามมูลค่ารวม"></div>
+            </div>
+          </div>
+          <div class="col-xl-8">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="cardx p-3 h-100">
+                  <div class="card-title-row"><h2 class="h6 mb-0">ข้อมูลหน่วยงาน</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="agencyProfile"></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="cardx p-3" data-collapse-id="agContractorsCard" data-collapse-default="open">
+                  <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างที่ได้งาน</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="agencyContractors"></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="cardx p-3 h-100" data-collapse-id="agMethodsCard" data-collapse-default="open">
+                  <div class="card-title-row"><h2 class="h6 mb-0">วิธีจัดหาที่ใช้</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="agencyMethods"></div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="cardx p-3 h-100" data-collapse-id="agTypesCard" data-collapse-default="open">
+                  <div class="card-title-row"><h2 class="h6 mb-0">ประเภทงาน/กลุ่มงาน</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="agencyTypes"></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="cardx p-3" data-collapse-id="agTimingCard" data-collapse-default="closed">
+                  <div class="card-title-row"><h2 class="h6 mb-0">จังหวะเวลาของสัญญา (เทียบปีงบประมาณ)</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="agencyTiming"></div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="cardx p-3" data-collapse-id="agLoyaltyCard" data-collapse-default="closed">
+                  <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างรายใหม่เทียบรายเดิม</h2>
+                    <span class="badge badge-derived">คำนวณ</span></div>
+                  <div id="agencyLoyalty"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- เปรียบเทียบหน่วยงาน 2 แห่ง: ฝังตรงในแท็บให้เห็นทันทีที่เปิด เหมือนที่แท็บผู้รับจ้างทำไว้ -->
+        <div class="row g-3 mt-0">
+          <div class="col-12">
+            <div class="cardx p-3">
+              <div class="card-title-row"><h2 class="h6 mb-0">เปรียบเทียบหน่วยงาน 2 แห่ง</h2>
+                <span class="badge badge-derived">คำนวณ</span></div>
+              <p class="small-muted mb-2">ค่าเริ่มต้นคือสองอันดับแรกตามมูลค่ารวมภายใต้ตัวกรองปัจจุบัน (นับที่ระดับกรมเสมอ)
+                เปลี่ยนได้จากช่องเลือกด้านล่าง</p>
+              <div class="row g-2 compare-picker mb-2">
+                <div class="col-6">
+                  <label class="form-label" for="agComparSelectA">รายการที่ 1</label>
+                  <select class="form-select form-select-sm" id="agComparSelectA"></select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="agComparSelectB">รายการที่ 2</label>
+                  <select class="form-select form-select-sm" id="agComparSelectB"></select>
+                </div>
+              </div>
+              <div id="agComparBody"></div>
+            </div>
+          </div>
+        </div>
+        </div><!-- /data-ag-pane="overview" -->
+
+        <!-- แท็บย่อย: วิเคราะห์เชิงลึกวิธีจัดหา (3E + Integrity ตามแนว INTOSAI GUID 5280) -->
+        <div data-ag-pane="method" hidden>
+          <div class="method-scope" id="agMethodScope"></div>
+          <div id="agMethodBody"></div>
+        </div>
+      </div>
+
+<div class="tab-pane fade" id="tab-network" role="tabpanel" aria-labelledby="pill-network" tabindex="0">
 
         <div class="hero-network mb-3">
           <h1 class="h5 mb-2">เครือข่ายหน่วยงานกับผู้รับจ้าง</h1>
@@ -1390,351 +1735,21 @@
           </div>
         </div>
       </div>
+        </div>
+      </div>
+
 
       <!-- ============ Contractors ============ -->
-      <div class="tab-pane fade" id="tab-contractor" role="tabpanel" aria-labelledby="pill-contractor" tabindex="0">
-        <div class="hero-contractor mb-3">
-          <h1 class="h5 mb-2">การจัดลำดับความเสี่ยงผู้รับจ้าง</h1>
-          <div class="small" id="contractorWeightNote">ประเมิน 5 มิติ ทุกมิติอยู่บนสเกล 0-100 เท่ากัน
-            ถ่วงน้ำหนัก เครือข่าย 30% · ราคา 20% · การแข่งขัน 20% · สัญญา 20% · การกระจุกตัว 10%</div>
-        </div>
-        <div class="warn-note mb-3" role="note">
-          คะแนนนี้ใช้เพื่อจัดลำดับความสำคัญในการตรวจสอบเท่านั้น ไม่ใช่ข้อสรุปว่ามีการกระทำผิด
-          ทุกกรณีต้องตรวจสอบเอกสารประกอบก่อน
-        </div>
+      
 
-        <section aria-labelledby="contractorKpiHeading" class="mb-3">
-          <h2 class="visually-hidden" id="contractorKpiHeading">ตัวชี้วัดผู้รับจ้าง</h2>
-          <div class="row g-3 analytics-kpi-grid" id="contractorKpis"></div>
-        </section>
-
-        <div class="row g-3">
-          <div class="col-xl-4">
-            <div class="cardx p-3 h-100">
-              <div class="section-label" aria-hidden="true">ตัวกรองผู้รับจ้าง</div>
-              <div class="row g-2 mb-2">
-                <div class="col-12">
-                  <label class="form-label" for="contractorSearch">ค้นหาผู้รับจ้าง</label>
-                  <input class="form-control form-control-sm" id="contractorSearch" type="search" placeholder="ชื่อผู้รับจ้าง">
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="contractorRiskMin">คะแนน ≥ <span id="contractorRiskMinLabel">0</span></label>
-                  <input class="form-range" id="contractorRiskMin" type="range" min="0" max="80" step="5" value="0"
-                         aria-describedby="contractorRiskMinLabel">
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="contractorContractMin">สัญญา ≥ <span id="contractorContractMinLabel">1</span></label>
-                  <input class="form-range" id="contractorContractMin" type="range" min="1" max="50" step="1" value="1"
-                         aria-describedby="contractorContractMinLabel">
-                </div>
-              </div>
-              <div class="card-title-row"><h2 class="h6 mb-0">ลำดับที่ควรตรวจสอบ</h2>
-                <span class="small-muted" id="contractorCount"></span></div>
-              <div id="contractorRankList" class="list-box contractor-list" role="list"
-                   aria-label="ผู้รับจ้างเรียงตามคะแนนความเสี่ยง"></div>
-            </div>
-          </div>
-          <div class="col-xl-8">
-            <div class="row g-3">
-              <div class="col-md-7">
-                <div class="cardx p-3 h-100">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ข้อมูลผู้รับจ้าง</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorProfile"></div>
-                </div>
-              </div>
-              <div class="col-md-5">
-                <div class="cardx p-3 h-100" data-collapse-id="conRadarCard" data-collapse-default="closed">
-                  <h2 class="h6">องค์ประกอบคะแนน 5 มิติ</h2>
-                  <p class="small-muted mb-2">ทุกแกนอยู่บนสเกล 0-100 เท่ากัน</p>
-                  <div id="contractorRiskChart" style="height:300px" role="img"
-                       aria-label="แผนภูมิเรดาร์องค์ประกอบคะแนนความเสี่ยง 5 มิติ"></div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="cardx p-3 h-100" data-collapse-id="conAgenciesCard" data-collapse-default="closed">
-                  <h2 class="h6">หน่วยงานที่ทำสัญญาด้วย</h2>
-                  <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-                    <caption class="visually-hidden">หน่วยงานที่ผู้รับจ้างรายนี้ทำสัญญาด้วย</caption>
-                    <thead><tr><th scope="col">หน่วยงาน</th><th scope="col" class="text-end">มูลค่า</th>
-                      <th scope="col" class="text-end">สัญญา</th><th scope="col" class="text-end">สัดส่วน</th></tr></thead>
-                    <tbody id="contractorPairBody"></tbody></table></div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="cardx p-3 h-100" data-collapse-id="conContractsCard" data-collapse-default="closed">
-                  <h2 class="h6">สัญญาที่ควรตรวจสอบ</h2>
-                  <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-                    <caption class="visually-hidden">สัญญาของผู้รับจ้างรายนี้เรียงตามคะแนนความเสี่ยง</caption>
-                    <thead><tr><th scope="col">โครงการ</th><th scope="col" class="text-end">มูลค่า</th>
-                      <th scope="col" class="text-end">คะแนน</th></tr></thead>
-                    <tbody id="contractorCaseBody"></tbody></table></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="conTypeCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ประเภทงานและความถนัด</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorTypes"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="conTimingCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">จังหวะเวลาของสัญญา (เทียบปีงบประมาณ)</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorTiming"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="conBidCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">สัญญาณการแข่งขัน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="contractorBids"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3 mt-0">
-          <div class="col-lg-7">
-            <div class="cardx p-3 h-100" data-collapse-id="conUnderbidCard" data-collapse-default="closed">
-              <div class="card-title-row"><h2 class="h6 mb-0">ลดราคาน้อยกว่าสนามของตัวเองมากที่สุด</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <p class="small-muted mb-2">"สนาม" คือสัญญาที่วิธีจัดหาและประเภทโครงการเดียวกัน
-                รายการนี้ดูทั้งชุดข้อมูลให้เลย ไม่ต้องเปิดดูทีละราย · กดที่แถวเพื่อเปิดข้อมูลรายนั้นด้านบน</p>
-              <div class="terr-controls">
-                <label>สัญญาที่เทียบได้ ≥
-                  <select class="form-select form-select-sm" id="ubMin">
-                    <option value="3" selected>3</option><option value="5">5</option><option value="10">10</option>
-                  </select></label>
-                <label>มูลค่ารวม ≥
-                  <select class="form-select form-select-sm" id="ubValue">
-                    <option value="0" selected>ไม่จำกัด</option><option value="10000000">10 ล้าน</option>
-                    <option value="50000000">50 ล้าน</option><option value="100000000">100 ล้าน</option>
-                  </select></label>
-                <label>เรียงตาม
-                  <select class="form-select form-select-sm" id="ubSort">
-                    <option value="rel" selected>ต่ำกว่าสนามมากสุด</option>
-                    <option value="gap">ส่วนต่างเป็นเงิน</option>
-                    <option value="value">มูลค่ารวม</option>
-                  </select></label>
-              </div>
-              <div id="conUnderbid"></div>
-            </div>
-          </div>
-          <div class="col-lg-5">
-            <div class="cardx p-3 h-100" data-collapse-id="conJvCard" data-collapse-default="closed">
-              <div class="card-title-row"><h2 class="h6 mb-0">กิจการค้าร่วม (JV)</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <div id="conJv"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- เปรียบเทียบผู้รับจ้าง 2 ราย: ฝังตรงในแท็บให้เห็นทันทีที่เปิด ไม่ต้องกดปุ่มเข้าไปดูใน modal อีกต่อไป -->
-        <div class="row g-3 mt-0">
-          <div class="col-12">
-            <div class="cardx p-3">
-              <div class="card-title-row"><h2 class="h6 mb-0">เปรียบเทียบผู้รับจ้าง 2 ราย</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <p class="small-muted mb-2">ค่าเริ่มต้นคือสองอันดับแรกตามคะแนนความเสี่ยงภายใต้ตัวกรองปัจจุบัน
-                เปลี่ยนได้จากช่องเลือกด้านล่าง</p>
-              <div class="row g-2 compare-picker mb-2">
-                <div class="col-6">
-                  <label class="form-label" for="ccSelectA">รายการที่ 1</label>
-                  <select class="form-select form-select-sm" id="ccSelectA"></select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="ccSelectB">รายการที่ 2</label>
-                  <select class="form-select form-select-sm" id="ccSelectB"></select>
-                </div>
-              </div>
-              <div id="ccCompareBody"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ หน่วยงาน ============ -->
-      <div class="tab-pane fade" id="tab-agency" role="tabpanel" aria-labelledby="pill-agency" tabindex="0">
-        <nav class="ag-views" aria-label="มุมมองของแท็บหน่วยงาน">
-          <button type="button" class="ag-view is-on" data-ag-view="overview" aria-pressed="true">🏛️ ภาพรวมหน่วยงาน</button>
-          <button type="button" class="ag-view" data-ag-view="method" aria-pressed="false">🔎 วิเคราะห์เชิงลึกวิธีจัดหา</button>
-        </nav>
-
-        <div data-ag-pane="overview">
-        <div class="hero mb-3">
-          <h1 class="h5 mb-2">โปรไฟล์และการจัดอันดับหน่วยงานจัดซื้อ</h1>
-          <div class="small" id="agencyLevelNote">นับที่ระดับกรม (รวมทุกสาขาเข้าด้วยกัน) — สลับเป็นระดับสาขาได้จากตัวกรองด้านซ้าย</div>
-        </div>
-        <div class="warn-note mb-3" role="note">
-          ตัวเลขในหน้านี้เป็นการสรุปข้อมูลที่มีอยู่จริง ไม่ใช่คะแนนความเสี่ยงหรือข้อสรุปว่าหน่วยงานใดกระทำผิด
-          ชุดข้อมูลนี้ไม่มีจำนวนผู้เสนอราคา จึงตอบได้เพียงว่า "ให้ใครได้งานด้วยวิธีอะไร" ไม่ใช่ "เหตุใดรายนั้นจึงชนะ"
-        </div>
-
-        <section aria-labelledby="agencyKpiHeading" class="mb-3">
-          <h2 class="visually-hidden" id="agencyKpiHeading">ตัวชี้วัดหน่วยงาน</h2>
-          <div class="row g-3 analytics-kpi-grid" id="agencyKpis"></div>
-        </section>
-
-        <div class="row g-3">
-          <div class="col-xl-4">
-            <div class="cardx p-3 h-100">
-              <div class="section-label" aria-hidden="true">ตัวกรองหน่วยงาน</div>
-              <div class="row g-2 mb-2">
-                <div class="col-12">
-                  <label class="form-label" for="agencySearch">ค้นหาหน่วยงาน</label>
-                  <input class="form-control form-control-sm" id="agencySearch" type="search" placeholder="ชื่อหน่วยงาน">
-                </div>
-                <div class="col-12">
-                  <label class="form-label" for="agencyLevel">นับที่ระดับ</label>
-                  <select class="form-select form-select-sm" id="agencyLevel">
-                    <option value="agency" selected>กรม/หน่วยงานต้นสังกัด</option>
-                    <option value="sub">หน่วยงานย่อย/สาขา</option>
-                  </select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="agencyContractMin">สัญญา ≥ <span id="agencyContractMinLabel">1</span></label>
-                  <input class="form-range" id="agencyContractMin" type="range" min="1" max="50" step="1" value="1"
-                         aria-describedby="agencyContractMinLabel">
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="agencyHhiMin">HHI ≥ <span id="agencyHhiMinLabel">0</span></label>
-                  <input class="form-range" id="agencyHhiMin" type="range" min="0" max="10000" step="500" value="0"
-                         aria-describedby="agencyHhiMinLabel">
-                </div>
-              </div>
-              <div class="card-title-row"><h2 class="h6 mb-0">เรียงตามมูลค่ารวม</h2>
-                <span class="small-muted" id="agencyCount"></span></div>
-              <div id="agencyRankList" class="list-box contractor-list" role="list"
-                   aria-label="หน่วยงานเรียงตามมูลค่ารวม"></div>
-            </div>
-          </div>
-          <div class="col-xl-8">
-            <div class="row g-3">
-              <div class="col-12">
-                <div class="cardx p-3 h-100">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ข้อมูลหน่วยงาน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyProfile"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="agContractorsCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างที่ได้งาน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyContractors"></div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="cardx p-3 h-100" data-collapse-id="agMethodsCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">วิธีจัดหาที่ใช้</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyMethods"></div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="cardx p-3 h-100" data-collapse-id="agTypesCard" data-collapse-default="open">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ประเภทงาน/กลุ่มงาน</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyTypes"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="agTimingCard" data-collapse-default="closed">
-                  <div class="card-title-row"><h2 class="h6 mb-0">จังหวะเวลาของสัญญา (เทียบปีงบประมาณ)</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyTiming"></div>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="cardx p-3" data-collapse-id="agLoyaltyCard" data-collapse-default="closed">
-                  <div class="card-title-row"><h2 class="h6 mb-0">ผู้รับจ้างรายใหม่เทียบรายเดิม</h2>
-                    <span class="badge badge-derived">คำนวณ</span></div>
-                  <div id="agencyLoyalty"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- เปรียบเทียบหน่วยงาน 2 แห่ง: ฝังตรงในแท็บให้เห็นทันทีที่เปิด เหมือนที่แท็บผู้รับจ้างทำไว้ -->
-        <div class="row g-3 mt-0">
-          <div class="col-12">
-            <div class="cardx p-3">
-              <div class="card-title-row"><h2 class="h6 mb-0">เปรียบเทียบหน่วยงาน 2 แห่ง</h2>
-                <span class="badge badge-derived">คำนวณ</span></div>
-              <p class="small-muted mb-2">ค่าเริ่มต้นคือสองอันดับแรกตามมูลค่ารวมภายใต้ตัวกรองปัจจุบัน (นับที่ระดับกรมเสมอ)
-                เปลี่ยนได้จากช่องเลือกด้านล่าง</p>
-              <div class="row g-2 compare-picker mb-2">
-                <div class="col-6">
-                  <label class="form-label" for="agComparSelectA">รายการที่ 1</label>
-                  <select class="form-select form-select-sm" id="agComparSelectA"></select>
-                </div>
-                <div class="col-6">
-                  <label class="form-label" for="agComparSelectB">รายการที่ 2</label>
-                  <select class="form-select form-select-sm" id="agComparSelectB"></select>
-                </div>
-              </div>
-              <div id="agComparBody"></div>
-            </div>
-          </div>
-        </div>
-        </div><!-- /data-ag-pane="overview" -->
-
-        <!-- แท็บย่อย: วิเคราะห์เชิงลึกวิธีจัดหา (3E + Integrity ตามแนว INTOSAI GUID 5280) -->
-        <div data-ag-pane="method" hidden>
-          <div class="method-scope" id="agMethodScope"></div>
-          <div id="agMethodBody"></div>
-        </div>
-      </div>
-
-      <!-- ============ Time Series ============ -->
-      <div class="tab-pane fade" id="tab-time" role="tabpanel" aria-labelledby="pill-time" tabindex="0">
-        <div class="cardx p-3 mb-3 section-block">
-          <h2 class="visually-hidden">ตัวเลือกการแสดงแนวโน้ม</h2>
-          <div class="section-label" aria-hidden="true">ตัวเลือกการแสดงผล</div>
-          <div class="row g-2 align-items-end">
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="tsDimension">แยกตาม</label>
-              <select class="form-select form-select-sm" id="tsDimension">
-                <option value="purchase_method_name">วิธีจัดหา</option>
-                <option value="project_type_name">ประเภทโครงการ</option>
-                <option value="risk_band">ระดับความเสี่ยง</option>
-              </select>
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label" for="tsMetric">แสดงค่า</label>
-              <select class="form-select form-select-sm" id="tsMetric">
-                <option value="counts">จำนวนสัญญา</option>
-                <option value="values">มูลค่าสัญญา</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div class="cardx p-3 mb-3">
-          <div class="card-title-row"><h2 class="h6 mb-0">แนวโน้มรายเดือน</h2>
-            <span class="badge badge-real">ข้อมูลจริง</span></div>
-          <div class="small-muted mb-2" id="tsNote"></div>
-          <div id="timeChart" style="height:420px" role="img"
-               aria-label="กราฟเส้นแนวโน้มรายเดือนตามมิติที่เลือก"></div>
-        </div>
-        <div class="cardx p-3" data-collapse-id="timeTableCard" data-collapse-default="closed">
-          <div class="card-title-row"><h2 class="h6 mb-0">สรุปรายเดือน</h2>
-            <span class="badge badge-derived">คำนวณ</span></div>
-          <p class="small-muted mb-2">แถวที่ไฮไลต์คือเดือนที่มีจำนวนสัญญาสูงสุด</p>
-          <div class="table-wrap"><table class="table table-sm mini-table mb-0">
-            <caption class="visually-hidden">สรุปจำนวนและมูลค่าสัญญารายเดือน</caption>
-            <thead><tr><th scope="col">เดือน</th><th scope="col" class="text-end">สัญญา</th>
-              <th scope="col" class="text-end">มูลค่า</th><th scope="col" class="text-end">เข้าเงื่อนไข</th>
-              <th scope="col" class="text-end">คะแนนเฉลี่ย</th></tr></thead>
-            <tbody id="tsMonthBody"></tbody></table></div>
-        </div>
-      </div>
-
-      <!-- ============ Rules ============ -->
-      <div class="tab-pane fade" id="tab-rules" role="tabpanel" aria-labelledby="pill-rules" tabindex="0">
+      <!-- ============ About: กฎการตรวจจับ / ตัวอย่างสาธิต ============ -->
+      <div class="tab-pane fade" id="tab-about" role="tabpanel" aria-labelledby="pill-about" tabindex="0">
+        <ul class="nav subtab-strip" role="tablist" aria-label="มุมมองย่อยของกฎการตรวจจับ">
+          <li class="nav-item" role="presentation"><button class="subtab-btn active" id="pill-rules" data-bs-toggle="pill" data-bs-target="#tab-rules" type="button" role="tab" aria-controls="tab-rules" aria-selected="true" title="ตารางอธิบายกฎและการปรับเงื่อนไข"><span aria-hidden="true">⚖️</span> กฎการตรวจจับ<span class="nav-count" id="navCountRules" aria-hidden="true"></span></button></li>
+          <li class="nav-item" role="presentation"><button class="subtab-btn" id="pill-demo" data-bs-toggle="pill" data-bs-target="#tab-demo" type="button" role="tab" aria-controls="tab-demo" aria-selected="false" title="ส่วนสาธิตที่ใช้ข้อมูลสังเคราะห์"><span aria-hidden="true">🧪</span> ตัวอย่างสาธิต</button></li>
+        </ul>
+        <div class="tab-content">
+<div class="tab-pane fade show active" id="tab-rules" role="tabpanel" aria-labelledby="pill-rules" tabindex="0">
 
         <!-- ความครอบคลุมตามกรอบ 3E: ชี้ช่องว่างว่ายังตรวจอะไรไม่ได้ -->
         <section class="cardx p-3 mb-3" aria-labelledby="coverageHeading" data-collapse-id="rulesCoverageCard" data-collapse-default="open">
@@ -1831,8 +1846,7 @@
         </div>
       </div>
 
-      <!-- ============ Demo (ข้อมูลสังเคราะห์) ============ -->
-      <div class="tab-pane fade demo-pane" id="tab-demo" role="tabpanel" aria-labelledby="pill-demo" tabindex="0">
+<div class="tab-pane fade demo-pane" id="tab-demo" role="tabpanel" aria-labelledby="pill-demo" tabindex="0">
         <div class="hero-demo mb-3">
           <h1 class="h5 mb-2">ตัวอย่างสาธิต · สิ่งที่ยังตรวจไม่ได้จากข้อมูลชุดนี้</h1>
           <div class="small" id="demoDisclaimer"></div>
@@ -1975,6 +1989,12 @@
           </div>
         </div>
       </div>
+        </div>
+      </div>
+
+
+      <!-- ============ Demo (ข้อมูลสังเคราะห์) ============ -->
+      
 
       <!-- ============ นำเข้าข้อมูล ============ -->
       <div class="tab-pane fade" id="tab-import" role="tabpanel" aria-labelledby="pill-import" tabindex="0">
