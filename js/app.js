@@ -7004,6 +7004,15 @@ ${placemarks.join('\n')}
   function renderRoadCard() {
     const meta = models().road;
     if (!meta) return;
+    // ชุดข้อมูลที่งานถนนระบุขนาดไม่พอ โมเดลยังมีอยู่แต่ค่าทุกตัวเป็น null — แสดงเหตุผลแทนตัวเลขว่าง
+    if (!meta.n) {
+      const msg = meta.note || 'งานถนนที่ระบุขนาดในชื่อโครงการมีน้อยเกินกว่าจะสร้างค่าคาดการณ์';
+      U.$('roadNote').textContent = msg;
+      Charts.draw('roadChart', [], {}, msg);
+      U.setHTML('roadBody', U.emptyRow(4, msg));
+      U.$('roadValidation').textContent = msg;
+      return;
+    }
     const rows = state.filtered.filter(r => r.road_z !== null && r.road_z !== undefined);
     const exp = meta.expected_at_median_size || {};
     U.$('roadNote').textContent =
