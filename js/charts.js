@@ -62,7 +62,7 @@ const Charts = (() => {
 
   /** วาดกราฟ; ถ้าไม่มีข้อมูลให้แสดงข้อความแทนที่จะปล่อยพื้นที่ว่าง
    *  (ของเดิมกราฟว่างแยกไม่ออกจาก widget ที่พัง) */
-  function draw(id, traces, layout = {}, emptyMessage = 'ไม่มีข้อมูลสำหรับกราฟนี้') {
+  function draw(id, traces, layout = {}, emptyMessage = 'ไม่มีข้อมูลสำหรับกราฟนี้', configExtra = null) {
     const el = U.$(id);
     if (!el) return;
     // ต้องครอบคลุมทุกชนิดกราฟที่ใช้: cartesian (x/y), pie (values/labels),
@@ -84,7 +84,8 @@ const Charts = (() => {
     // Plotly แก้ trace/layout ที่ส่งเข้าไปตรงๆ ตอนผู้ใช้ซูมหรือกด legend
     // จึงเก็บสำเนาที่ยังไม่ถูกแตะไว้ให้ปุ่มรีเซ็ตใช้วาดกลับ
     el._spec = { traces: clone(traces), layout: clone(full) };
-    Plotly.react(el, traces, full, CONFIG);
+    // configExtra ใช้เฉพาะจุดที่ต้องเปิดเครื่องมือ Plotly พิเศษ (เช่น ลากเลือกจุด) โดยไม่กระทบกราฟอื่น
+    Plotly.react(el, traces, full, configExtra ? Object.assign({}, CONFIG, configExtra) : CONFIG);
     el.dataset.plotted = '1';
     renderTools(el);
   }
@@ -107,6 +108,13 @@ const Charts = (() => {
   const KIND_KEY = 'pa_chart_kind:';
   const DONUT_MAX = 8;
   const TOPN_OPTIONS = [10, 20];
+
+  const TS_KINDS = {
+    line:     { icon: '📈', label: 'เส้น' },
+    stackbar: { icon: '▤', label: 'แท่งซ้อน' },
+    area:     { icon: '⛰', label: 'พื้นที่ซ้อน' },
+    heatmap:  { icon: '▧', label: 'แผนที่ความร้อน' },
+  };
 
   let filterHook = null;
   /** app.js เรียกครั้งเดียวตอนบูต — คลิกแท่ง/ชิ้นโดนัทที่ประกาศ opts.filterKey ไว้จะเรียก fn(key, value)
@@ -163,14 +171,20 @@ const Charts = (() => {
       el.parentNode.insertBefore(bar, el);
     }
     const s = el._series;
+    const ts = el._ts;
     const kinds = s ? allowedKinds(s) : [];
     const btn = (attrs, text, title, on) =>
       `<button type="button" class="chart-tool${on ? ' is-on' : ''}" ${attrs} title="${title}" aria-label="${title}">${text}</button>`;
-    const kindBtns = kinds.length > 1
+    const kindBtns = s && kinds.length > 1
       ? `<span class="chart-kinds" role="group" aria-label="แบบกราฟ">${kinds.map(k =>
           `<button type="button" class="chart-tool${k === s.kind ? ' is-on' : ''}" data-kind="${k}"
             aria-pressed="${k === s.kind}" title="แสดงเป็น${KINDS[k].label}"
             aria-label="แสดงเป็น${KINDS[k].label}">${KINDS[k].icon}</button>`).join('')}</span>`
+      : ts
+      ? `<span class="chart-kinds" role="group" aria-label="แบบกราฟ">${Object.keys(TS_KINDS).map(k =>
+          `<button type="button" class="chart-tool${k === ts.kind ? ' is-on' : ''}" data-tskind="${k}"
+            aria-pressed="${k === ts.kind}" title="แสดงเป็น${TS_KINDS[k].label}"
+            aria-label="แสดงเป็น${TS_KINDS[k].label}">${TS_KINDS[k].icon}</button>`).join('')}</span>`
       : '';
     // Top N และ % มีผลเฉพาะกราฟที่ทุกค่าเป็นส่วนหนึ่งของผลรวมเดียว (parts) — ฮิสโทแกรม/นับตามกฎที่ติดได้หลายข้อ
     // เรียงหรือย่อเป็น % ไม่ได้ความหมายเดิม จึงไม่แสดงตัวเลือกนี้ให้
@@ -201,6 +215,7 @@ const Charts = (() => {
     const el = document.getElementById(this.dataset.for);
     if (!el) return;
     if (b.dataset.kind) { setKind(el, b.dataset.kind); return; }
+    if (b.dataset.tskind) { setTsKind(el, b.dataset.tskind); return; }
     const act = b.dataset.act;
     if (act === 'reset') resetChart(el);
     else if (act === 'full') toggleFull(el);
@@ -236,12 +251,29 @@ const Charts = (() => {
     renderSeries(el);
   }
 
+  function setTsKind(el, kind) {
+    const ts = el._ts;
+    if (!ts || ts.kind === kind) return;
+    ts.kind = kind;
+    try {
+      if (kind === 'line') localStorage.removeItem(KIND_KEY + el.id);
+      else localStorage.setItem(KIND_KEY + el.id, kind);
+    } catch (e) { /* โหมดส่วนตัว */ }
+    drawTimeseries(el.id, ts);
+  }
+
   function resetChart(el) {
     if (el._series) {
       try { localStorage.removeItem(KIND_KEY + el.id); } catch (e) { /* โหมดส่วนตัว */ }
       const s = el._series;
       s.kind = s.natural; s.topN = null; s.pct = false;
       renderSeries(el);
+      return;
+    }
+    if (el._ts) {
+      try { localStorage.removeItem(KIND_KEY + el.id); } catch (e) { /* โหมดส่วนตัว */ }
+      el._ts.kind = 'line';
+      drawTimeseries(el.id, el._ts);
       return;
     }
     if (el._spec && el.dataset.plotted) {
@@ -316,12 +348,17 @@ const Charts = (() => {
         t.labels.forEach((l, i) => rows.push([name, l, t.values[i]]));
       } else if (t.r && t.theta) {
         t.r.forEach((r, i) => rows.push([name, t.theta[i], r]));
+      } else if (t.type === 'heatmap' && t.z) {
+        // แผนที่ความร้อน: y คือชื่อชุดข้อมูล (ไม่ใช่ค่า) ค่าจริงอยู่ใน z — ต้องเช็กก่อนกิ่ง x+y ทั่วไป
+        t.z.forEach((row, yi) => row.forEach((v, xi) => rows.push([t.y[yi], t.x[xi], v])));
       } else if (t.x && t.y) {
         t.x.forEach((x, i) => rows.push([name, x, t.y[i]]));
       }
     }
     const isSankey = spec.traces.some(t => t.type === 'sankey');
+    const isHeatmap = spec.traces.some(t => t.type === 'heatmap');
     const headers = isSankey ? ['จาก', 'ไป', 'ค่า']
+      : isHeatmap ? ['ชุดข้อมูล', 'ช่วงเวลา', 'ค่า']
       : ['ชุดข้อมูล', axisTitle(spec.layout.xaxis) || 'x', axisTitle(spec.layout.yaxis) || 'ค่า'];
     return { headers, rows };
   }
@@ -618,6 +655,57 @@ const Charts = (() => {
     });
   }
 
+  /** เส้นแนวโน้มหลายชุดที่สลับแบบได้ (เส้น / แท่งซ้อน / พื้นที่ซ้อน / แผนที่ความร้อน) — ใช้กับแท็บแนวโน้มเวลา
+   *  series = [{ name, y:[ตามลำดับ xLabels] }] · ต่างจาก lines() ตรงที่จำแบบกราฟที่เลือกไว้และมีแถบเครื่องมือ */
+  function timeseries(id, xLabels, series, opts = {}) {
+    const el = U.$(id);
+    if (!el) return;
+    let saved = null;
+    try { saved = localStorage.getItem(KIND_KEY + id); } catch (e) { /* โหมดส่วนตัว */ }
+    const kind = saved && TS_KINDS[saved] ? saved : 'line';
+    el._series = null;
+    el._ts = { xLabels, series, opts, kind };
+    drawTimeseries(id, el._ts);
+  }
+
+  function drawTimeseries(id, ts) {
+    const { xLabels, series, opts, kind } = ts;
+    if (kind === 'heatmap') {
+      draw(id, [{
+        type: 'heatmap', x: xLabels, y: series.map(s => s.name), z: series.map(s => s.y),
+        colorscale: 'Teal', hoverongaps: false,
+        hovertemplate: '%{y}<br>%{x}: %{z:,.0f}<extra></extra>',
+      }], {
+        margin: { t: 16, l: 150, r: 20, b: 50 },
+        xaxis: { gridcolor: T().grid },
+        yaxis: { gridcolor: T().grid, automargin: true },
+      }, 'ไม่มีข้อมูลสำหรับกราฟนี้');
+      return;
+    }
+    const traces = series.map((s, i) => {
+      const color = CATEGORICAL[i % CATEGORICAL.length];
+      const hovertemplate = '%{fullData.name}<br>%{x}: %{y:,.0f}<extra></extra>';
+      if (kind === 'stackbar') {
+        return { type: 'bar', name: s.name, x: xLabels, y: s.y, marker: { color }, hovertemplate };
+      }
+      if (kind === 'area') {
+        // stackgroup ทำให้พื้นที่ซ้อนทับกันสะสม เส้นบางเพราะพื้นที่สีเป็นตัวสื่อสารหลักอยู่แล้ว
+        return { type: 'scatter', mode: 'lines', name: s.name, x: xLabels, y: s.y,
+          stackgroup: 'one', line: { color, width: 1 }, hovertemplate };
+      }
+      return { type: 'scatter', mode: 'lines+markers', name: s.name, x: xLabels, y: s.y,
+        line: { color, width: 2.5, shape: 'spline', smoothing: 0.4 }, marker: { size: 5 }, hovertemplate };
+    });
+    draw(id, traces, {
+      yaxis: { title: opts.yTitle, gridcolor: T().grid },
+      xaxis: { gridcolor: T().grid },
+      margin: { t: 16, l: 70, r: 20, b: 50 },
+      legend: { orientation: 'h', y: -0.16, font: { size: 10 } },
+      hovermode: 'x unified',
+      barmode: kind === 'stackbar' ? 'stack' : undefined,
+    });
+  }
+
   function waterfall(id, labels, values, title) {
     draw(id, [{
       type: 'waterfall', x: labels, y: values,
@@ -743,7 +831,10 @@ const Charts = (() => {
       },
       yaxis: { title: { text: 'คะแนนความเสี่ยง', font: { size: 11 } }, gridcolor: T().grid, range: [-yMax * 0.04, yMax * 1.1] },
       legend: { orientation: 'h', y: -0.3, font: { size: 10.5 } },
-    });
+      dragmode: 'lasso',
+      // เปิดปุ่มลากเลือกเฉพาะกราฟนี้ (ของเดิมปิดทุกกราฟไว้เพราะกราฟส่วนใหญ่เลือกจุดแล้วไม่มีผลอะไร)
+      // ผู้เรียก (app.js) ผูก plotly_selected ไว้ต่างหากเพื่อใส่ตะกร้าทีละกลุ่ม
+    }, undefined, { modeBarButtonsToRemove: ['autoScale2d'] });
   }
 
   /** เส้นครอบคลุมมูลค่าของคิว (ดู Analytics.queueCoverage)
@@ -805,5 +896,5 @@ const Charts = (() => {
     }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
   }
 
-  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme, wireFilterClick, resetAllVisible };
+  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, timeseries, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme, wireFilterClick, resetAllVisible };
 })();

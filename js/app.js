@@ -1486,10 +1486,20 @@ const App = (() => {
         const id = ev.points && ev.points[0] && ev.points[0].customdata;
         if (id) openProfile(id);
       });
+      // ลากเลือกหลายจุด (โหมดลากเริ่มต้นของกราฟนี้คือ lasso) → ใส่ตะกร้าทีเดียวทั้งกลุ่ม
+      const byId = new Map(priced.map(r => [r.project_id, r]));
+      plot.removeAllListeners('plotly_selected');
+      plot.on('plotly_selected', ev => {
+        if (!ev || !ev.points || !ev.points.length) return;
+        const picked = ev.points.map(p => byId.get(p.customdata)).filter(Boolean);
+        if (picked.length) addManyToCart(picked);
+      });
     }
     const dropped = rows.length - priced.length;
     U.setHTML('ovRiskValueNote', dropped
-      ? `ไม่แสดง ${U.num(dropped)} สัญญาที่ไม่มีมูลค่าในกราฟนี้ (แกนมูลค่าเป็นสเกล log)` : '');
+      ? `ไม่แสดง ${U.num(dropped)} สัญญาที่ไม่มีมูลค่าในกราฟนี้ (แกนมูลค่าเป็นสเกล log) · ` +
+        `ลากคลุมจุดหลายจุดเพื่อใส่ตะกร้าทีเดียว`
+      : 'ลากคลุมจุดหลายจุดเพื่อใส่ตะกร้าทีเดียว');
 
     // 2) เส้นครอบคลุมมูลค่า
     if (rows.length) {
@@ -6480,7 +6490,7 @@ ${placemarks.join('\n')}
         `ถึง ${U.thaiMonthLabel(ts.months[ts.months.length - 1])}`
       : 'ไม่มีข้อมูลวันทำสัญญาในชุดที่เลือก';
 
-    Charts.lines('timeChart', ts.months.map(U.thaiMonthLabel),
+    Charts.timeseries('timeChart', ts.months.map(U.thaiMonthLabel),
       ts.series.slice(0, 10).map(s => ({
         name: state.ts.dimension === 'risk_band' ? bandLabel(s.name) : truncate(s.name, 34),
         y: s[metric],
