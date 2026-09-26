@@ -353,6 +353,7 @@ const App = (() => {
       activateDataset(payload, { ...info, bootMsg, first: true, notice: bootNotice });
 
       wireGlobalFilters();
+      Charts.wireFilterClick(toggleChartFilter);
       wireTabs();
       wireControls();
       wireNetTerritory();
@@ -1542,6 +1543,17 @@ const App = (() => {
     applyFilters();
   }
 
+  /** คลิกแท่ง/ชิ้นโดนัทที่ประกาศ opts.filterKey ไว้ (ดู Charts.wireFilterClick) — คลิกซ้ำค่าเดิมเพื่อยกเลิก
+   *  ใช้ FILTER_CONTROL ตัวเดียวกับที่แถบตัวกรองใช้ จึงมีผลเหมือนเลือกจากดรอปดาวน์เอง */
+  function toggleChartFilter(key, value) {
+    const ctrlId = FILTER_CONTROL[key];
+    const el = ctrlId && U.$(ctrlId);
+    if (!el) return;
+    el.value = state.filters[key] === value ? '' : value;
+    syncFiltersFromUI();
+    applyFilters();
+  }
+
   function wireOverviewQueue() {
     syncQueueControls();
     // ลิงก์ "ไปที่คิวตรวจสอบ" ในหัวหน้า
@@ -1579,7 +1591,8 @@ const App = (() => {
 
     const bands = Rules.BANDS.filter(b => (s.bandCounts[b.key] || 0) > 0);
     Charts.donut('ovBandDonut', bands.map(b => b.label),
-      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา');
+      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา',
+      { filterKey: 'band', filterValues: bands.map(b => b.key) });
 
     const ruleStats = Rules.DEFS
       .map(d => ({ d, n: s.counts.get(d.id).n }))
@@ -1590,6 +1603,7 @@ const App = (() => {
       horizontal: true,
       colors: ruleStats.map(x => x.d.source === 'synthetic' ? Charts.C.purple : Charts.C.teal),
       axisTitle: 'จำนวนสัญญา',
+      filterKey: 'rule', filterValues: ruleStats.map(x => x.d.id),
     });
 
     const ts = Analytics.timeseries(rows, 'risk_band');
@@ -1598,7 +1612,8 @@ const App = (() => {
 
     const methods = [...U.countBy(rows, r => r.purchase_method_name)]
       .sort((a, b) => b[1] - a[1]).slice(0, 6);
-    Charts.donut('ovMethodDonut', methods.map(m => m[0].slice(0, 28)), methods.map(m => m[1]), null, 'สัญญา');
+    Charts.donut('ovMethodDonut', methods.map(m => m[0].slice(0, 28)), methods.map(m => m[1]), null, 'สัญญา',
+      { filterKey: 'method', filterValues: methods.map(m => m[0]) });
 
     const agencies = Analytics.agencyTotals(rows)
       .sort((a, b) => b.n_flagged - a.n_flagged || b.total_value - a.total_value).slice(0, 12);
@@ -5009,7 +5024,8 @@ ${placemarks.join('\n')}
 
     const bands = Rules.BANDS.filter(b => (s.bandCounts[b.key] || 0) > 0);
     Charts.donut('fraudSeverityDonut', bands.map(b => b.label),
-      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา');
+      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา',
+      { filterKey: 'band', filterValues: bands.map(b => b.key) });
 
     const cats = new Map();
     for (const d of Rules.DEFS) {
@@ -6831,6 +6847,7 @@ ${placemarks.join('\n')}
       `ใช้เป็นกลุ่มเปรียบเทียบของโมเดลทุกตัวในแท็บความผิดปกติ`;
     Charts.bar('wgChart', order.map(([k]) => workGroupLabel(k)), order.map(([, v]) => v.length), {
       horizontal: true, color: Charts.C.teal, axisTitle: 'จำนวนสัญญา', parts: true,
+      filterKey: 'workGroup', filterValues: order.map(([k]) => k),
     });
   }
 
@@ -13934,6 +13951,7 @@ ${labVocabText()}`;
       exportRecords(state.filtered.filter(r => (r.rule_hits || []).length), 'procurement-redflags.csv'));
 
     U.$('provenanceBtn').addEventListener('click', showProvenance);
+    U.$('chartResetBtn').addEventListener('click', () => { Charts.resetAllVisible(); cartToast('รีเซ็ตกราฟที่แสดงอยู่ทั้งหมดแล้ว'); });
 
     // ไล่เหตุผล (CoT) — ดู js/cot.js · สื่อสารผ่าน api นี้เท่านั้น
     CoT.init({

@@ -54,6 +54,9 @@ const Charts = (() => {
       hoverlabel: { font: { family: FONT.family, size: 11 } },
       xaxis: { gridcolor: T().grid, zerolinecolor: T().line },
       yaxis: { gridcolor: T().grid, zerolinecolor: T().line },
+      // Plotly.react เห็นค่าที่เปลี่ยนแล้วไล่แท่ง/เส้นเข้าตำแหน่งใหม่ให้เอง เมื่อตัวกรองเปลี่ยน
+      // ผู้ใช้จึงเห็นว่าตัวเลขไหนขยับ ไม่ใช่กราฟกระพริบเปลี่ยนเป็นค่าใหม่ทันที
+      transition: { duration: 350, easing: 'cubic-in-out' },
     }, extra);
   }
 
@@ -103,6 +106,12 @@ const Charts = (() => {
   };
   const KIND_KEY = 'pa_chart_kind:';
   const DONUT_MAX = 8;
+  const TOPN_OPTIONS = [10, 20];
+
+  let filterHook = null;
+  /** app.js เรียกครั้งเดียวตอนบูต — คลิกแท่ง/ชิ้นโดนัทที่ประกาศ opts.filterKey ไว้จะเรียก fn(key, value)
+   *  แยกเป็น hook เพราะ charts.js ไม่รู้จัก state ตัวกรองหรือ applyFilters ของ app.js */
+  function wireFilterClick(fn) { filterHook = fn; }
 
   function toolsOf(el) {
     const prev = el.previousElementSibling;
@@ -114,6 +123,33 @@ const Charts = (() => {
     if (bar) bar.hidden = true;
   }
 
+  /* ---------- ค่าที่จำไว้ต่อกราฟ: แบบกราฟ · Top N · โหมด % ----------
+     ของเดิมเก็บแค่ชื่อแบบกราฟเป็นสตริงเปล่า จึงต้องอ่านแบบที่รองรับทั้งสตริงเดิมและ JSON ใหม่ */
+  function loadUiState(id) {
+    let raw = null;
+    try { raw = localStorage.getItem(KIND_KEY + id); } catch (e) { /* โหมดส่วนตัว */ }
+    if (!raw) return {};
+    try {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object') return o;
+    } catch (e) { /* ค่าเดิมก่อนอัปเดตคือชื่อแบบกราฟล้วนๆ ไม่ใช่ JSON */ }
+    return { kind: raw };
+  }
+  function saveUiState(id, st) {
+    try {
+      if (!st.kind && !st.topN && !st.pct) { localStorage.removeItem(KIND_KEY + id); return; }
+      localStorage.setItem(KIND_KEY + id, JSON.stringify(st));
+    } catch (e) { /* โหมดส่วนตัว */ }
+  }
+  function persist(el) {
+    const s = el._series;
+    saveUiState(el.id, {
+      kind: s.kind !== s.natural ? s.kind : undefined,
+      topN: s.topN || undefined,
+      pct: s.pct || undefined,
+    });
+  }
+
   function renderTools(el) {
     let bar = toolsOf(el);
     if (!bar) {
@@ -123,21 +159,36 @@ const Charts = (() => {
       bar.setAttribute('role', 'toolbar');
       bar.setAttribute('aria-label', 'เครื่องมือกราฟ');
       bar.addEventListener('click', onToolClick);
+      bar.addEventListener('change', onToolChange);
       el.parentNode.insertBefore(bar, el);
     }
     const s = el._series;
     const kinds = s ? allowedKinds(s) : [];
-    const btn = (attrs, text, title) =>
-      `<button type="button" class="chart-tool" ${attrs} title="${title}" aria-label="${title}">${text}</button>`;
+    const btn = (attrs, text, title, on) =>
+      `<button type="button" class="chart-tool${on ? ' is-on' : ''}" ${attrs} title="${title}" aria-label="${title}">${text}</button>`;
     const kindBtns = kinds.length > 1
       ? `<span class="chart-kinds" role="group" aria-label="แบบกราฟ">${kinds.map(k =>
           `<button type="button" class="chart-tool${k === s.kind ? ' is-on' : ''}" data-kind="${k}"
             aria-pressed="${k === s.kind}" title="แสดงเป็น${KINDS[k].label}"
             aria-label="แสดงเป็น${KINDS[k].label}">${KINDS[k].icon}</button>`).join('')}</span>`
       : '';
+    // Top N และ % มีผลเฉพาะกราฟที่ทุกค่าเป็นส่วนหนึ่งของผลรวมเดียว (parts) — ฮิสโทแกรม/นับตามกฎที่ติดได้หลายข้อ
+    // เรียงหรือย่อเป็น % ไม่ได้ความหมายเดิม จึงไม่แสดงตัวเลือกนี้ให้
+    const canTopN = s && s.parts && s.labels.length > TOPN_OPTIONS[0];
+    const topNSel = canTopN
+      ? `<select class="chart-tool chart-topn" data-act="topn" title="แสดงเฉพาะรายการที่มีค่าสูงสุด N อันดับแรก" aria-label="จำนวนอันดับที่แสดง">
+          <option value=""${s.topN ? '' : ' selected'}>ทั้งหมด (${s.labels.length})</option>
+          ${TOPN_OPTIONS.filter(n => n < s.labels.length).map(n =>
+            `<option value="${n}"${s.topN === n ? ' selected' : ''}>สูงสุด ${n}</option>`).join('')}
+        </select>`
+      : '';
+    const pctBtn = s && s.parts
+      ? btn('data-act="pct" aria-pressed="' + !!s.pct + '"', '%', 'แสดงเป็นสัดส่วน % ของผลรวมที่แสดงอยู่', s.pct)
+      : '';
     const isTable = s && s.kind === 'table';
-    bar.innerHTML = kindBtns +
-      btn('data-act="reset"', '↺', 'รีเซ็ตกลับค่าเริ่มต้น (แบบกราฟ การซูม และรายการที่ซ่อนจาก legend)') +
+    const hint = s && s.opts.filterKey ? '<span class="chart-hint">คลิกเพื่อกรอง</span>' : '';
+    bar.innerHTML = hint + kindBtns + topNSel + pctBtn +
+      btn('data-act="reset"', '↺', 'รีเซ็ตกลับค่าเริ่มต้น (แบบกราฟ ลำดับ % การซูม และรายการที่ซ่อนจาก legend)') +
       (document.fullscreenEnabled ? btn('data-act="full"', '⤢', 'ขยายเต็มจอ (กด Esc เพื่อออก)') : '') +
       (isTable ? '' : btn('data-act="png"', 'PNG', 'ดาวน์โหลดกราฟเป็นภาพ PNG')) +
       (exportRows(el).rows.length ? btn('data-act="csv"', 'CSV', 'ดาวน์โหลดข้อมูลของกราฟนี้เป็น CSV') : '');
@@ -153,6 +204,7 @@ const Charts = (() => {
     const act = b.dataset.act;
     if (act === 'reset') resetChart(el);
     else if (act === 'full') toggleFull(el);
+    else if (act === 'pct') togglePct(el);
     else if (act === 'png' && el.dataset.plotted) {
       Plotly.downloadImage(el, { format: 'png', scale: 2, filename: fileBase(el) });
     } else if (act === 'csv') {
@@ -161,16 +213,48 @@ const Charts = (() => {
     }
   }
 
+  function onToolChange(e) {
+    const sel = e.target.closest('[data-act="topn"]');
+    if (!sel) return;
+    const el = document.getElementById(this.dataset.for);
+    if (el) setTopN(el, sel.value ? Number(sel.value) : null);
+  }
+
+  function setTopN(el, n) {
+    const s = el._series;
+    if (!s || s.topN === n) return;
+    s.topN = n;
+    persist(el);
+    renderSeries(el);
+  }
+
+  function togglePct(el) {
+    const s = el._series;
+    if (!s) return;
+    s.pct = !s.pct;
+    persist(el);
+    renderSeries(el);
+  }
+
   function resetChart(el) {
     if (el._series) {
       try { localStorage.removeItem(KIND_KEY + el.id); } catch (e) { /* โหมดส่วนตัว */ }
-      el._series.kind = el._series.natural;
+      const s = el._series;
+      s.kind = s.natural; s.topN = null; s.pct = false;
       renderSeries(el);
       return;
     }
     if (el._spec && el.dataset.plotted) {
       Plotly.react(el, clone(el._spec.traces), clone(el._spec.layout), CONFIG);
     }
+  }
+
+  /** รีเซ็ตกราฟทุกตัวที่มองเห็นอยู่ในขณะนี้ (ใช้กับปุ่ม "รีเซ็ตกราฟในแท็บนี้" ของ app.js) */
+  function resetAllVisible(root = document) {
+    root.querySelectorAll('.chart-tools:not([hidden])').forEach(bar => {
+      const el = document.getElementById(bar.dataset.for);
+      if (el && el.offsetParent) resetChart(el);
+    });
   }
 
   function toggleFull(el) {
@@ -206,16 +290,17 @@ const Charts = (() => {
     return (typeof t === 'string' ? t : t && t.text) || '';
   }
 
-  /** แปลงข้อมูลที่อยู่ในกราฟเป็นแถว CSV — กราฟป้าย+ค่าใช้ข้อมูลต้นทาง กราฟอื่นอ่านจาก trace */
+  /** แปลงข้อมูลที่อยู่ในกราฟเป็นแถว CSV — กราฟป้าย+ค่าใช้ข้อมูลต้นทาง (ตามที่กำลังแสดงจริง) กราฟอื่นอ่านจาก trace */
   function exportRows(el) {
     const s = el._series;
     if (s) {
-      const head = s.opts.axisTitle || s.opts.centerLabel || 'ค่า';
-      const total = s.values.reduce((a, b) => a + (+b || 0), 0);
+      const { labels, values } = s.view || visibleData(s);
+      const head = s.pct ? 'สัดส่วนที่แสดง (%)' : (s.opts.axisTitle || s.opts.centerLabel || 'ค่า');
+      const total = values.reduce((a, b) => a + (+b || 0), 0);
       return {
-        headers: ['รายการ', head].concat(s.parts ? ['สัดส่วน (%)'] : []),
-        rows: s.labels.map((l, i) => [l, s.values[i]]
-          .concat(s.parts ? [total ? +(s.values[i] / total * 100).toFixed(2) : ''] : [])),
+        headers: ['รายการ', head].concat(s.parts && !s.pct ? ['สัดส่วนที่แสดง (%)'] : []),
+        rows: labels.map((l, i) => [l, values[i]]
+          .concat(s.parts && !s.pct ? [total ? +(values[i] / total * 100).toFixed(2) : ''] : [])),
       };
     }
     const spec = el._spec;
@@ -258,13 +343,36 @@ const Charts = (() => {
     return kinds;
   }
 
+  /** ตัดเหลือ Top N (เรียงตามค่ามากไปน้อย คงลำดับเดิมของรายการที่เหลือไว้) และ/หรือแปลงเป็น %
+   *  ทำเฉพาะกราฟ parts — ฮิสโทแกรมหรือกราฟที่ลำดับแกนมีความหมาย (เช่นช่วงราคา) จะไม่ถูกเรียงใหม่ */
+  function visibleData(s) {
+    let labels = s.labels, values = s.values, filterValues = s.opts.filterValues || null;
+    // colors เป็นสีต่อแท่ง (array เท่าจำนวน labels เดิม) ต้องตัดตามดัชนีเดียวกับ Top N
+    // ไม่เช่นนั้นสีจะเลื่อนไปคนละแท่งเมื่อตัดรายการออก
+    let colors = Array.isArray(s.opts.colors) ? s.opts.colors : null;
+    if (s.parts && s.topN && s.topN < labels.length) {
+      const idx = values.map((v, i) => i).sort((a, b) => (+values[b] || 0) - (+values[a] || 0)).slice(0, s.topN);
+      idx.sort((a, b) => a - b);
+      labels = idx.map(i => labels[i]);
+      values = idx.map(i => values[i]);
+      if (filterValues) filterValues = idx.map(i => filterValues[i]);
+      if (colors) colors = idx.map(i => colors[i]);
+    }
+    if (s.parts && s.pct) {
+      const total = values.reduce((a, b) => a + (+b || 0), 0);
+      values = values.map(v => total ? +((+v || 0) / total * 100).toFixed(2) : 0);
+    }
+    return { labels, values, filterValues, colors };
+  }
+
   function series(id, s) {
     const el = U.$(id);
     if (!el) return;
     el._series = s;
-    let saved = null;
-    try { saved = localStorage.getItem(KIND_KEY + id); } catch (e) { /* โหมดส่วนตัว */ }
-    s.kind = saved && allowedKinds(s).includes(saved) ? saved : s.natural;
+    const saved = loadUiState(id);
+    s.kind = saved.kind && allowedKinds(s).includes(saved.kind) ? saved.kind : s.natural;
+    s.topN = s.parts && saved.topN && saved.topN < s.labels.length ? saved.topN : null;
+    s.pct = !!(s.parts && saved.pct);
     renderSeries(el);
   }
 
@@ -272,30 +380,51 @@ const Charts = (() => {
     const s = el._series;
     if (!s || s.kind === kind) return;
     s.kind = kind;
-    try {
-      if (kind === s.natural) localStorage.removeItem(KIND_KEY + el.id);
-      else localStorage.setItem(KIND_KEY + el.id, kind);
-    } catch (e) { /* โหมดส่วนตัว */ }
+    persist(el);
     renderSeries(el);
   }
 
   function renderSeries(el) {
     const s = el._series;
+    s.view = visibleData(s);
     el.classList.toggle('chart-as-table', s.kind === 'table');
     if (s.kind === 'table') {
       if (el.dataset.plotted) { Plotly.purge(el); delete el.dataset.plotted; }
       el._spec = null;
       el.innerHTML = seriesTable(s);
-      if (s.labels.length) renderTools(el); else hideTools(el);
+      if (s.view.labels.length) renderTools(el); else hideTools(el);
       return;
     }
     if (s.kind === 'donut') drawDonut(el.id, s);
     else if (s.kind === 'treemap') drawTreemap(el.id, s);
     else drawBar(el.id, s, s.kind === 'hbar');
+    wireSeriesClick(el, s);
+  }
+
+  /** คลิกแท่ง/ชิ้นโดนัท/กล่องทรีแมป ที่มี opts.filterKey ไว้ → ตั้งตัวกรองส่วนกลางผ่าน wireFilterClick
+   *  ดัชนีอ้างอิงจาก s.view (หลังตัด Top N แล้ว) ไม่ใช่ s.labels ดิบ */
+  function wireSeriesClick(el, s) {
+    if (!el.dataset.plotted || typeof el.on !== 'function') return;
+    if (el.removeAllListeners) el.removeAllListeners('plotly_click');
+    const key = s.opts.filterKey, vals = s.view.filterValues;
+    if (!key || !vals || !filterHook) return;
+    el.on('plotly_click', ev => {
+      const pt = ev.points && ev.points[0];
+      if (!pt) return;
+      let idx;
+      if (s.kind === 'treemap') {
+        if (!pt.id || pt.id === '__all') return;
+        idx = Number(pt.id.slice(1));
+      } else {
+        idx = pt.pointIndex ?? pt.pointNumber ?? pt.i;
+      }
+      if (typeof idx === 'number' && vals[idx] != null) filterHook(key, vals[idx]);
+    });
   }
 
   function seriesTable(s) {
-    if (!s.labels.length) return U.emptyState('ไม่มีข้อมูลสำหรับกราฟนี้');
+    const { labels } = s.view;
+    if (!labels.length) return U.emptyState('ไม่มีข้อมูลสำหรับกราฟนี้');
     const { headers, rows } = exportRows({ _series: s });
     const fmt = v => v == null || v === '' ? '–'
       : typeof v === 'number' ? v.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : U.esc(v);
@@ -320,13 +449,18 @@ const Charts = (() => {
 
   /* ---------- รูปแบบกราฟที่ใช้ซ้ำ ---------- */
 
-  /** parts: true เมื่อค่าทุกแท่งรวมกันเป็นผลรวมเดียว (เปิดให้สลับเป็นโดนัท/ทรีแมปได้) */
+  /** parts: true เมื่อค่าทุกแท่งรวมกันเป็นผลรวมเดียว (เปิดให้สลับเป็นโดนัท/ทรีแมปและ Top N/% ได้)
+   *  filterKey/filterValues (ใน opts): คลิกแท่งแล้วตั้งตัวกรองส่วนกลาง — filterValues ต้องยาวเท่า labels */
   function bar(id, labels, values, opts = {}) {
     series(id, { labels, values, opts, natural: opts.horizontal ? 'hbar' : 'bar', parts: !!opts.parts });
   }
 
-  function donut(id, labels, values, colors, centerLabel) {
-    series(id, { labels, values, opts: { colors: colors || null, centerLabel }, natural: 'donut', parts: true });
+  function donut(id, labels, values, colors, centerLabel, opts = {}) {
+    series(id, {
+      labels, values,
+      opts: { colors: colors || null, centerLabel, filterKey: opts.filterKey, filterValues: opts.filterValues },
+      natural: 'donut', parts: true,
+    });
   }
 
   function partColors(s) {
@@ -334,13 +468,15 @@ const Charts = (() => {
   }
 
   function drawBar(id, s, horizontal) {
-    const { title, color, colors, axisTitle, refLines } = s.opts;
-    const labels = s.labels, values = s.values;
+    const { title, color, axisTitle: axisTitleOpt, refLines } = s.opts;
+    const { labels, values, colors } = s.view;
     // รูปแบบ hover เขียนอ้างแกนของแนวเดิม (%{x} ของแท่งนอน) ต้องสลับแกนตามเมื่อหมุนกราฟ
-    let valueFormat = s.opts.valueFormat;
+    let valueFormat = s.pct ? null : s.opts.valueFormat;
     if (valueFormat && horizontal !== (s.natural === 'hbar')) {
       valueFormat = valueFormat.replace(/%\{([xy])/g, (_, a) => '%{' + (a === 'x' ? 'y' : 'x'));
     }
+    if (s.pct) valueFormat = '%{' + (horizontal ? 'x' : 'y') + ':.1f}%';
+    const axisTitleText = s.pct ? ((axisTitleOpt ? axisTitleOpt + ' ' : '') + '(%)') : axisTitleOpt;
     const marker = { color: colors || color || C.teal };
     const trace = horizontal
       ? { type: 'bar', orientation: 'h', y: labels, x: values, marker }
@@ -366,8 +502,8 @@ const Charts = (() => {
       // 220px เผื่อป้ายยาวของกราฟที่ออกแบบเป็นแท่งนอนอยู่แล้ว ส่วนกราฟที่ผู้ใช้หมุนมาจากแบบอื่น
       // มักอยู่ในการ์ดแคบ ให้ automargin ขยายเท่าป้ายจริงแทน ไม่เช่นนั้นแท่งจะถูกบีบจนอ่านไม่ได้
       margin: horizontal ? { t: title ? 34 : 12, l: s.natural === 'hbar' ? 220 : 20, r: 24, b: 40 } : { t: title ? 34 : 12, l: 66, r: 20, b: 70 },
-      xaxis: horizontal ? { title: axisTitle, gridcolor: T().grid } : { automargin: true, gridcolor: T().grid },
-      yaxis: horizontal ? { automargin: true, autorange: 'reversed' } : { title: axisTitle, gridcolor: T().grid },
+      xaxis: horizontal ? { title: axisTitleText, gridcolor: T().grid } : { automargin: true, gridcolor: T().grid },
+      yaxis: horizontal ? { automargin: true, autorange: 'reversed' } : { title: axisTitleText, gridcolor: T().grid },
       shapes, annotations,
     });
   }
@@ -376,9 +512,11 @@ const Charts = (() => {
    *  ของเดิมพิมพ์เปอร์เซ็นต์บนทุกชิ้น ซึ่งทับกันเมื่อหลายชิ้นมีสัดส่วนใกล้เคียงกัน
    *  จึงแสดงเฉพาะชิ้นที่ตั้งแต่ 5% ขึ้นไป ส่วนที่เหลืออ่านได้จาก legend และ hover */
   function drawDonut(id, s) {
-    const labels = s.labels, values = s.values;
-    const centerLabel = s.opts.centerLabel || s.opts.axisTitle;
-    const total = values.reduce((a, b) => a + (b || 0), 0);
+    const { labels, values } = s.view;
+    const centerLabel = s.pct ? 'สัดส่วน %' : (s.opts.centerLabel || s.opts.axisTitle);
+    const total = values.reduce((a, b) => a + (+b || 0), 0);
+    // ค่าที่วาดเป็น % อยู่แล้วเมื่อ s.pct — พาย normalize ตามสัดส่วนเสมออยู่แล้วจึงได้รูปร่างเดิม
+    // ต่างกันแค่ป้าย/hover ที่อ่านเป็น % ตรงๆ แทนจำนวนดิบ
     const pcts = values.map(v => total ? v / total : 0);
     draw(id, [{
       type: 'pie', hole: 0.62, labels, values,
@@ -387,32 +525,33 @@ const Charts = (() => {
       textinfo: 'text', textposition: 'inside', insidetextorientation: 'horizontal',
       textfont: { size: 12, color: '#fff' },
       sort: false,
-      hovertemplate: '%{label}<br>%{value:,.0f} (%{percent})<extra></extra>',
+      hovertemplate: s.pct ? '%{label}<br>%{value:.1f}%<extra></extra>' : '%{label}<br>%{value:,.0f} (%{percent})<extra></extra>',
     }], {
       margin: { t: 12, l: 12, r: 12, b: 12 },
       showlegend: true,
       legend: { orientation: 'h', y: -0.08, font: { size: 11 } },
       annotations: [{
-        text: `<b>${total.toLocaleString('th-TH')}</b>` + (centerLabel ? `<br><span style="font-size:11px">${centerLabel}</span>` : ''),
+        text: s.pct ? '<b>100%</b>' : (`<b>${total.toLocaleString('th-TH')}</b>` + (centerLabel ? `<br><span style="font-size:11px">${centerLabel}</span>` : '')),
         showarrow: false, font: { size: 17, color: T().ink }, x: 0.5, y: 0.5,
       }],
     });
   }
 
   function drawTreemap(id, s) {
+    const { labels, values } = s.view;
     const cols = partColors(s);
-    const colors = s.labels.map((_, i) => cols[i % cols.length]);
+    const colors = labels.map((_, i) => cols[i % cols.length]);
     // ใช้ id แยกจากป้าย กันป้ายซ้ำกัน และมีโหนดรากชัดเจนเพื่อให้ % เทียบกับทั้งหมด
     draw(id, [{
       type: 'treemap', branchvalues: 'total',
-      ids: ['__all'].concat(s.labels.map((_, i) => 'n' + i)),
-      labels: ['ทั้งหมด'].concat(s.labels),
-      parents: [''].concat(s.labels.map(() => '__all')),
-      values: [s.values.reduce((a, b) => a + (+b || 0), 0)].concat(s.values),
+      ids: ['__all'].concat(labels.map((_, i) => 'n' + i)),
+      labels: ['ทั้งหมด'].concat(labels),
+      parents: [''].concat(labels.map(() => '__all')),
+      values: [values.reduce((a, b) => a + (+b || 0), 0)].concat(values),
       marker: { colors: ['rgba(0,0,0,0)'].concat(colors), line: { color: T().surface, width: 2 } },
       textfont: { color: [T().dim].concat(colors.map(inkOn)) },
       textinfo: 'label+value+percent root',
-      hovertemplate: '%{label}<br>%{value:,.0f} (%{percentRoot:.1%})<extra></extra>',
+      hovertemplate: s.pct ? '%{label}<br>%{value:.1f}%<extra></extra>' : '%{label}<br>%{value:,.0f} (%{percentRoot:.1%})<extra></extra>',
       pathbar: { visible: false },
     }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
   }
@@ -666,5 +805,5 @@ const Charts = (() => {
     }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
   }
 
-  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme };
+  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme, wireFilterClick, resetAllVisible };
 })();
