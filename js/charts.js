@@ -72,11 +72,237 @@ const Charts = (() => {
     if (!hasData) {
       if (el.dataset.plotted) { Plotly.purge(el); delete el.dataset.plotted; }
       el.innerHTML = U.emptyState(emptyMessage);
+      el._spec = null;
+      hideTools(el);
       return;
     }
     if (!el.dataset.plotted) el.innerHTML = '';
-    Plotly.react(el, traces, baseLayout(layout), CONFIG);
+    const full = baseLayout(layout);
+    // Plotly แก้ trace/layout ที่ส่งเข้าไปตรงๆ ตอนผู้ใช้ซูมหรือกด legend
+    // จึงเก็บสำเนาที่ยังไม่ถูกแตะไว้ให้ปุ่มรีเซ็ตใช้วาดกลับ
+    el._spec = { traces: clone(traces), layout: clone(full) };
+    Plotly.react(el, traces, full, CONFIG);
     el.dataset.plotted = '1';
+    renderTools(el);
+  }
+
+  function clone(x) {
+    try { return structuredClone(x); } catch (e) { return JSON.parse(JSON.stringify(x)); }
+  }
+
+  /* ---------- แถบเครื่องมือของกราฟ: สลับแบบ · รีเซ็ต · เต็มจอ · ดาวน์โหลด ----------
+     ใส่ครั้งเดียวที่ draw() กราฟทุกตัวจึงได้เครื่องมือชุดเดียวกันโดยไม่ต้องแก้ทีละจุด
+     วางเป็นพี่น้องก่อนหน้ากราฟ ไม่ใช่ข้างใน เพราะ Plotly.purge/innerHTML ของกราฟจะล้างทิ้ง */
+
+  const KINDS = {
+    bar:     { icon: '▮', label: 'แท่งตั้ง' },
+    hbar:    { icon: '▬', label: 'แท่งนอน' },
+    donut:   { icon: '◔', label: 'โดนัท' },
+    treemap: { icon: '▦', label: 'ทรีแมป' },
+    table:   { icon: '☰', label: 'ตาราง' },
+  };
+  const KIND_KEY = 'pa_chart_kind:';
+  const DONUT_MAX = 8;
+
+  function toolsOf(el) {
+    const prev = el.previousElementSibling;
+    return prev && prev.classList.contains('chart-tools') && prev.dataset.for === el.id ? prev : null;
+  }
+
+  function hideTools(el) {
+    const bar = toolsOf(el);
+    if (bar) bar.hidden = true;
+  }
+
+  function renderTools(el) {
+    let bar = toolsOf(el);
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'chart-tools';
+      bar.dataset.for = el.id;
+      bar.setAttribute('role', 'toolbar');
+      bar.setAttribute('aria-label', 'เครื่องมือกราฟ');
+      bar.addEventListener('click', onToolClick);
+      el.parentNode.insertBefore(bar, el);
+    }
+    const s = el._series;
+    const kinds = s ? allowedKinds(s) : [];
+    const btn = (attrs, text, title) =>
+      `<button type="button" class="chart-tool" ${attrs} title="${title}" aria-label="${title}">${text}</button>`;
+    const kindBtns = kinds.length > 1
+      ? `<span class="chart-kinds" role="group" aria-label="แบบกราฟ">${kinds.map(k =>
+          `<button type="button" class="chart-tool${k === s.kind ? ' is-on' : ''}" data-kind="${k}"
+            aria-pressed="${k === s.kind}" title="แสดงเป็น${KINDS[k].label}"
+            aria-label="แสดงเป็น${KINDS[k].label}">${KINDS[k].icon}</button>`).join('')}</span>`
+      : '';
+    const isTable = s && s.kind === 'table';
+    bar.innerHTML = kindBtns +
+      btn('data-act="reset"', '↺', 'รีเซ็ตกลับค่าเริ่มต้น (แบบกราฟ การซูม และรายการที่ซ่อนจาก legend)') +
+      (document.fullscreenEnabled ? btn('data-act="full"', '⤢', 'ขยายเต็มจอ (กด Esc เพื่อออก)') : '') +
+      (isTable ? '' : btn('data-act="png"', 'PNG', 'ดาวน์โหลดกราฟเป็นภาพ PNG')) +
+      (exportRows(el).rows.length ? btn('data-act="csv"', 'CSV', 'ดาวน์โหลดข้อมูลของกราฟนี้เป็น CSV') : '');
+    bar.hidden = false;
+  }
+
+  function onToolClick(e) {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const el = document.getElementById(this.dataset.for);
+    if (!el) return;
+    if (b.dataset.kind) { setKind(el, b.dataset.kind); return; }
+    const act = b.dataset.act;
+    if (act === 'reset') resetChart(el);
+    else if (act === 'full') toggleFull(el);
+    else if (act === 'png' && el.dataset.plotted) {
+      Plotly.downloadImage(el, { format: 'png', scale: 2, filename: fileBase(el) });
+    } else if (act === 'csv') {
+      const { headers, rows } = exportRows(el);
+      U.downloadCSV(fileBase(el) + '.csv', headers, rows);
+    }
+  }
+
+  function resetChart(el) {
+    if (el._series) {
+      try { localStorage.removeItem(KIND_KEY + el.id); } catch (e) { /* โหมดส่วนตัว */ }
+      el._series.kind = el._series.natural;
+      renderSeries(el);
+      return;
+    }
+    if (el._spec && el.dataset.plotted) {
+      Plotly.react(el, clone(el._spec.traces), clone(el._spec.layout), CONFIG);
+    }
+  }
+
+  function toggleFull(el) {
+    const host = el.parentElement;
+    if (document.fullscreenElement === host) { document.exitFullscreen(); return; }
+    host.classList.add('chart-fs-host');
+    const onChange = () => {
+      const on = document.fullscreenElement === host;
+      el.classList.toggle('chart-full', on);
+      if (!on) {
+        host.classList.remove('chart-fs-host');
+        document.removeEventListener('fullscreenchange', onChange);
+      }
+      requestAnimationFrame(() => {
+        if (el.dataset.plotted) Promise.resolve(Plotly.Plots.resize(el)).catch(() => {});
+      });
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    host.requestFullscreen().catch(() => {
+      host.classList.remove('chart-fs-host');
+      document.removeEventListener('fullscreenchange', onChange);
+    });
+  }
+
+  function fileBase(el) {
+    const card = el.closest('.cardx');
+    const title = card?.querySelector('h2, h3')?.textContent.trim() || el.id;
+    return title.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').slice(0, 60);
+  }
+
+  function axisTitle(ax) {
+    const t = ax && ax.title;
+    return (typeof t === 'string' ? t : t && t.text) || '';
+  }
+
+  /** แปลงข้อมูลที่อยู่ในกราฟเป็นแถว CSV — กราฟป้าย+ค่าใช้ข้อมูลต้นทาง กราฟอื่นอ่านจาก trace */
+  function exportRows(el) {
+    const s = el._series;
+    if (s) {
+      const head = s.opts.axisTitle || s.opts.centerLabel || 'ค่า';
+      const total = s.values.reduce((a, b) => a + (+b || 0), 0);
+      return {
+        headers: ['รายการ', head].concat(s.parts ? ['สัดส่วน (%)'] : []),
+        rows: s.labels.map((l, i) => [l, s.values[i]]
+          .concat(s.parts ? [total ? +(s.values[i] / total * 100).toFixed(2) : ''] : [])),
+      };
+    }
+    const spec = el._spec;
+    if (!spec) return { headers: [], rows: [] };
+    const rows = [];
+    for (const t of spec.traces) {
+      const name = t.name || '';
+      if (t.type === 'sankey' && t.link) {
+        const lab = (t.node && t.node.label) || [];
+        (t.link.value || []).forEach((v, i) =>
+          rows.push([lab[t.link.source[i]] ?? t.link.source[i], lab[t.link.target[i]] ?? t.link.target[i], v]));
+      } else if (t.labels && t.values) {
+        t.labels.forEach((l, i) => rows.push([name, l, t.values[i]]));
+      } else if (t.r && t.theta) {
+        t.r.forEach((r, i) => rows.push([name, t.theta[i], r]));
+      } else if (t.x && t.y) {
+        t.x.forEach((x, i) => rows.push([name, x, t.y[i]]));
+      }
+    }
+    const isSankey = spec.traces.some(t => t.type === 'sankey');
+    const headers = isSankey ? ['จาก', 'ไป', 'ค่า']
+      : ['ชุดข้อมูล', axisTitle(spec.layout.xaxis) || 'x', axisTitle(spec.layout.yaxis) || 'ค่า'];
+    return { headers, rows };
+  }
+
+  /* ---------- กราฟแบบป้าย+ค่า ที่สลับแบบได้ (แท่ง / โดนัท / ทรีแมป / ตาราง) ----------
+     parts = ค่าทุกตัวเป็นส่วนหนึ่งของผลรวมเดียวกัน (สัญญาหนึ่งอยู่ได้หมวดเดียว)
+     เฉพาะแบบนี้จึงเปิดโดนัท/ทรีแมป — จำนวนตามกฎที่สัญญาเดียวติดหลายข้อ ฮิสโทแกรม
+     หรืออัตราส่วน ถ้าวาดเป็นโดนัทจะสื่อสัดส่วนที่ไม่มีอยู่จริง */
+
+  function allowedKinds(s) {
+    const kinds = ['bar', 'hbar'];
+    const nonNeg = s.values.every(v => v == null || v >= 0);
+    const total = s.values.reduce((a, b) => a + (+b || 0), 0);
+    if (s.parts && nonNeg && total > 0) {
+      if (s.natural === 'donut' || s.labels.length <= DONUT_MAX) kinds.push('donut');
+      kinds.push('treemap');
+    }
+    kinds.push('table');
+    return kinds;
+  }
+
+  function series(id, s) {
+    const el = U.$(id);
+    if (!el) return;
+    el._series = s;
+    let saved = null;
+    try { saved = localStorage.getItem(KIND_KEY + id); } catch (e) { /* โหมดส่วนตัว */ }
+    s.kind = saved && allowedKinds(s).includes(saved) ? saved : s.natural;
+    renderSeries(el);
+  }
+
+  function setKind(el, kind) {
+    const s = el._series;
+    if (!s || s.kind === kind) return;
+    s.kind = kind;
+    try {
+      if (kind === s.natural) localStorage.removeItem(KIND_KEY + el.id);
+      else localStorage.setItem(KIND_KEY + el.id, kind);
+    } catch (e) { /* โหมดส่วนตัว */ }
+    renderSeries(el);
+  }
+
+  function renderSeries(el) {
+    const s = el._series;
+    el.classList.toggle('chart-as-table', s.kind === 'table');
+    if (s.kind === 'table') {
+      if (el.dataset.plotted) { Plotly.purge(el); delete el.dataset.plotted; }
+      el._spec = null;
+      el.innerHTML = seriesTable(s);
+      if (s.labels.length) renderTools(el); else hideTools(el);
+      return;
+    }
+    if (s.kind === 'donut') drawDonut(el.id, s);
+    else if (s.kind === 'treemap') drawTreemap(el.id, s);
+    else drawBar(el.id, s, s.kind === 'hbar');
+  }
+
+  function seriesTable(s) {
+    if (!s.labels.length) return U.emptyState('ไม่มีข้อมูลสำหรับกราฟนี้');
+    const { headers, rows } = exportRows({ _series: s });
+    const fmt = v => v == null || v === '' ? '–'
+      : typeof v === 'number' ? v.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : U.esc(v);
+    return `<div class="table-wrap"><table class="table table-sm mini-table mb-0">
+      <thead><tr>${headers.map((h, i) => `<th scope="col"${i ? ' class="text-end"' : ''}>${U.esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map((v, i) =>
+        `<td${i ? ' class="text-end"' : ''}>${fmt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
 
   /** เรียกเมื่อแท็บถูกเปิด — กราฟที่วาดตอนแท็บซ่อนอยู่จะมีความกว้าง 0 */
@@ -94,7 +320,27 @@ const Charts = (() => {
 
   /* ---------- รูปแบบกราฟที่ใช้ซ้ำ ---------- */
 
-  function bar(id, labels, values, { title, color, horizontal = false, valueFormat, colors, axisTitle, refLines } = {}) {
+  /** parts: true เมื่อค่าทุกแท่งรวมกันเป็นผลรวมเดียว (เปิดให้สลับเป็นโดนัท/ทรีแมปได้) */
+  function bar(id, labels, values, opts = {}) {
+    series(id, { labels, values, opts, natural: opts.horizontal ? 'hbar' : 'bar', parts: !!opts.parts });
+  }
+
+  function donut(id, labels, values, colors, centerLabel) {
+    series(id, { labels, values, opts: { colors: colors || null, centerLabel }, natural: 'donut', parts: true });
+  }
+
+  function partColors(s) {
+    return Array.isArray(s.opts.colors) ? s.opts.colors : CATEGORICAL;
+  }
+
+  function drawBar(id, s, horizontal) {
+    const { title, color, colors, axisTitle, refLines } = s.opts;
+    const labels = s.labels, values = s.values;
+    // รูปแบบ hover เขียนอ้างแกนของแนวเดิม (%{x} ของแท่งนอน) ต้องสลับแกนตามเมื่อหมุนกราฟ
+    let valueFormat = s.opts.valueFormat;
+    if (valueFormat && horizontal !== (s.natural === 'hbar')) {
+      valueFormat = valueFormat.replace(/%\{([xy])/g, (_, a) => '%{' + (a === 'x' ? 'y' : 'x'));
+    }
     const marker = { color: colors || color || C.teal };
     const trace = horizontal
       ? { type: 'bar', orientation: 'h', y: labels, x: values, marker }
@@ -117,7 +363,9 @@ const Charts = (() => {
     }));
     draw(id, [trace], {
       title: title ? { text: title, font: { size: 12 } } : undefined,
-      margin: horizontal ? { t: title ? 34 : 12, l: 220, r: 24, b: 40 } : { t: title ? 34 : 12, l: 66, r: 20, b: 70 },
+      // 220px เผื่อป้ายยาวของกราฟที่ออกแบบเป็นแท่งนอนอยู่แล้ว ส่วนกราฟที่ผู้ใช้หมุนมาจากแบบอื่น
+      // มักอยู่ในการ์ดแคบ ให้ automargin ขยายเท่าป้ายจริงแทน ไม่เช่นนั้นแท่งจะถูกบีบจนอ่านไม่ได้
+      margin: horizontal ? { t: title ? 34 : 12, l: s.natural === 'hbar' ? 220 : 20, r: 24, b: 40 } : { t: title ? 34 : 12, l: 66, r: 20, b: 70 },
       xaxis: horizontal ? { title: axisTitle, gridcolor: T().grid } : { automargin: true, gridcolor: T().grid },
       yaxis: horizontal ? { automargin: true, autorange: 'reversed' } : { title: axisTitle, gridcolor: T().grid },
       shapes, annotations,
@@ -127,12 +375,14 @@ const Charts = (() => {
   /** โดนัทพร้อมยอดรวมกลางวง
    *  ของเดิมพิมพ์เปอร์เซ็นต์บนทุกชิ้น ซึ่งทับกันเมื่อหลายชิ้นมีสัดส่วนใกล้เคียงกัน
    *  จึงแสดงเฉพาะชิ้นที่ตั้งแต่ 5% ขึ้นไป ส่วนที่เหลืออ่านได้จาก legend และ hover */
-  function donut(id, labels, values, colors, centerLabel) {
+  function drawDonut(id, s) {
+    const labels = s.labels, values = s.values;
+    const centerLabel = s.opts.centerLabel || s.opts.axisTitle;
     const total = values.reduce((a, b) => a + (b || 0), 0);
     const pcts = values.map(v => total ? v / total : 0);
     draw(id, [{
       type: 'pie', hole: 0.62, labels, values,
-      marker: { colors: colors || CATEGORICAL, line: { color: T().surface, width: 2 } },
+      marker: { colors: partColors(s), line: { color: T().surface, width: 2 } },
       text: pcts.map(p => p >= 0.05 ? (p * 100).toFixed(0) + '%' : ''),
       textinfo: 'text', textposition: 'inside', insidetextorientation: 'horizontal',
       textfont: { size: 12, color: '#fff' },
@@ -147,6 +397,24 @@ const Charts = (() => {
         showarrow: false, font: { size: 17, color: T().ink }, x: 0.5, y: 0.5,
       }],
     });
+  }
+
+  function drawTreemap(id, s) {
+    const cols = partColors(s);
+    const colors = s.labels.map((_, i) => cols[i % cols.length]);
+    // ใช้ id แยกจากป้าย กันป้ายซ้ำกัน และมีโหนดรากชัดเจนเพื่อให้ % เทียบกับทั้งหมด
+    draw(id, [{
+      type: 'treemap', branchvalues: 'total',
+      ids: ['__all'].concat(s.labels.map((_, i) => 'n' + i)),
+      labels: ['ทั้งหมด'].concat(s.labels),
+      parents: [''].concat(s.labels.map(() => '__all')),
+      values: [s.values.reduce((a, b) => a + (+b || 0), 0)].concat(s.values),
+      marker: { colors: ['rgba(0,0,0,0)'].concat(colors), line: { color: T().surface, width: 2 } },
+      textfont: { color: [T().dim].concat(colors.map(inkOn)) },
+      textinfo: 'label+value+percent root',
+      hovertemplate: '%{label}<br>%{value:,.0f} (%{percentRoot:.1%})<extra></extra>',
+      pathbar: { visible: false },
+    }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
   }
 
   function sankey(id, edges, { nodeColorFn, height } = {}) {

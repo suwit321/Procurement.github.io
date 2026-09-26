@@ -6830,7 +6830,7 @@ ${placemarks.join('\n')}
       (nTypes ? `ละเอียดกว่า "ประเภทโครงการ" ซึ่งมี ${U.num(nTypes)} ประเภท · ` : '') +
       `ใช้เป็นกลุ่มเปรียบเทียบของโมเดลทุกตัวในแท็บความผิดปกติ`;
     Charts.bar('wgChart', order.map(([k]) => workGroupLabel(k)), order.map(([, v]) => v.length), {
-      horizontal: true, color: Charts.C.teal, axisTitle: 'จำนวนสัญญา',
+      horizontal: true, color: Charts.C.teal, axisTitle: 'จำนวนสัญญา', parts: true,
     });
   }
 
@@ -8016,7 +8016,7 @@ ${placemarks.join('\n')}
       statuses.map((s, i) => `${s} · ${byStatus[i].length} เคส`),
       byStatus.map(list => U.sum(list.map(c => c.value))),
       { horizontal: true, color: Charts.C.teal, axisTitle: 'มูลค่ารวมที่ค้างอยู่ (บาท)',
-        valueFormat: '%{x:,.0f} บาท' });
+        valueFormat: '%{x:,.0f} บาท', parts: true });
 
     U.setHTML('kanban', statuses.map((status, i) => {
       const items = byStatus[i];
