@@ -1900,6 +1900,45 @@ button.detail-clickable { text-decoration: none; }
 .subtab-btn:focus-visible { outline: none; box-shadow: var(--shadow-focus); position: relative; z-index: 1; }
 .subtab-btn .nav-count:empty { display: none; }
 
+/* ---------- 25c) แถบเครื่องมือกราฟ (สร้างโดย Charts.draw) ---------- */
+.chart-tools {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
+  gap: 4px; margin: 0 0 4px;
+  opacity: .72; transition: opacity .14s ease;
+}
+.chart-tools[hidden] { display: none; }
+.chart-tools:hover, .chart-tools:focus-within { opacity: 1; }
+.chart-kinds {
+  display: inline-flex; margin-right: 4px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden;
+}
+.chart-tool {
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--muted);
+  min-width: 28px; height: 26px; padding: 0 7px;
+  font-size: var(--text-xs); font-weight: 600; line-height: 1; cursor: pointer;
+  transition: background-color .14s ease, color .14s ease;
+}
+.chart-kinds .chart-tool { border: 0; border-radius: 0; font-size: 13px; }
+.chart-kinds .chart-tool + .chart-tool { border-left: 1px solid var(--border-strong); }
+.chart-tool:hover { background: var(--surface-hover); color: var(--text); }
+.chart-tool.is-on { background: var(--primary); color: #fff; }
+.chart-tool:focus-visible { outline: none; box-shadow: var(--shadow-focus); position: relative; z-index: 1; }
+.chart-hint {
+  font-size: var(--text-xs); color: var(--muted);
+  margin-right: auto; align-self: center;
+}
+.chart-topn {
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text);
+  height: 26px; padding: 0 6px; font-size: var(--text-xs); cursor: pointer;
+}
+.chart-as-table { height: auto !important; max-height: 420px; overflow: auto; }
+.chart-fs-host:fullscreen { background: var(--surface); padding: 20px 24px; overflow: auto; }
+.chart-fs-host:fullscreen::backdrop { background: var(--surface); }
+.chart-full { height: calc(100vh - 160px) !important; min-height: 320px; }
+.chart-full.chart-as-table { max-height: none; }
+
 /* ---- โหมดกระชับ: ซ่อนชั้นคำอธิบาย เหลือตัวเลขและกราฟ ----
    ซ่อนเฉพาะข้อความประกอบ ไม่ซ่อนตัวควบคุม ตาราง กราฟ หรือค่าใดๆ
    ผู้ใช้จึงยังทำงานได้ครบเหมือนเดิม ต่างแค่ไม่มีคำอธิบายกำกับ */
@@ -2243,7 +2282,7 @@ h2.card-head-el {
 /* โหมดพิมพ์: ผู้ตรวจสอบต้องแนบผลในรายงาน
    ตัดส่วนควบคุมออก และกางการ์ดที่พับไว้ให้เห็นเนื้อหาครบ */
 @media print {
-  .topbar, .filter-bar, .quick-filters, .tab-groupnav, .tab-subnav, .subtab-strip,
+  .topbar, .filter-bar, .quick-filters, .tab-groupnav, .tab-subnav, .subtab-strip, .chart-tools,
   .card-collapse-btn, .density-switch, .case-note { display: none !important; }
   .cardx.is-collapsed > *:not(.card-head-el) { display: revert !important; }
   .cardx { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }

@@ -54,12 +54,15 @@ const Charts = (() => {
       hoverlabel: { font: { family: FONT.family, size: 11 } },
       xaxis: { gridcolor: T().grid, zerolinecolor: T().line },
       yaxis: { gridcolor: T().grid, zerolinecolor: T().line },
+      // Plotly.react เห็นค่าที่เปลี่ยนแล้วไล่แท่ง/เส้นเข้าตำแหน่งใหม่ให้เอง เมื่อตัวกรองเปลี่ยน
+      // ผู้ใช้จึงเห็นว่าตัวเลขไหนขยับ ไม่ใช่กราฟกระพริบเปลี่ยนเป็นค่าใหม่ทันที
+      transition: { duration: 350, easing: 'cubic-in-out' },
     }, extra);
   }
 
   /** วาดกราฟ; ถ้าไม่มีข้อมูลให้แสดงข้อความแทนที่จะปล่อยพื้นที่ว่าง
    *  (ของเดิมกราฟว่างแยกไม่ออกจาก widget ที่พัง) */
-  function draw(id, traces, layout = {}, emptyMessage = 'ไม่มีข้อมูลสำหรับกราฟนี้') {
+  function draw(id, traces, layout = {}, emptyMessage = 'ไม่มีข้อมูลสำหรับกราฟนี้', configExtra = null) {
     const el = U.$(id);
     if (!el) return;
     // ต้องครอบคลุมทุกชนิดกราฟที่ใช้: cartesian (x/y), pie (values/labels),
@@ -72,11 +75,400 @@ const Charts = (() => {
     if (!hasData) {
       if (el.dataset.plotted) { Plotly.purge(el); delete el.dataset.plotted; }
       el.innerHTML = U.emptyState(emptyMessage);
+      el._spec = null;
+      hideTools(el);
       return;
     }
     if (!el.dataset.plotted) el.innerHTML = '';
-    Plotly.react(el, traces, baseLayout(layout), CONFIG);
+    const full = baseLayout(layout);
+    // Plotly แก้ trace/layout ที่ส่งเข้าไปตรงๆ ตอนผู้ใช้ซูมหรือกด legend
+    // จึงเก็บสำเนาที่ยังไม่ถูกแตะไว้ให้ปุ่มรีเซ็ตใช้วาดกลับ
+    el._spec = { traces: clone(traces), layout: clone(full) };
+    // configExtra ใช้เฉพาะจุดที่ต้องเปิดเครื่องมือ Plotly พิเศษ (เช่น ลากเลือกจุด) โดยไม่กระทบกราฟอื่น
+    Plotly.react(el, traces, full, configExtra ? Object.assign({}, CONFIG, configExtra) : CONFIG);
     el.dataset.plotted = '1';
+    renderTools(el);
+  }
+
+  function clone(x) {
+    try { return structuredClone(x); } catch (e) { return JSON.parse(JSON.stringify(x)); }
+  }
+
+  /* ---------- แถบเครื่องมือของกราฟ: สลับแบบ · รีเซ็ต · เต็มจอ · ดาวน์โหลด ----------
+     ใส่ครั้งเดียวที่ draw() กราฟทุกตัวจึงได้เครื่องมือชุดเดียวกันโดยไม่ต้องแก้ทีละจุด
+     วางเป็นพี่น้องก่อนหน้ากราฟ ไม่ใช่ข้างใน เพราะ Plotly.purge/innerHTML ของกราฟจะล้างทิ้ง */
+
+  const KINDS = {
+    bar:     { icon: '▮', label: 'แท่งตั้ง' },
+    hbar:    { icon: '▬', label: 'แท่งนอน' },
+    donut:   { icon: '◔', label: 'โดนัท' },
+    treemap: { icon: '▦', label: 'ทรีแมป' },
+    table:   { icon: '☰', label: 'ตาราง' },
+  };
+  const KIND_KEY = 'pa_chart_kind:';
+  const DONUT_MAX = 8;
+  const TOPN_OPTIONS = [10, 20];
+
+  const TS_KINDS = {
+    line:     { icon: '📈', label: 'เส้น' },
+    stackbar: { icon: '▤', label: 'แท่งซ้อน' },
+    area:     { icon: '⛰', label: 'พื้นที่ซ้อน' },
+    heatmap:  { icon: '▧', label: 'แผนที่ความร้อน' },
+  };
+
+  let filterHook = null;
+  /** app.js เรียกครั้งเดียวตอนบูต — คลิกแท่ง/ชิ้นโดนัทที่ประกาศ opts.filterKey ไว้จะเรียก fn(key, value)
+   *  แยกเป็น hook เพราะ charts.js ไม่รู้จัก state ตัวกรองหรือ applyFilters ของ app.js */
+  function wireFilterClick(fn) { filterHook = fn; }
+
+  function toolsOf(el) {
+    const prev = el.previousElementSibling;
+    return prev && prev.classList.contains('chart-tools') && prev.dataset.for === el.id ? prev : null;
+  }
+
+  function hideTools(el) {
+    const bar = toolsOf(el);
+    if (bar) bar.hidden = true;
+  }
+
+  /* ---------- ค่าที่จำไว้ต่อกราฟ: แบบกราฟ · Top N · โหมด % ----------
+     ของเดิมเก็บแค่ชื่อแบบกราฟเป็นสตริงเปล่า จึงต้องอ่านแบบที่รองรับทั้งสตริงเดิมและ JSON ใหม่ */
+  function loadUiState(id) {
+    let raw = null;
+    try { raw = localStorage.getItem(KIND_KEY + id); } catch (e) { /* โหมดส่วนตัว */ }
+    if (!raw) return {};
+    try {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object') return o;
+    } catch (e) { /* ค่าเดิมก่อนอัปเดตคือชื่อแบบกราฟล้วนๆ ไม่ใช่ JSON */ }
+    return { kind: raw };
+  }
+  function saveUiState(id, st) {
+    try {
+      if (!st.kind && !st.topN && !st.pct) { localStorage.removeItem(KIND_KEY + id); return; }
+      localStorage.setItem(KIND_KEY + id, JSON.stringify(st));
+    } catch (e) { /* โหมดส่วนตัว */ }
+  }
+  function persist(el) {
+    const s = el._series;
+    saveUiState(el.id, {
+      kind: s.kind !== s.natural ? s.kind : undefined,
+      topN: s.topN || undefined,
+      pct: s.pct || undefined,
+    });
+  }
+
+  function renderTools(el) {
+    let bar = toolsOf(el);
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'chart-tools';
+      bar.dataset.for = el.id;
+      bar.setAttribute('role', 'toolbar');
+      bar.setAttribute('aria-label', 'เครื่องมือกราฟ');
+      bar.addEventListener('click', onToolClick);
+      bar.addEventListener('change', onToolChange);
+      el.parentNode.insertBefore(bar, el);
+    }
+    const s = el._series;
+    const ts = el._ts;
+    const kinds = s ? allowedKinds(s) : [];
+    const btn = (attrs, text, title, on) =>
+      `<button type="button" class="chart-tool${on ? ' is-on' : ''}" ${attrs} title="${title}" aria-label="${title}">${text}</button>`;
+    const kindBtns = s && kinds.length > 1
+      ? `<span class="chart-kinds" role="group" aria-label="แบบกราฟ">${kinds.map(k =>
+          `<button type="button" class="chart-tool${k === s.kind ? ' is-on' : ''}" data-kind="${k}"
+            aria-pressed="${k === s.kind}" title="แสดงเป็น${KINDS[k].label}"
+            aria-label="แสดงเป็น${KINDS[k].label}">${KINDS[k].icon}</button>`).join('')}</span>`
+      : ts
+      ? `<span class="chart-kinds" role="group" aria-label="แบบกราฟ">${Object.keys(TS_KINDS).map(k =>
+          `<button type="button" class="chart-tool${k === ts.kind ? ' is-on' : ''}" data-tskind="${k}"
+            aria-pressed="${k === ts.kind}" title="แสดงเป็น${TS_KINDS[k].label}"
+            aria-label="แสดงเป็น${TS_KINDS[k].label}">${TS_KINDS[k].icon}</button>`).join('')}</span>`
+      : '';
+    // Top N และ % มีผลเฉพาะกราฟที่ทุกค่าเป็นส่วนหนึ่งของผลรวมเดียว (parts) — ฮิสโทแกรม/นับตามกฎที่ติดได้หลายข้อ
+    // เรียงหรือย่อเป็น % ไม่ได้ความหมายเดิม จึงไม่แสดงตัวเลือกนี้ให้
+    const canTopN = s && s.parts && s.labels.length > TOPN_OPTIONS[0];
+    const topNSel = canTopN
+      ? `<select class="chart-tool chart-topn" data-act="topn" title="แสดงเฉพาะรายการที่มีค่าสูงสุด N อันดับแรก" aria-label="จำนวนอันดับที่แสดง">
+          <option value=""${s.topN ? '' : ' selected'}>ทั้งหมด (${s.labels.length})</option>
+          ${TOPN_OPTIONS.filter(n => n < s.labels.length).map(n =>
+            `<option value="${n}"${s.topN === n ? ' selected' : ''}>สูงสุด ${n}</option>`).join('')}
+        </select>`
+      : '';
+    const pctBtn = s && s.parts
+      ? btn('data-act="pct" aria-pressed="' + !!s.pct + '"', '%', 'แสดงเป็นสัดส่วน % ของผลรวมที่แสดงอยู่', s.pct)
+      : '';
+    const isTable = s && s.kind === 'table';
+    const hint = s && s.opts.filterKey ? '<span class="chart-hint">คลิกเพื่อกรอง</span>' : '';
+    bar.innerHTML = hint + kindBtns + topNSel + pctBtn +
+      btn('data-act="reset"', '↺', 'รีเซ็ตกลับค่าเริ่มต้น (แบบกราฟ ลำดับ % การซูม และรายการที่ซ่อนจาก legend)') +
+      (document.fullscreenEnabled ? btn('data-act="full"', '⤢', 'ขยายเต็มจอ (กด Esc เพื่อออก)') : '') +
+      (isTable ? '' : btn('data-act="png"', 'PNG', 'ดาวน์โหลดกราฟเป็นภาพ PNG')) +
+      (exportRows(el).rows.length ? btn('data-act="csv"', 'CSV', 'ดาวน์โหลดข้อมูลของกราฟนี้เป็น CSV') : '');
+    bar.hidden = false;
+  }
+
+  function onToolClick(e) {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const el = document.getElementById(this.dataset.for);
+    if (!el) return;
+    if (b.dataset.kind) { setKind(el, b.dataset.kind); return; }
+    if (b.dataset.tskind) { setTsKind(el, b.dataset.tskind); return; }
+    const act = b.dataset.act;
+    if (act === 'reset') resetChart(el);
+    else if (act === 'full') toggleFull(el);
+    else if (act === 'pct') togglePct(el);
+    else if (act === 'png' && el.dataset.plotted) {
+      Plotly.downloadImage(el, { format: 'png', scale: 2, filename: fileBase(el) });
+    } else if (act === 'csv') {
+      const { headers, rows } = exportRows(el);
+      U.downloadCSV(fileBase(el) + '.csv', headers, rows);
+    }
+  }
+
+  function onToolChange(e) {
+    const sel = e.target.closest('[data-act="topn"]');
+    if (!sel) return;
+    const el = document.getElementById(this.dataset.for);
+    if (el) setTopN(el, sel.value ? Number(sel.value) : null);
+  }
+
+  function setTopN(el, n) {
+    const s = el._series;
+    if (!s || s.topN === n) return;
+    s.topN = n;
+    persist(el);
+    renderSeries(el);
+  }
+
+  function togglePct(el) {
+    const s = el._series;
+    if (!s) return;
+    s.pct = !s.pct;
+    persist(el);
+    renderSeries(el);
+  }
+
+  function setTsKind(el, kind) {
+    const ts = el._ts;
+    if (!ts || ts.kind === kind) return;
+    ts.kind = kind;
+    try {
+      if (kind === 'line') localStorage.removeItem(KIND_KEY + el.id);
+      else localStorage.setItem(KIND_KEY + el.id, kind);
+    } catch (e) { /* โหมดส่วนตัว */ }
+    drawTimeseries(el.id, ts);
+  }
+
+  function resetChart(el) {
+    if (el._series) {
+      try { localStorage.removeItem(KIND_KEY + el.id); } catch (e) { /* โหมดส่วนตัว */ }
+      const s = el._series;
+      s.kind = s.natural; s.topN = null; s.pct = false;
+      renderSeries(el);
+      return;
+    }
+    if (el._ts) {
+      try { localStorage.removeItem(KIND_KEY + el.id); } catch (e) { /* โหมดส่วนตัว */ }
+      el._ts.kind = 'line';
+      drawTimeseries(el.id, el._ts);
+      return;
+    }
+    if (el._spec && el.dataset.plotted) {
+      Plotly.react(el, clone(el._spec.traces), clone(el._spec.layout), CONFIG);
+    }
+  }
+
+  /** รีเซ็ตกราฟทุกตัวที่มองเห็นอยู่ในขณะนี้ (ใช้กับปุ่ม "รีเซ็ตกราฟในแท็บนี้" ของ app.js) */
+  function resetAllVisible(root = document) {
+    root.querySelectorAll('.chart-tools:not([hidden])').forEach(bar => {
+      const el = document.getElementById(bar.dataset.for);
+      if (el && el.offsetParent) resetChart(el);
+    });
+  }
+
+  function toggleFull(el) {
+    const host = el.parentElement;
+    if (document.fullscreenElement === host) { document.exitFullscreen(); return; }
+    host.classList.add('chart-fs-host');
+    const onChange = () => {
+      const on = document.fullscreenElement === host;
+      el.classList.toggle('chart-full', on);
+      if (!on) {
+        host.classList.remove('chart-fs-host');
+        document.removeEventListener('fullscreenchange', onChange);
+      }
+      requestAnimationFrame(() => {
+        if (el.dataset.plotted) Promise.resolve(Plotly.Plots.resize(el)).catch(() => {});
+      });
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    host.requestFullscreen().catch(() => {
+      host.classList.remove('chart-fs-host');
+      document.removeEventListener('fullscreenchange', onChange);
+    });
+  }
+
+  function fileBase(el) {
+    const card = el.closest('.cardx');
+    const title = card?.querySelector('h2, h3')?.textContent.trim() || el.id;
+    return title.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_').slice(0, 60);
+  }
+
+  function axisTitle(ax) {
+    const t = ax && ax.title;
+    return (typeof t === 'string' ? t : t && t.text) || '';
+  }
+
+  /** แปลงข้อมูลที่อยู่ในกราฟเป็นแถว CSV — กราฟป้าย+ค่าใช้ข้อมูลต้นทาง (ตามที่กำลังแสดงจริง) กราฟอื่นอ่านจาก trace */
+  function exportRows(el) {
+    const s = el._series;
+    if (s) {
+      const { labels, values } = s.view || visibleData(s);
+      const head = s.pct ? 'สัดส่วนที่แสดง (%)' : (s.opts.axisTitle || s.opts.centerLabel || 'ค่า');
+      const total = values.reduce((a, b) => a + (+b || 0), 0);
+      return {
+        headers: ['รายการ', head].concat(s.parts && !s.pct ? ['สัดส่วนที่แสดง (%)'] : []),
+        rows: labels.map((l, i) => [l, values[i]]
+          .concat(s.parts && !s.pct ? [total ? +(values[i] / total * 100).toFixed(2) : ''] : [])),
+      };
+    }
+    const spec = el._spec;
+    if (!spec) return { headers: [], rows: [] };
+    const rows = [];
+    for (const t of spec.traces) {
+      const name = t.name || '';
+      if (t.type === 'sankey' && t.link) {
+        const lab = (t.node && t.node.label) || [];
+        (t.link.value || []).forEach((v, i) =>
+          rows.push([lab[t.link.source[i]] ?? t.link.source[i], lab[t.link.target[i]] ?? t.link.target[i], v]));
+      } else if (t.labels && t.values) {
+        t.labels.forEach((l, i) => rows.push([name, l, t.values[i]]));
+      } else if (t.r && t.theta) {
+        t.r.forEach((r, i) => rows.push([name, t.theta[i], r]));
+      } else if (t.type === 'heatmap' && t.z) {
+        // แผนที่ความร้อน: y คือชื่อชุดข้อมูล (ไม่ใช่ค่า) ค่าจริงอยู่ใน z — ต้องเช็กก่อนกิ่ง x+y ทั่วไป
+        t.z.forEach((row, yi) => row.forEach((v, xi) => rows.push([t.y[yi], t.x[xi], v])));
+      } else if (t.x && t.y) {
+        t.x.forEach((x, i) => rows.push([name, x, t.y[i]]));
+      }
+    }
+    const isSankey = spec.traces.some(t => t.type === 'sankey');
+    const isHeatmap = spec.traces.some(t => t.type === 'heatmap');
+    const headers = isSankey ? ['จาก', 'ไป', 'ค่า']
+      : isHeatmap ? ['ชุดข้อมูล', 'ช่วงเวลา', 'ค่า']
+      : ['ชุดข้อมูล', axisTitle(spec.layout.xaxis) || 'x', axisTitle(spec.layout.yaxis) || 'ค่า'];
+    return { headers, rows };
+  }
+
+  /* ---------- กราฟแบบป้าย+ค่า ที่สลับแบบได้ (แท่ง / โดนัท / ทรีแมป / ตาราง) ----------
+     parts = ค่าทุกตัวเป็นส่วนหนึ่งของผลรวมเดียวกัน (สัญญาหนึ่งอยู่ได้หมวดเดียว)
+     เฉพาะแบบนี้จึงเปิดโดนัท/ทรีแมป — จำนวนตามกฎที่สัญญาเดียวติดหลายข้อ ฮิสโทแกรม
+     หรืออัตราส่วน ถ้าวาดเป็นโดนัทจะสื่อสัดส่วนที่ไม่มีอยู่จริง */
+
+  function allowedKinds(s) {
+    const kinds = ['bar', 'hbar'];
+    const nonNeg = s.values.every(v => v == null || v >= 0);
+    const total = s.values.reduce((a, b) => a + (+b || 0), 0);
+    if (s.parts && nonNeg && total > 0) {
+      if (s.natural === 'donut' || s.labels.length <= DONUT_MAX) kinds.push('donut');
+      kinds.push('treemap');
+    }
+    kinds.push('table');
+    return kinds;
+  }
+
+  /** ตัดเหลือ Top N (เรียงตามค่ามากไปน้อย คงลำดับเดิมของรายการที่เหลือไว้) และ/หรือแปลงเป็น %
+   *  ทำเฉพาะกราฟ parts — ฮิสโทแกรมหรือกราฟที่ลำดับแกนมีความหมาย (เช่นช่วงราคา) จะไม่ถูกเรียงใหม่ */
+  function visibleData(s) {
+    let labels = s.labels, values = s.values, filterValues = s.opts.filterValues || null;
+    // colors เป็นสีต่อแท่ง (array เท่าจำนวน labels เดิม) ต้องตัดตามดัชนีเดียวกับ Top N
+    // ไม่เช่นนั้นสีจะเลื่อนไปคนละแท่งเมื่อตัดรายการออก
+    let colors = Array.isArray(s.opts.colors) ? s.opts.colors : null;
+    if (s.parts && s.topN && s.topN < labels.length) {
+      const idx = values.map((v, i) => i).sort((a, b) => (+values[b] || 0) - (+values[a] || 0)).slice(0, s.topN);
+      idx.sort((a, b) => a - b);
+      labels = idx.map(i => labels[i]);
+      values = idx.map(i => values[i]);
+      if (filterValues) filterValues = idx.map(i => filterValues[i]);
+      if (colors) colors = idx.map(i => colors[i]);
+    }
+    if (s.parts && s.pct) {
+      const total = values.reduce((a, b) => a + (+b || 0), 0);
+      values = values.map(v => total ? +((+v || 0) / total * 100).toFixed(2) : 0);
+    }
+    return { labels, values, filterValues, colors };
+  }
+
+  function series(id, s) {
+    const el = U.$(id);
+    if (!el) return;
+    el._series = s;
+    const saved = loadUiState(id);
+    s.kind = saved.kind && allowedKinds(s).includes(saved.kind) ? saved.kind : s.natural;
+    s.topN = s.parts && saved.topN && saved.topN < s.labels.length ? saved.topN : null;
+    s.pct = !!(s.parts && saved.pct);
+    renderSeries(el);
+  }
+
+  function setKind(el, kind) {
+    const s = el._series;
+    if (!s || s.kind === kind) return;
+    s.kind = kind;
+    persist(el);
+    renderSeries(el);
+  }
+
+  function renderSeries(el) {
+    const s = el._series;
+    s.view = visibleData(s);
+    el.classList.toggle('chart-as-table', s.kind === 'table');
+    if (s.kind === 'table') {
+      if (el.dataset.plotted) { Plotly.purge(el); delete el.dataset.plotted; }
+      el._spec = null;
+      el.innerHTML = seriesTable(s);
+      if (s.view.labels.length) renderTools(el); else hideTools(el);
+      return;
+    }
+    if (s.kind === 'donut') drawDonut(el.id, s);
+    else if (s.kind === 'treemap') drawTreemap(el.id, s);
+    else drawBar(el.id, s, s.kind === 'hbar');
+    wireSeriesClick(el, s);
+  }
+
+  /** คลิกแท่ง/ชิ้นโดนัท/กล่องทรีแมป ที่มี opts.filterKey ไว้ → ตั้งตัวกรองส่วนกลางผ่าน wireFilterClick
+   *  ดัชนีอ้างอิงจาก s.view (หลังตัด Top N แล้ว) ไม่ใช่ s.labels ดิบ */
+  function wireSeriesClick(el, s) {
+    if (!el.dataset.plotted || typeof el.on !== 'function') return;
+    if (el.removeAllListeners) el.removeAllListeners('plotly_click');
+    const key = s.opts.filterKey, vals = s.view.filterValues;
+    if (!key || !vals || !filterHook) return;
+    el.on('plotly_click', ev => {
+      const pt = ev.points && ev.points[0];
+      if (!pt) return;
+      let idx;
+      if (s.kind === 'treemap') {
+        if (!pt.id || pt.id === '__all') return;
+        idx = Number(pt.id.slice(1));
+      } else {
+        idx = pt.pointIndex ?? pt.pointNumber ?? pt.i;
+      }
+      if (typeof idx === 'number' && vals[idx] != null) filterHook(key, vals[idx]);
+    });
+  }
+
+  function seriesTable(s) {
+    const { labels } = s.view;
+    if (!labels.length) return U.emptyState('ไม่มีข้อมูลสำหรับกราฟนี้');
+    const { headers, rows } = exportRows({ _series: s });
+    const fmt = v => v == null || v === '' ? '–'
+      : typeof v === 'number' ? v.toLocaleString('th-TH', { maximumFractionDigits: 2 }) : U.esc(v);
+    return `<div class="table-wrap"><table class="table table-sm mini-table mb-0">
+      <thead><tr>${headers.map((h, i) => `<th scope="col"${i ? ' class="text-end"' : ''}>${U.esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map((v, i) =>
+        `<td${i ? ' class="text-end"' : ''}>${fmt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
 
   /** เรียกเมื่อแท็บถูกเปิด — กราฟที่วาดตอนแท็บซ่อนอยู่จะมีความกว้าง 0 */
@@ -94,7 +486,34 @@ const Charts = (() => {
 
   /* ---------- รูปแบบกราฟที่ใช้ซ้ำ ---------- */
 
-  function bar(id, labels, values, { title, color, horizontal = false, valueFormat, colors, axisTitle, refLines } = {}) {
+  /** parts: true เมื่อค่าทุกแท่งรวมกันเป็นผลรวมเดียว (เปิดให้สลับเป็นโดนัท/ทรีแมปและ Top N/% ได้)
+   *  filterKey/filterValues (ใน opts): คลิกแท่งแล้วตั้งตัวกรองส่วนกลาง — filterValues ต้องยาวเท่า labels */
+  function bar(id, labels, values, opts = {}) {
+    series(id, { labels, values, opts, natural: opts.horizontal ? 'hbar' : 'bar', parts: !!opts.parts });
+  }
+
+  function donut(id, labels, values, colors, centerLabel, opts = {}) {
+    series(id, {
+      labels, values,
+      opts: { colors: colors || null, centerLabel, filterKey: opts.filterKey, filterValues: opts.filterValues },
+      natural: 'donut', parts: true,
+    });
+  }
+
+  function partColors(s) {
+    return Array.isArray(s.opts.colors) ? s.opts.colors : CATEGORICAL;
+  }
+
+  function drawBar(id, s, horizontal) {
+    const { title, color, axisTitle: axisTitleOpt, refLines } = s.opts;
+    const { labels, values, colors } = s.view;
+    // รูปแบบ hover เขียนอ้างแกนของแนวเดิม (%{x} ของแท่งนอน) ต้องสลับแกนตามเมื่อหมุนกราฟ
+    let valueFormat = s.pct ? null : s.opts.valueFormat;
+    if (valueFormat && horizontal !== (s.natural === 'hbar')) {
+      valueFormat = valueFormat.replace(/%\{([xy])/g, (_, a) => '%{' + (a === 'x' ? 'y' : 'x'));
+    }
+    if (s.pct) valueFormat = '%{' + (horizontal ? 'x' : 'y') + ':.1f}%';
+    const axisTitleText = s.pct ? ((axisTitleOpt ? axisTitleOpt + ' ' : '') + '(%)') : axisTitleOpt;
     const marker = { color: colors || color || C.teal };
     const trace = horizontal
       ? { type: 'bar', orientation: 'h', y: labels, x: values, marker }
@@ -117,9 +536,11 @@ const Charts = (() => {
     }));
     draw(id, [trace], {
       title: title ? { text: title, font: { size: 12 } } : undefined,
-      margin: horizontal ? { t: title ? 34 : 12, l: 220, r: 24, b: 40 } : { t: title ? 34 : 12, l: 66, r: 20, b: 70 },
-      xaxis: horizontal ? { title: axisTitle, gridcolor: T().grid } : { automargin: true, gridcolor: T().grid },
-      yaxis: horizontal ? { automargin: true, autorange: 'reversed' } : { title: axisTitle, gridcolor: T().grid },
+      // 220px เผื่อป้ายยาวของกราฟที่ออกแบบเป็นแท่งนอนอยู่แล้ว ส่วนกราฟที่ผู้ใช้หมุนมาจากแบบอื่น
+      // มักอยู่ในการ์ดแคบ ให้ automargin ขยายเท่าป้ายจริงแทน ไม่เช่นนั้นแท่งจะถูกบีบจนอ่านไม่ได้
+      margin: horizontal ? { t: title ? 34 : 12, l: s.natural === 'hbar' ? 220 : 20, r: 24, b: 40 } : { t: title ? 34 : 12, l: 66, r: 20, b: 70 },
+      xaxis: horizontal ? { title: axisTitleText, gridcolor: T().grid } : { automargin: true, gridcolor: T().grid },
+      yaxis: horizontal ? { automargin: true, autorange: 'reversed' } : { title: axisTitleText, gridcolor: T().grid },
       shapes, annotations,
     });
   }
@@ -127,26 +548,49 @@ const Charts = (() => {
   /** โดนัทพร้อมยอดรวมกลางวง
    *  ของเดิมพิมพ์เปอร์เซ็นต์บนทุกชิ้น ซึ่งทับกันเมื่อหลายชิ้นมีสัดส่วนใกล้เคียงกัน
    *  จึงแสดงเฉพาะชิ้นที่ตั้งแต่ 5% ขึ้นไป ส่วนที่เหลืออ่านได้จาก legend และ hover */
-  function donut(id, labels, values, colors, centerLabel) {
-    const total = values.reduce((a, b) => a + (b || 0), 0);
+  function drawDonut(id, s) {
+    const { labels, values } = s.view;
+    const centerLabel = s.pct ? 'สัดส่วน %' : (s.opts.centerLabel || s.opts.axisTitle);
+    const total = values.reduce((a, b) => a + (+b || 0), 0);
+    // ค่าที่วาดเป็น % อยู่แล้วเมื่อ s.pct — พาย normalize ตามสัดส่วนเสมออยู่แล้วจึงได้รูปร่างเดิม
+    // ต่างกันแค่ป้าย/hover ที่อ่านเป็น % ตรงๆ แทนจำนวนดิบ
     const pcts = values.map(v => total ? v / total : 0);
     draw(id, [{
       type: 'pie', hole: 0.62, labels, values,
-      marker: { colors: colors || CATEGORICAL, line: { color: T().surface, width: 2 } },
+      marker: { colors: partColors(s), line: { color: T().surface, width: 2 } },
       text: pcts.map(p => p >= 0.05 ? (p * 100).toFixed(0) + '%' : ''),
       textinfo: 'text', textposition: 'inside', insidetextorientation: 'horizontal',
       textfont: { size: 12, color: '#fff' },
       sort: false,
-      hovertemplate: '%{label}<br>%{value:,.0f} (%{percent})<extra></extra>',
+      hovertemplate: s.pct ? '%{label}<br>%{value:.1f}%<extra></extra>' : '%{label}<br>%{value:,.0f} (%{percent})<extra></extra>',
     }], {
       margin: { t: 12, l: 12, r: 12, b: 12 },
       showlegend: true,
       legend: { orientation: 'h', y: -0.08, font: { size: 11 } },
       annotations: [{
-        text: `<b>${total.toLocaleString('th-TH')}</b>` + (centerLabel ? `<br><span style="font-size:11px">${centerLabel}</span>` : ''),
+        text: s.pct ? '<b>100%</b>' : (`<b>${total.toLocaleString('th-TH')}</b>` + (centerLabel ? `<br><span style="font-size:11px">${centerLabel}</span>` : '')),
         showarrow: false, font: { size: 17, color: T().ink }, x: 0.5, y: 0.5,
       }],
     });
+  }
+
+  function drawTreemap(id, s) {
+    const { labels, values } = s.view;
+    const cols = partColors(s);
+    const colors = labels.map((_, i) => cols[i % cols.length]);
+    // ใช้ id แยกจากป้าย กันป้ายซ้ำกัน และมีโหนดรากชัดเจนเพื่อให้ % เทียบกับทั้งหมด
+    draw(id, [{
+      type: 'treemap', branchvalues: 'total',
+      ids: ['__all'].concat(labels.map((_, i) => 'n' + i)),
+      labels: ['ทั้งหมด'].concat(labels),
+      parents: [''].concat(labels.map(() => '__all')),
+      values: [values.reduce((a, b) => a + (+b || 0), 0)].concat(values),
+      marker: { colors: ['rgba(0,0,0,0)'].concat(colors), line: { color: T().surface, width: 2 } },
+      textfont: { color: [T().dim].concat(colors.map(inkOn)) },
+      textinfo: 'label+value+percent root',
+      hovertemplate: s.pct ? '%{label}<br>%{value:.1f}%<extra></extra>' : '%{label}<br>%{value:,.0f} (%{percentRoot:.1%})<extra></extra>',
+      pathbar: { visible: false },
+    }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
   }
 
   function sankey(id, edges, { nodeColorFn, height } = {}) {
@@ -208,6 +652,57 @@ const Charts = (() => {
       margin: { t: 16, l: 70, r: 20, b: 50 },
       legend: { orientation: 'h', y: -0.16, font: { size: 10 } },
       hovermode: 'x unified',
+    });
+  }
+
+  /** เส้นแนวโน้มหลายชุดที่สลับแบบได้ (เส้น / แท่งซ้อน / พื้นที่ซ้อน / แผนที่ความร้อน) — ใช้กับแท็บแนวโน้มเวลา
+   *  series = [{ name, y:[ตามลำดับ xLabels] }] · ต่างจาก lines() ตรงที่จำแบบกราฟที่เลือกไว้และมีแถบเครื่องมือ */
+  function timeseries(id, xLabels, series, opts = {}) {
+    const el = U.$(id);
+    if (!el) return;
+    let saved = null;
+    try { saved = localStorage.getItem(KIND_KEY + id); } catch (e) { /* โหมดส่วนตัว */ }
+    const kind = saved && TS_KINDS[saved] ? saved : 'line';
+    el._series = null;
+    el._ts = { xLabels, series, opts, kind };
+    drawTimeseries(id, el._ts);
+  }
+
+  function drawTimeseries(id, ts) {
+    const { xLabels, series, opts, kind } = ts;
+    if (kind === 'heatmap') {
+      draw(id, [{
+        type: 'heatmap', x: xLabels, y: series.map(s => s.name), z: series.map(s => s.y),
+        colorscale: 'Teal', hoverongaps: false,
+        hovertemplate: '%{y}<br>%{x}: %{z:,.0f}<extra></extra>',
+      }], {
+        margin: { t: 16, l: 150, r: 20, b: 50 },
+        xaxis: { gridcolor: T().grid },
+        yaxis: { gridcolor: T().grid, automargin: true },
+      }, 'ไม่มีข้อมูลสำหรับกราฟนี้');
+      return;
+    }
+    const traces = series.map((s, i) => {
+      const color = CATEGORICAL[i % CATEGORICAL.length];
+      const hovertemplate = '%{fullData.name}<br>%{x}: %{y:,.0f}<extra></extra>';
+      if (kind === 'stackbar') {
+        return { type: 'bar', name: s.name, x: xLabels, y: s.y, marker: { color }, hovertemplate };
+      }
+      if (kind === 'area') {
+        // stackgroup ทำให้พื้นที่ซ้อนทับกันสะสม เส้นบางเพราะพื้นที่สีเป็นตัวสื่อสารหลักอยู่แล้ว
+        return { type: 'scatter', mode: 'lines', name: s.name, x: xLabels, y: s.y,
+          stackgroup: 'one', line: { color, width: 1 }, hovertemplate };
+      }
+      return { type: 'scatter', mode: 'lines+markers', name: s.name, x: xLabels, y: s.y,
+        line: { color, width: 2.5, shape: 'spline', smoothing: 0.4 }, marker: { size: 5 }, hovertemplate };
+    });
+    draw(id, traces, {
+      yaxis: { title: opts.yTitle, gridcolor: T().grid },
+      xaxis: { gridcolor: T().grid },
+      margin: { t: 16, l: 70, r: 20, b: 50 },
+      legend: { orientation: 'h', y: -0.16, font: { size: 10 } },
+      hovermode: 'x unified',
+      barmode: kind === 'stackbar' ? 'stack' : undefined,
     });
   }
 
@@ -336,7 +831,10 @@ const Charts = (() => {
       },
       yaxis: { title: { text: 'คะแนนความเสี่ยง', font: { size: 11 } }, gridcolor: T().grid, range: [-yMax * 0.04, yMax * 1.1] },
       legend: { orientation: 'h', y: -0.3, font: { size: 10.5 } },
-    });
+      dragmode: 'lasso',
+      // เปิดปุ่มลากเลือกเฉพาะกราฟนี้ (ของเดิมปิดทุกกราฟไว้เพราะกราฟส่วนใหญ่เลือกจุดแล้วไม่มีผลอะไร)
+      // ผู้เรียก (app.js) ผูก plotly_selected ไว้ต่างหากเพื่อใส่ตะกร้าทีละกลุ่ม
+    }, undefined, { modeBarButtonsToRemove: ['autoScale2d'] });
   }
 
   /** เส้นครอบคลุมมูลค่าของคิว (ดู Analytics.queueCoverage)
@@ -398,5 +896,5 @@ const Charts = (() => {
     }], { margin: { t: 6, l: 6, r: 6, b: 6 } });
   }
 
-  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme };
+  return { C, CATEGORICAL, draw, resizeIn, bar, donut, sankey, scatter, lines, timeseries, waterfall, radar, radarCompare, treemap, riskValue, coverage, treemapTree, CONFIG, baseLayout, refreshTheme, wireFilterClick, resetAllVisible };
 })();

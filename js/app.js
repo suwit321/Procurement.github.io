@@ -353,6 +353,7 @@ const App = (() => {
       activateDataset(payload, { ...info, bootMsg, first: true, notice: bootNotice });
 
       wireGlobalFilters();
+      Charts.wireFilterClick(toggleChartFilter);
       wireTabs();
       wireControls();
       wireNetTerritory();
@@ -1485,10 +1486,20 @@ const App = (() => {
         const id = ev.points && ev.points[0] && ev.points[0].customdata;
         if (id) openProfile(id);
       });
+      // ลากเลือกหลายจุด (โหมดลากเริ่มต้นของกราฟนี้คือ lasso) → ใส่ตะกร้าทีเดียวทั้งกลุ่ม
+      const byId = new Map(priced.map(r => [r.project_id, r]));
+      plot.removeAllListeners('plotly_selected');
+      plot.on('plotly_selected', ev => {
+        if (!ev || !ev.points || !ev.points.length) return;
+        const picked = ev.points.map(p => byId.get(p.customdata)).filter(Boolean);
+        if (picked.length) addManyToCart(picked);
+      });
     }
     const dropped = rows.length - priced.length;
     U.setHTML('ovRiskValueNote', dropped
-      ? `ไม่แสดง ${U.num(dropped)} สัญญาที่ไม่มีมูลค่าในกราฟนี้ (แกนมูลค่าเป็นสเกล log)` : '');
+      ? `ไม่แสดง ${U.num(dropped)} สัญญาที่ไม่มีมูลค่าในกราฟนี้ (แกนมูลค่าเป็นสเกล log) · ` +
+        `ลากคลุมจุดหลายจุดเพื่อใส่ตะกร้าทีเดียว`
+      : 'ลากคลุมจุดหลายจุดเพื่อใส่ตะกร้าทีเดียว');
 
     // 2) เส้นครอบคลุมมูลค่า
     if (rows.length) {
@@ -1542,6 +1553,17 @@ const App = (() => {
     applyFilters();
   }
 
+  /** คลิกแท่ง/ชิ้นโดนัทที่ประกาศ opts.filterKey ไว้ (ดู Charts.wireFilterClick) — คลิกซ้ำค่าเดิมเพื่อยกเลิก
+   *  ใช้ FILTER_CONTROL ตัวเดียวกับที่แถบตัวกรองใช้ จึงมีผลเหมือนเลือกจากดรอปดาวน์เอง */
+  function toggleChartFilter(key, value) {
+    const ctrlId = FILTER_CONTROL[key];
+    const el = ctrlId && U.$(ctrlId);
+    if (!el) return;
+    el.value = state.filters[key] === value ? '' : value;
+    syncFiltersFromUI();
+    applyFilters();
+  }
+
   function wireOverviewQueue() {
     syncQueueControls();
     // ลิงก์ "ไปที่คิวตรวจสอบ" ในหัวหน้า
@@ -1579,7 +1601,8 @@ const App = (() => {
 
     const bands = Rules.BANDS.filter(b => (s.bandCounts[b.key] || 0) > 0);
     Charts.donut('ovBandDonut', bands.map(b => b.label),
-      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา');
+      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา',
+      { filterKey: 'band', filterValues: bands.map(b => b.key) });
 
     const ruleStats = Rules.DEFS
       .map(d => ({ d, n: s.counts.get(d.id).n }))
@@ -1590,6 +1613,7 @@ const App = (() => {
       horizontal: true,
       colors: ruleStats.map(x => x.d.source === 'synthetic' ? Charts.C.purple : Charts.C.teal),
       axisTitle: 'จำนวนสัญญา',
+      filterKey: 'rule', filterValues: ruleStats.map(x => x.d.id),
     });
 
     const ts = Analytics.timeseries(rows, 'risk_band');
@@ -1598,7 +1622,8 @@ const App = (() => {
 
     const methods = [...U.countBy(rows, r => r.purchase_method_name)]
       .sort((a, b) => b[1] - a[1]).slice(0, 6);
-    Charts.donut('ovMethodDonut', methods.map(m => m[0].slice(0, 28)), methods.map(m => m[1]), null, 'สัญญา');
+    Charts.donut('ovMethodDonut', methods.map(m => m[0].slice(0, 28)), methods.map(m => m[1]), null, 'สัญญา',
+      { filterKey: 'method', filterValues: methods.map(m => m[0]) });
 
     const agencies = Analytics.agencyTotals(rows)
       .sort((a, b) => b.n_flagged - a.n_flagged || b.total_value - a.total_value).slice(0, 12);
@@ -5009,7 +5034,8 @@ ${placemarks.join('\n')}
 
     const bands = Rules.BANDS.filter(b => (s.bandCounts[b.key] || 0) > 0);
     Charts.donut('fraudSeverityDonut', bands.map(b => b.label),
-      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา');
+      bands.map(b => s.bandCounts[b.key]), bands.map(b => b.color), 'สัญญา',
+      { filterKey: 'band', filterValues: bands.map(b => b.key) });
 
     const cats = new Map();
     for (const d of Rules.DEFS) {
@@ -6464,7 +6490,7 @@ ${placemarks.join('\n')}
         `ถึง ${U.thaiMonthLabel(ts.months[ts.months.length - 1])}`
       : 'ไม่มีข้อมูลวันทำสัญญาในชุดที่เลือก';
 
-    Charts.lines('timeChart', ts.months.map(U.thaiMonthLabel),
+    Charts.timeseries('timeChart', ts.months.map(U.thaiMonthLabel),
       ts.series.slice(0, 10).map(s => ({
         name: state.ts.dimension === 'risk_band' ? bandLabel(s.name) : truncate(s.name, 34),
         y: s[metric],
@@ -6830,7 +6856,8 @@ ${placemarks.join('\n')}
       (nTypes ? `ละเอียดกว่า "ประเภทโครงการ" ซึ่งมี ${U.num(nTypes)} ประเภท · ` : '') +
       `ใช้เป็นกลุ่มเปรียบเทียบของโมเดลทุกตัวในแท็บความผิดปกติ`;
     Charts.bar('wgChart', order.map(([k]) => workGroupLabel(k)), order.map(([, v]) => v.length), {
-      horizontal: true, color: Charts.C.teal, axisTitle: 'จำนวนสัญญา',
+      horizontal: true, color: Charts.C.teal, axisTitle: 'จำนวนสัญญา', parts: true,
+      filterKey: 'workGroup', filterValues: order.map(([k]) => k),
     });
   }
 
@@ -7004,6 +7031,15 @@ ${placemarks.join('\n')}
   function renderRoadCard() {
     const meta = models().road;
     if (!meta) return;
+    // ชุดข้อมูลที่งานถนนระบุขนาดไม่พอ โมเดลยังมีอยู่แต่ค่าทุกตัวเป็น null — แสดงเหตุผลแทนตัวเลขว่าง
+    if (!meta.n) {
+      const msg = meta.note || 'งานถนนที่ระบุขนาดในชื่อโครงการมีน้อยเกินกว่าจะสร้างค่าคาดการณ์';
+      U.$('roadNote').textContent = msg;
+      Charts.draw('roadChart', [], {}, msg);
+      U.setHTML('roadBody', U.emptyRow(4, msg));
+      U.$('roadValidation').textContent = msg;
+      return;
+    }
     const rows = state.filtered.filter(r => r.road_z !== null && r.road_z !== undefined);
     const exp = meta.expected_at_median_size || {};
     U.$('roadNote').textContent =
@@ -8007,7 +8043,7 @@ ${placemarks.join('\n')}
       statuses.map((s, i) => `${s} · ${byStatus[i].length} เคส`),
       byStatus.map(list => U.sum(list.map(c => c.value))),
       { horizontal: true, color: Charts.C.teal, axisTitle: 'มูลค่ารวมที่ค้างอยู่ (บาท)',
-        valueFormat: '%{x:,.0f} บาท' });
+        valueFormat: '%{x:,.0f} บาท', parts: true });
 
     U.setHTML('kanban', statuses.map((status, i) => {
       const items = byStatus[i];
@@ -13925,6 +13961,7 @@ ${labVocabText()}`;
       exportRecords(state.filtered.filter(r => (r.rule_hits || []).length), 'procurement-redflags.csv'));
 
     U.$('provenanceBtn').addEventListener('click', showProvenance);
+    U.$('chartResetBtn').addEventListener('click', () => { Charts.resetAllVisible(); cartToast('รีเซ็ตกราฟที่แสดงอยู่ทั้งหมดแล้ว'); });
 
     // ไล่เหตุผล (CoT) — ดู js/cot.js · สื่อสารผ่าน api นี้เท่านั้น
     CoT.init({
