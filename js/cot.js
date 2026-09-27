@@ -30,7 +30,7 @@ const CoT = (() => {
   const REQUIRED = ['rows', 'allRows', 'summary', 'meta', 'models', 'datasetName', 'tabId', 'filterSummary',
     'tabOpts', 'labels', 'gotoTab', 'openDetail', 'openProfile', 'download', 'toast',
     'setBand', 'jumpTo', 'exportQueue', 'aiReady', 'aiScopeText', 'aiSend',
-    'setRule', 'settings', 'ruleOverlap', 'coverageGaps', 'contractorProfiles', 'agencyProfiles', 'agencyName',
+    'setRule', 'settings', 'ruleContext', 'ruleOverlap', 'coverageGaps', 'contractorProfiles', 'agencyProfiles', 'agencyName',
     'underbid', 'hasNetwork', 'netFilter', 'territory', 'mapShown', 'stackGroups', 'deepPattern'];
 
   function init(a) {
@@ -102,6 +102,26 @@ const CoT = (() => {
       if (a.enabled !== b.enabled || a.weight !== b.weight || thr) changed.push(d.id);
     }
     return { changed, disabled };
+  }
+
+  /** กฎที่ไม่เข้ากับชุดข้อมูลที่เปิดอยู่ (Rules.applicability) — ต้องแยกจาก "ไม่พบ" เพราะความหมายต่างกัน
+   *  ไม่พบ = ตรวจแล้วไม่มีสัญญาเข้าเงื่อนไข · ไม่เข้ากับชุดข้อมูล = ตรวจไม่ได้ตั้งแต่ต้น */
+  function notApplicable() {
+    const set = api.settings() || {}, ctx = api.ruleContext();
+    const out = new Map();
+    for (const d of Rules.DEFS) {
+      if (!set[d.id] || set[d.id].enabled === false) continue;
+      const a = Rules.applicability(d, ctx, set[d.id].thresholds);
+      if (!a.ok) out.set(d.id, a.reason);
+    }
+    return out;
+  }
+  /** คู่กฎนี้ถูกจัดการในคะแนนแล้วหรือยัง: อยู่ family เดียวกัน (นับข้อเดียว) หรือข้อใดเป็นกฎคุณภาพข้อมูล (ไม่นับ)
+   *  เงื่อนไขเดียวกับ handledPair ในตารางความทับซ้อนของแท็บกฎ (app.js renderRuleQuality) */
+  function overlapHandled(smallId, bigId) {
+    const a = Rules.BY_ID.get(smallId), b = Rules.BY_ID.get(bigId);
+    if (!a || !b) return false;
+    return a.scored === false || b.scored === false || !!(a.family && a.family === b.family);
   }
 
   const bandCuts = () => Rules.BANDS.filter(b => b.key !== 'none')
@@ -231,10 +251,13 @@ const CoT = (() => {
         // summary.counts สร้างจาก Rules.summarize(state.filtered) ตัวเดียวกับ KPI ของแท็บ (app.js renderFraud)
         const cnt = d => s.counts.get(d.id) || { n: 0, value: 0 };
         const firing = realDefs.filter(d => cnt(d).n > 0).sort((a, b) => cnt(b).value - cnt(a).value);
-        const silent = realDefs.filter(d => cnt(d).n === 0);
+        const na = notApplicable();
+        const naDefs = realDefs.filter(d => na.has(d.id));
+        const silent = realDefs.filter(d => cnt(d).n === 0 && !na.has(d.id));
         const realHits = r => (r.rule_hits || []).filter(h => h.source !== 'synthetic');
         const realFlagged = rows.filter(r => realHits(r).length > 0);
-        const multi = rows.filter(r => realHits(r).length >= 3);
+        // นับเฉพาะ hit ที่บวกคะแนนจริง (หนึ่งข้อต่อ family · ไม่รวมกฎคุณภาพข้อมูล) = สัญญาณที่ไม่ใช่เรื่องเดียวกันซ้ำ
+        const multi = rows.filter(r => realHits(r).filter(h => h.counted).length >= 3);
         const total = sumV(rows);
         const ch = settingChanges();
 
@@ -251,13 +274,15 @@ const CoT = (() => {
           F.m('สัญญาในขอบเขต', U.num(rows.length), `มูลค่ารวม ${money(total)} บาท`),
           F.m('พบสัญญาณ ≥ 1 ข้อ (ทุกกฎ)', `${U.num(s.flagged)} สัญญา`, `${pct(s.flagged / s.total)} · มูลค่า ${money(s.flaggedValue)} บาท`),
           F.m('ติดกฎที่ใช้ข้อมูลจริง ≥ 1 ข้อ', `${U.num(realFlagged.length)} สัญญา`, `มูลค่า ${money(sumV(realFlagged))} บาท`),
-          F.m('กฎข้อมูลจริงที่พบ', `${firing.length} จาก ${realDefs.length} ข้อ`, `ไม่พบเลย ${silent.length} ข้อ`),
-          F.m('ติดกฎจริงตั้งแต่ 3 ข้อ', `${U.num(multi.length)} สัญญา`, `มูลค่า ${money(sumV(multi))} บาท`),
+          F.m('กฎข้อมูลจริงที่พบ', `${firing.length} จาก ${realDefs.length} ข้อ`,
+            `ไม่พบเลย ${silent.length} ข้อ${naDefs.length ? ` · ไม่เข้ากับชุดข้อมูลนี้ ${naDefs.length} ข้อ` : ''}`),
+          F.m('ติดกฎจริงที่นับคะแนน ≥ 3 กลุ่ม', `${U.num(multi.length)} สัญญา`, `มูลค่า ${money(sumV(multi))} บาท`),
         ];
 
         const baseline = [
           { label: 'เกณฑ์ระดับความเสี่ยง', value: bandCuts(),
-            source: 'ขอบของระดับในระบบคะแนน (Rules.BANDS) คะแนนคือผลรวมน้ำหนักของกฎที่ติด ซึ่งมนุษย์เป็นผู้ตั้ง ไม่ใช่ความน่าจะเป็นที่จะผิดจริง' },
+            source: 'ขอบของระดับในระบบคะแนน (Rules.BANDS) คะแนนคือผลรวมน้ำหนักของกฎที่ติด ซึ่งมนุษย์เป็นผู้ตั้ง ไม่ใช่ความน่าจะเป็นที่จะผิดจริง ' +
+              '· กฎที่วัดเรื่องเดียวกัน (family) นับน้ำหนักข้อเดียว และกฎคุณภาพข้อมูลไม่บวกคะแนน (Rules.scoreHits)' },
           { label: 'น้ำหนักกฎ',
             value: ch.changed.length ? `ปรับจากค่าเริ่มต้น ${ch.changed.length} ข้อ (${ch.changed.join(', ')})` : 'ค่าเริ่มต้นของระบบทุกข้อ',
             source: 'เทียบค่าที่ตั้งอยู่กับ Rules.defaultSettings() ถ้าปรับแล้ว ทุกตัวเลขคะแนนในทุกแท็บเป็นค่าตามที่ตั้ง' },
@@ -281,7 +306,7 @@ const CoT = (() => {
         }
         if (multi.length) {
           finds.push(F.find('high', sumV(multi),
-            `${U.num(multi.length)} สัญญาติดกฎที่ใช้ข้อมูลจริงตั้งแต่ 3 ข้อ รวม ${money(sumV(multi))} บาท`,
+            `${U.num(multi.length)} สัญญาติดกฎจริงที่นับคะแนนตั้งแต่ 3 กลุ่ม (กฎที่วัดเรื่องเดียวกันนับเป็นกลุ่มเดียว) รวม ${money(sumV(multi))} บาท`,
             'เปิดดูก่อนเพราะสัญญาณมาจากหลายเงื่อนไข แต่ต้องเช็กว่าเป็นสัญญาณอิสระต่อกันจริงหรือกฎที่ทับกัน (ดูตารางความทับซ้อนในแท็บกฎ) เพราะกฎที่ทับกันทำให้ดูรุนแรงเกินจริง'));
         }
         if (cats.length) {
@@ -294,6 +319,11 @@ const CoT = (() => {
           finds.push(F.find('mid', 0,
             `กฎที่ใช้ข้อมูลจริง ${silent.length} ข้อไม่พบสัญญาณเลยในขอบเขตนี้ (${silent.slice(0, 8).map(d => d.id).join(', ')}${silent.length > 8 ? ' …' : ''})`,
             'ไม่ได้แปลว่าไม่มีปัญหา อาจเป็นเพราะคอลัมน์ที่กฎนั้นต้องใช้ไม่มีข้อมูล หรือกรองขอบเขตแคบจนไม่มีสัญญาเข้าเงื่อนไข ดูเงื่อนไขของแต่ละกฎในแท็บกฎ'));
+        }
+        if (naDefs.length) {
+          finds.push(F.find('low', 0,
+            `กฎ ${naDefs.length} ข้อไม่เข้ากับชุดข้อมูลนี้จึงไม่ได้ตรวจ (${naDefs.map(d => d.id).join(', ')})`,
+            naDefs.map(d => `${d.id}: ${na.get(d.id)}`).join(' | ')));
         }
         if (s.total > 0 && s.flagged / s.total > 0.8) {
           finds.push(F.find('mid', s.flaggedValue,
@@ -582,6 +612,8 @@ const CoT = (() => {
         const ov = api.ruleOverlap();               // computeRuleOverlap(state.records) ตัวเดียวกับตารางความทับซ้อนในแท็บกฎ
         const ch = settingChanges();
         const firing = realDefs.filter(d => (s.counts.get(d.id) || { n: 0 }).n > 0);
+        const na = notApplicable();
+        const naReal = realDefs.filter(d => na.has(d.id));
 
         // ช่องว่างความครอบคลุม: ช่อง (มิติ × ช่วงกระบวนการ) ที่ไม่มีกฎ และรู้แน่ว่าขาดข้อมูลอะไร (COVERAGE_GAPS ใน app.js)
         const { cells } = Rules.coverage(s.counts);
@@ -595,7 +627,8 @@ const CoT = (() => {
 
         const measure = [
           F.m('กฎทั้งหมด', `${defs.length} ข้อ`, `ข้อมูลจริง ${realDefs.length} · สาธิต ${synthDefs.length}${customDefs.length ? ` · สร้างเอง ${customDefs.length}` : ''}`),
-          F.m('กฎจริงที่พบในขอบเขตนี้', `${firing.length} จาก ${realDefs.length} ข้อ`, `ไม่พบ ${realDefs.length - firing.length} ข้อ`),
+          F.m('กฎจริงที่พบในขอบเขตนี้', `${firing.length} จาก ${realDefs.length} ข้อ`,
+            `ไม่พบ ${realDefs.length - firing.length - naReal.length} ข้อ${naReal.length ? ` · ไม่เข้ากับชุดข้อมูลนี้ ${naReal.length} ข้อ` : ''}`),
           F.m('ปรับจากค่าเริ่มต้น', `${ch.changed.length} ข้อ`, ch.changed.length ? ch.changed.join(', ') : 'ใช้ค่าเริ่มต้นทั้งหมด'),
           F.m('คู่กฎที่ทับซ้อนมาก', `${ov.notable.length} คู่`, `จาก ${ov.active.length} กฎที่พบ ≥ 20 สัญญา (ทั้งชุดข้อมูล)`),
           F.m('ช่องที่ยังตรวจไม่ได้', `${gaps.length} ช่อง`, 'มิติ × ช่วงกระบวนการ ที่ขาดข้อมูล'),
@@ -615,14 +648,25 @@ const CoT = (() => {
           if (p.contain >= 0.95) { let e = contained.get(p.smallId); if (!e) contained.set(p.smallId, e = []); e.push(p); }
           else overlapOnly.push(p);
         }
+        const handled = [];
         for (const [small, list] of contained) {
           const lo = Math.min(...list.map(p => p.contain)), hi = Math.max(...list.map(p => p.contain));
-          finds.push(F.find('high', Math.max(...list.map(p => p.inter)),
-            `กฎ ${ruleName(small)} ติดธงเฉพาะสัญญาที่ ${list.map(p => `${p.bigId} (${U.num(p.inter)} สัญญา)`).join(', ')} ติดอยู่แล้ว ` +
+          const open = list.filter(p => !overlapHandled(small, p.bigId));
+          if (!open.length) { handled.push(`${small} ⊂ ${list.map(p => p.bigId).join('/')}`); continue; }
+          finds.push(F.find('high', Math.max(...open.map(p => p.inter)),
+            `กฎ ${ruleName(small)} ติดธงเฉพาะสัญญาที่ ${open.map(p => `${p.bigId} (${U.num(p.inter)} สัญญา)`).join(', ')} ติดอยู่แล้ว ` +
               `${lo === hi ? pct(lo, 0) : pct(lo, 0) + '–' + pct(hi, 0)} — น้ำหนักถูกบวกซ้อน`,
             'ทบทวนว่าตั้งใจให้ยกระดับความเสี่ยงหรือไม่ ถ้าไม่ตั้งใจ คือการนับซ้ำ ให้ลดน้ำหนักข้อใดข้อหนึ่งในแท็บนี้'));
         }
-        for (const p of overlapOnly.slice(0, 3)) {
+        if (handled.length) {
+          finds.push(F.find('low', 0, `คู่กฎที่ซ้อนกันแต่ระบบนับคะแนนครั้งเดียวแล้ว: ${handled.join(', ')}`,
+            'อยู่ family เดียวกัน (นับน้ำหนักสูงสุดข้อเดียว) หรือข้อเล็กเป็นกฎคุณภาพข้อมูลที่ไม่บวกคะแนน — ไม่ทำให้คะแนนสูงเกินจริง'));
+        }
+        if (naReal.length) {
+          finds.push(F.find('mid', 0, `กฎ ${naReal.length} ข้อไม่เข้ากับชุดข้อมูลนี้จึงไม่ได้ตรวจ (${naReal.map(d => d.id).join(', ')})`,
+            naReal.map(d => `${d.id}: ${na.get(d.id)}`).join(' | ') + ' — ช่องที่กฎเหล่านี้ควรตรวจจึงว่างอยู่ ไม่ใช่ "ไม่พบปัญหา"'));
+        }
+        for (const p of overlapOnly.filter(p => !overlapHandled(p.smallId, p.bigId)).slice(0, 3)) {
           finds.push(F.find('mid', p.inter,
             `กฎ ${p.a} กับ ${p.b} ทับกัน ${U.num(p.inter)} สัญญา (Jaccard ${p.jac.toFixed(2)}, ${pct(p.contain, 0)} ของกฎที่เล็กกว่า) — อาจวัดสิ่งเดียวกัน`,
             'ตรวจว่ากฎสองข้อวัดคนละเรื่องจริงหรือไม่ ถ้าวัดสิ่งเดียวกัน สัญญาชุดนี้ได้คะแนนสูงเกินจริง'));
@@ -655,7 +699,7 @@ const CoT = (() => {
           ],
           baseline, finds: F.sortFinds(finds), acts,
           limits: [
-            'คะแนนคือผลรวมน้ำหนักที่มนุษย์กำหนด ไม่ได้ปรับเทียบกับผลการตรวจสอบจริง',
+            'คะแนนคือผลรวมน้ำหนักที่มนุษย์กำหนด (กฎที่วัดเรื่องเดียวกันนับข้อเดียว · กฎคุณภาพข้อมูลไม่นับ) ไม่ได้ปรับเทียบกับผลการตรวจสอบจริง',
             'ชุดข้อมูลไม่มีผลการตรวจสอบจริง (ground truth) จึงวัดความแม่นยำ (precision/recall) ของกฎไม่ได้เลย ส่วนตารางประเมินการจัดลำดับในแท็บกฎใช้ "ความผิดพลาดของข้อมูล" เป็นป้ายชั่วคราว ไม่ใช่ป้ายการทุจริต',
             'ความทับซ้อนบอกได้เพียงว่ากฎวัดสิ่งเดียวกันหรือไม่ ไม่ได้บอกว่ากฎถูกหรือผิด',
             'ช่องที่ยังตรวจไม่ได้ต้องขอข้อมูลเพิ่มจากหน่วยงานหรือระบบต้นทาง ตามที่ระบุในแต่ละช่อง',
@@ -1147,9 +1191,9 @@ const CoT = (() => {
 
         const baseline = [
           { label: 'เกณฑ์ระดับ', value: `≥ P${m.thresholds.strong_pct} = Unusual Pattern · ≥ P${flagPct} = Requires Further Review`,
-            source: 'เปอร์เซ็นไทล์ของ reconstruction error ทั้งชุดข้อมูล (สูตรเดียวกับ ml_pct ของ Isolation Forest)' },
-          { label: '"เห็นตรงกัน"', value: 'กฎ ≥ 40 · IF ≥ P95 · Deep ≥ P95 (อย่างน้อย 2 ใน 3)',
-            source: 'เกณฑ์ที่หน้าต่างนี้ตั้งเอง ไม่มีการถ่วงน้ำหนักระหว่าง engine' },
+            source: `เปอร์เซ็นไทล์ของ reconstruction error ภายในกลุ่มงานเดียวกัน (${Object.keys(m.peer_grouping.groups).length} กลุ่ม แบ่งจากชื่อโครงการ) ไม่ใช่ทั้งชุดข้อมูล — งานก่อสร้างจึงแข่งกับงานก่อสร้างด้วยกันเท่านั้น` },
+          { label: '"เห็นตรงกัน"', value: 'กฎ ≥ 40 · IF ≥ P95 (ทั้งชุด) · Deep ≥ P95 (ภายในกลุ่มงานเดียวกัน) — อย่างน้อย 2 ใน 3',
+            source: 'เกณฑ์ที่หน้าต่างนี้ตั้งเอง ไม่มีการถ่วงน้ำหนักระหว่าง engine · IF กับ Deep ใช้ฐานเทียบต่างกัน จึงไม่ใช่ค่าที่เทียบตรง ๆ กันได้' },
           { label: 'ซ้ำกับ Isolation Forest?', value: v.duplicates_if ? 'ใช่' : 'ไม่ใช่',
             source: `Spearman ${m.vs_isolation_forest.spearman} · 5% บนซ้ำกัน ${pct(m.vs_isolation_forest.top5pct_overlap, 0)}` },
           { label: 'เสถียรข้ามการแบ่งข้อมูลฝึก/ทดสอบ?', value: v.stable ? 'ผ่านเกณฑ์' : 'ต่ำกว่าเกณฑ์เล็กน้อย',
@@ -1194,6 +1238,7 @@ const CoT = (() => {
           baseline, finds: F.sortFinds(finds), acts,
           limits: [
             'ปัจจัยที่ Autoencoder และ Isolation Forest ใช้เป็นชุดเดียวกันทั้ง 12 ตัว การเห็นตรงกันของสองโมเดลนี้จึงไม่ใช่หลักฐานอิสระ',
+            'deep_score เทียบเฉพาะภายในกลุ่มงานเดียวกัน (จำแนกจากชื่อโครงการ) ส่วน ml_pct ของ Isolation Forest ยังเทียบทั้งชุด ตัวเลขทั้งสองจึงเทียบตรง ๆ กันไม่ได้ ใช้ดูทิศทางเดียวกันเท่านั้น',
             'ชุดข้อมูลนี้ไม่มีผลตรวจสอบจริง (ground truth) จึงวัดความแม่นยำของ deep_score ไม่ได้เลย ใช้จัดลำดับความสำคัญเท่านั้น',
             v.stable ? 'ความเสถียรของอันดับเมื่อเปลี่ยนวิธีแบ่งข้อมูลฝึก/ทดสอบผ่านเกณฑ์ที่ตั้งไว้'
               : 'ความเสถียรของอันดับเมื่อเปลี่ยนวิธีแบ่งข้อมูลฝึก/ทดสอบยังต่ำกว่าเกณฑ์เล็กน้อย (ดูตัวเลขในแท็บ)',

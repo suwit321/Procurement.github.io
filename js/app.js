@@ -727,6 +727,9 @@ const App = (() => {
     const s = state.summary;
     const value = U.sum(state.filtered.map(r => r.contract_price_agree));
     const realRules = Rules.DEFS.filter(d => d.source === 'real' && s.counts.get(d.id).n > 0).length;
+    // ตัวหารนับเฉพาะกฎที่ใช้กับชุดข้อมูลนี้ได้ — กฎที่ "ไม่เข้ากับชุดข้อมูล" ไม่ได้ตรวจ จึงไม่ใช่ "ไม่ทำงาน"
+    const realApplicable = Rules.DEFS.filter(d => d.source === 'real'
+      && Rules.applicability(d, state.ctx, state.settings[d.id]?.thresholds).ok).length;
 
     // พาดหัวเป็นจำนวนที่ "ควรตรวจสอบก่อน" ไม่ใช่จำนวนที่พบสัญญาณ
     // เพราะกฎน้ำหนักต่ำอย่าง R9/R13/R14 เข้าเงื่อนไขเป็นวงกว้าง
@@ -744,7 +747,7 @@ const App = (() => {
       ['มูลค่าที่ควรตรวจสอบก่อน', U.money(priorityValue), 'บาท',
         value ? `${U.pct(priorityValue / value)} ของมูลค่ารวม` : '-', 'priority'],
       ['พบสัญญาณอย่างน้อย 1 ข้อ', U.num(s.flagged), 'สัญญา',
-        `กฎที่ทำงานจริง ${realRules} จาก ${Rules.DEFS.filter(d => d.source === 'real').length} ข้อ`, 'flagged'],
+        `กฎที่ทำงานจริง ${realRules} จาก ${realApplicable} ข้อที่ใช้กับชุดนี้ได้`, 'flagged'],
     ];
     U.setHTML('kpis', items.map(i => {
       const [label, val, unit, sub, shortcut] = i;
@@ -1656,6 +1659,23 @@ const App = (() => {
     return `<span class="badge ${b.cls}">${U.num(score)}</span>`;
   }
 
+  /** น้ำหนักที่ hit นี้บวกเข้าคะแนนจริง พร้อมเหตุผลเมื่อไม่นับ (นิยามอยู่ที่ Rules.scoreHits) */
+  function hitWeightHTML(h, cls) {
+    if (h.notCounted === 'quality') {
+      return '<span class="badge badge-none" title="กฎคุณภาพข้อมูล แสดงให้เห็นแต่ไม่บวกคะแนนความเสี่ยง">ไม่นับคะแนน · คุณภาพข้อมูล</span>';
+    }
+    if (h.notCounted === 'family') {
+      return `<span class="badge badge-none" title="วัดเรื่องเดียวกับ ${U.esc(h.coveredBy || '')} ซึ่งนับคะแนนไปแล้ว">+0 · นับใน ${U.esc(h.coveredBy || '')} แล้ว</span>`;
+    }
+    return `<span class="${cls}" title="น้ำหนักที่บวกเข้าคะแนน">+${U.num(h.weight)}</span>`;
+  }
+  /** ข้อความล้วนของน้ำหนัก สำหรับ CSV และข้อความที่ส่งให้ AI */
+  function hitWeightText(h) {
+    if (h.notCounted === 'quality') return `ไม่นับคะแนน (คุณภาพข้อมูล)`;
+    if (h.notCounted === 'family') return `0 (นับใน ${h.coveredBy || '-'} แล้ว)`;
+    return String(h.weight);
+  }
+
   function clickable(type, id, label) {
     return `<span class="detail-clickable" data-type="${U.esc(type)}" data-id="${U.esc(id)}" role="button" tabindex="0">${U.esc(label)}</span>`;
   }
@@ -1719,7 +1739,9 @@ const App = (() => {
     }
 
     const kv = (k, v) => `<div class="detail-kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
-    const ratio = r.price_build ? r.contract_price_agree / r.price_build : null;
+    // ราคากลางเป็นของทั้งโครงการ จึงเทียบกับยอดรวมสัญญาของโครงการ (เหมือน Rules R2/R13)
+    const pa = state.ctx.projectAgg.get(r.project_id);
+    const ratio = r.price_build && pa && !pa.missing ? pa.sum / r.price_build : null;
 
     U.setHTML('detail', `
       <div class="mb-2 d-flex justify-content-between align-items-start gap-2">
@@ -1740,7 +1762,8 @@ const App = (() => {
       ${kv('มูลค่าสัญญา', `<span class="metric">${U.baht(r.contract_price_agree)}</span>`)}
       ${kv('ราคากลาง', `<span class="metric">${U.baht(r.price_build)}</span>`)}
       ${kv('วงเงินโครงการ', `<span class="metric">${U.baht(r.project_money)}</span>`)}
-      ${ratio !== null ? kv('ราคาต่อราคากลาง', `<span class="metric">${(ratio * 100).toFixed(2)}%</span>`) : ''}
+      ${ratio !== null ? kv(pa.n > 1 ? `ยอดรวม ${U.num(pa.n)} สัญญาต่อราคากลาง` : 'ราคาต่อราคากลาง',
+        `<span class="metric">${(ratio * 100).toFixed(2)}%</span>`) : ''}
       ${kv('วันทำสัญญา', U.thaiDate(r.contract_date))}
       ${kv('วันสิ้นสุด', U.thaiDate(r.contract_finish_date) +
         (r.duration_days !== null ? ` <span class="small-muted">(${U.num(r.duration_days)} วัน)</span>` : ''))}
@@ -1760,7 +1783,7 @@ const App = (() => {
           <strong class="small">${h.rule_id} · ${U.esc(h.rule_name)}</strong>
           <div class="flex-shrink-0">
             <span class="badge ${h.source === 'synthetic' ? 'badge-synthetic' : 'badge-real'}">${h.source === 'synthetic' ? 'สาธิต' : 'จริง'}</span>
-            <span class="badge ${Rules.BANDS.find(b => b.key === h.severity)?.cls || 'badge-medium'}">+${h.weight}</span>
+            ${hitWeightHTML(h, `badge ${Rules.BANDS.find(b => b.key === h.severity)?.cls || 'badge-medium'}`)}
           </div>
         </div>
         <div class="small mb-1"><strong>ค่าที่พบ:</strong> ${U.esc(h.actual)}</div>
@@ -1770,7 +1793,9 @@ const App = (() => {
       </div>`).join('')
       : U.emptyState('ไม่พบสัญญาณความเสี่ยงในโครงการนี้'));
 
-    Charts.waterfall('waterfall', hits.map(h => h.rule_id), hits.map(h => h.weight),
+    // แสดงเฉพาะ hit ที่บวกเข้าคะแนนจริง ขั้นบันไดจึงรวมได้เท่า risk_score พอดี
+    const scoredHits = hits.filter(h => h.source === 'real' && h.counted);
+    Charts.waterfall('waterfall', scoredHits.map(h => h.rule_id), scoredHits.map(h => h.weight),
       hits.length ? `รวม ${U.num(r.risk_score)} คะแนน` : '');
 
     if (pan && map && r.lat !== null) map.setView([r.lat, r.lon], Math.max(map.getZoom(), 12));
@@ -6623,13 +6648,17 @@ ${placemarks.join('\n')}
       const stat = s.counts.get(def.id);
       const band = Rules.BANDS.find(b => b.key === def.severity);
       const isDemo = def.source === 'synthetic';
+      const app = Rules.applicability(def, state.ctx, cfg.thresholds);
+      const family = def.family ? Rules.DEFS.filter(d => d.family === def.family && d.id !== def.id).map(d => d.id) : [];
       return `
-        <tr class="${cfg.enabled ? '' : 'rule-off'}">
+        <tr class="${cfg.enabled && app.ok ? '' : 'rule-off'}">
           <td data-sort="${def.id}" style="min-width:170px">
             <div class="fw-semibold">${def.id} · ${U.esc(def.name)}</div>
             <div class="mt-1">
               <span class="badge ${band?.cls || 'badge-medium'}">${band?.label || def.severity}</span>
               <span class="badge badge-none">น้ำหนัก ${cfg.weight}</span>
+              ${def.scored === false ? '<span class="badge badge-none" title="แสดงเป็นสัญญาณแต่ไม่บวกคะแนนความเสี่ยง">คุณภาพข้อมูล · ไม่นับคะแนน</span>' : ''}
+              ${family.length ? `<span class="badge badge-none" title="กฎกลุ่มเดียวกันวัดเรื่องเดียวกัน ถ้าติดพร้อมกันนับเฉพาะน้ำหนักสูงสุดข้อเดียว">กลุ่มเดียวกับ ${U.esc(family.join(', '))}</span>` : ''}
               ${cfg.enabled ? '' : '<span class="badge badge-none">ปิดใช้งาน</span>'}
             </div>
             <div class="small-muted mt-1">หมวด: ${U.esc(def.category)}</div>
@@ -6642,6 +6671,8 @@ ${placemarks.join('\n')}
             <div class="mt-1">${(doc.fields || []).map(f =>
               `<code class="field-chip">${U.esc(f)}</code>`).join(' ')}</div>
             <div class="small-muted mt-1">${U.esc(doc.basis || '')}</div>
+            ${doc.history ? `<details class="audit-details mt-1"><summary>บันทึกการออกแบบ (ตัวเลขจากชุดข้อมูลที่ระบุ ไม่ใช่ชุดที่เปิดอยู่)</summary>
+              <div class="small-muted">${U.esc(doc.history)}</div></details>` : ''}
           </td>
           <td style="min-width:230px">
             <div class="codebox">${U.esc(def.logic(cfg.thresholds))}</div>
@@ -6649,25 +6680,30 @@ ${placemarks.join('\n')}
                     data-type="diagram" data-id="${def.id}">🔍 ดูตัวอย่างรูปแบบ</button>` : ''}
           </td>
           <td class="small" style="min-width:250px">${auditStepsHTML(def.id)}</td>
-          ${numTd(stat.n)}
+          ${app.ok ? numTd(stat.n)
+            : `<td class="small" data-sort="-1" style="min-width:160px"><strong>ไม่เข้ากับชุดข้อมูลนี้</strong><div class="small-muted">${U.esc(app.reason)}</div></td>`}
         </tr>`;
     }).join(''));
   }
 
   function exportRuleTable() {
     const s = state.summary;
-    const headers = ['กฎ', 'ชื่อ', 'ระดับ', 'น้ำหนัก', 'หมวด', 'เปิดใช้งาน',
-      'คำอธิบายกฎ', 'ประเภทข้อมูล', 'คอลัมน์ที่ใช้', 'ที่มาและเหตุผล', 'การคำนวณ', 'จำนวนที่พบ', 'มูลค่าที่พบ'];
+    const headers = ['กฎ', 'ชื่อ', 'ระดับ', 'น้ำหนัก', 'หมวด', 'เปิดใช้งาน', 'นับคะแนน', 'กลุ่ม (family)',
+      'คำอธิบายกฎ', 'ประเภทข้อมูล', 'คอลัมน์ที่ใช้', 'ที่มาและเหตุผล', 'บันทึกการออกแบบ', 'การคำนวณ',
+      'ใช้กับชุดนี้ได้', 'จำนวนที่พบ', 'มูลค่าที่พบ'];
     const rows = Rules.DEFS.map(def => {
       const cfg = state.settings[def.id];
       const doc = Rules.DOCS[def.id] || {};
       const stat = s.counts.get(def.id);
+      const app = Rules.applicability(def, state.ctx, cfg.thresholds);
       return [def.id, def.name,
         Rules.BANDS.find(b => b.key === def.severity)?.label || def.severity,
         cfg.weight, def.category, cfg.enabled ? 'ใช่' : 'ไม่',
+        def.scored === false ? 'ไม่ (คุณภาพข้อมูล)' : 'ใช่', def.family || '',
         def.desc, def.source === 'synthetic' ? 'ข้อมูลสาธิต' : 'ข้อมูลจริง',
-        (doc.fields || []).join(' '), doc.basis || '',
-        def.logic(cfg.thresholds), stat.n, stat.value];
+        (doc.fields || []).join(' '), doc.basis || '', doc.history || '',
+        def.logic(cfg.thresholds), app.ok ? 'ใช่' : `ไม่: ${app.reason}`,
+        app.ok ? stat.n : '', app.ok ? stat.value : ''];
     });
     U.downloadCSV('procurement-rules.csv', headers, rows);
   }
@@ -6681,6 +6717,7 @@ ${placemarks.join('\n')}
       const cfg = state.settings[def.id];
       const stat = s.counts.get(def.id);
       const band = Rules.BANDS.find(b => b.key === def.severity);
+      const app = Rules.applicability(def, state.ctx, cfg.thresholds);
       return `
         <div class="cardx rule-config mb-3" data-rule="${def.id}">
           <div class="p-3">
@@ -6692,12 +6729,15 @@ ${placemarks.join('\n')}
                   <span class="badge ${def.source === 'synthetic' ? 'badge-synthetic' : 'badge-real'}">
                     ${def.source === 'synthetic' ? 'ข้อมูลสาธิต' : 'ข้อมูลจริง'}</span>
                   <span class="badge badge-none">${U.esc(def.category)}</span>
+                  ${def.scored === false ? '<span class="badge badge-none">คุณภาพข้อมูล · ไม่นับคะแนน</span>' : ''}
                 </div>
                 <div class="small-muted mt-1">${U.esc(def.desc)}</div>
               </div>
               <div class="text-end flex-shrink-0">
-                <div class="v">${U.num(stat.n)}</div>
-                <div class="small-muted">สัญญา · ${U.money(stat.value)} บาท</div>
+                ${app.ok ? `<div class="v">${U.num(stat.n)}</div>
+                <div class="small-muted">สัญญา · ${U.money(stat.value)} บาท</div>`
+                  : `<div class="small"><strong>ไม่เข้ากับชุดข้อมูลนี้</strong></div>
+                <div class="small-muted" style="max-width:260px">${U.esc(app.reason)}</div>`}
               </div>
             </div>
 
@@ -6907,7 +6947,7 @@ ${placemarks.join('\n')}
     const rows = state.filtered.filter(r => r.ml_pct !== null && r.ml_pct !== undefined);
     U.$('mlNote').textContent =
       `ให้คะแนนสัญญาที่แยกออกจากกลุ่มได้ง่ายเมื่อดู ${meta.features.length} ปัจจัยพร้อมกัน ` +
-      `โดยไม่ใช้ผลของกฎ R1-R22 เลย · ปัจจัยที่ขึ้นกับชนิดงานเทียบภายในกลุ่มงานเดียวกัน · ` +
+      `โดยไม่ใช้ผลของกฎ R1-R23 เลย · ปัจจัยที่ขึ้นกับชนิดงานเทียบภายในกลุ่มงานเดียวกัน · ` +
       `ความเสถียรเมื่อสร้างป่าใหม่ด้วย seed อื่น: Spearman ${meta.stability_spearman} · ` +
       `200 อันดับแรกซ้ำกัน ${U.pct(meta.stability_top200_overlap, 0)} · ` +
       `ไม่ให้คะแนน ${U.num(meta.n_excluded)} สัญญาที่ราคาเป็นศูนย์หรือไม่มีราคากลาง (เป็นปัญหาข้อมูล ไม่ใช่พฤติกรรม)`;
@@ -7188,13 +7228,22 @@ ${placemarks.join('\n')}
     const { active, matrix, notable } = computeRuleOverlap(recs);
     U.$('ruleOverlapNote').textContent =
       `คะแนนความเสี่ยงคือผลรวมน้ำหนักของกฎ ถ้าสองกฎติดธงสัญญาชุดเดียวกัน สัญญานั้นถูกนับคะแนนซ้ำ ` +
+      `ยกเว้นกฎกลุ่มเดียวกัน (family นับข้อเดียว) และกฎคุณภาพข้อมูล (ไม่นับคะแนน) · ` +
       `ตารางแสดงคู่ที่ทับกันมาก (Jaccard ≥ 0.2 หรือกฎหนึ่งอยู่ในอีกกฎเกือบทั้งหมด) จาก ${active.length} กฎที่พบ ≥ 20 สัญญา`;
+    // คู่ที่ Rules.scoreHits จัดการแล้ว: family เดียวกัน หรือข้อใดข้อหนึ่งไม่บวกคะแนน
+    const handledPair = p => {
+      const a = Rules.BY_ID.get(p.a), b = Rules.BY_ID.get(p.b);
+      return !!a && !!b && (a.scored === false || b.scored === false || (a.family && a.family === b.family));
+    };
     U.setHTML('ruleOverlapBody', notable.map(p => `
       <tr>
         <td class="text-nowrap"><span class="rule-chip">${p.a}</span> <span class="rule-chip">${p.b}</span></td>
         ${numTd(p.inter)}
         <td class="text-end" ${sortAttr(p.jac)}>${p.jac.toFixed(2)}</td>
-        <td class="small">${p.contain >= 0.95
+        <td class="small">${handledPair(p)
+          ? `ทับกัน ${U.pct(p.contain, 0)} ของกฎที่เล็กกว่า · <strong>นับคะแนนครั้งเดียวแล้ว</strong> ` +
+            `(${Rules.BY_ID.get(p.a).scored === false || Rules.BY_ID.get(p.b).scored === false ? 'มีกฎคุณภาพข้อมูลที่ไม่บวกคะแนน' : 'กลุ่มเดียวกัน'})`
+          : p.contain >= 0.95
           ? `<strong>${p.smallId}</strong> ติดธงเฉพาะสัญญาที่ <strong>${p.bigId}</strong> ติดอยู่แล้ว (${U.pct(p.contain, 0)}) · ` +
             `น้ำหนักบวกซ้อน ควรเป็นความตั้งใจให้ยกระดับเท่านั้น ไม่เช่นนั้นคือการนับซ้ำ`
           : `ทับกัน ${U.pct(p.contain, 0)} ของกฎที่เล็กกว่า · อาจวัดสิ่งเดียวกัน`}</td>
@@ -7212,8 +7261,7 @@ ${placemarks.join('\n')}
       return;
     }
     const label = r => (r.rule_hits || []).some(h => enabledProxy.includes(h.rule_id));
-    const leaveOut = r => Math.min(100, (r.rule_hits || [])
-      .filter(h => h.source === 'real' && !enabledProxy.includes(h.rule_id)).reduce((s, h) => s + h.weight, 0));
+    const leaveOut = r => Rules.scoreHits(r.rule_hits, { exclude: enabledProxy }).score;
     const positives = recs.filter(label).length;
     const base = positives / recs.length;
 
@@ -7273,7 +7321,7 @@ ${placemarks.join('\n')}
   }
 
   function renderDeep() {
-    loadScriptOnce('js/deeppattern.js?v=1', 'DeepPattern').then(DP => {
+    loadScriptOnce('js/deeppattern.js?v=3', 'DeepPattern').then(DP => {
       if (!DP.__wired) { DP.init(deepPatternApi()); DP.__wired = true; }
       DP.render();
     }).catch(err => {
@@ -7760,7 +7808,7 @@ ${placemarks.join('\n')}
       ['จำนวนสัญญาณ', x => (x.r.rule_hits || []).length],
       ['รหัสกฎที่เข้าเงื่อนไข', x => (x.r.rule_hits || []).map(h => h.rule_id).join(' ')],
       ['รายละเอียดสัญญาณ', x => (x.r.rule_hits || []).map(h =>
-        `${h.rule_id} ${h.rule_name}${h.source === 'synthetic' ? ' [ข้อมูลสาธิต]' : ''} (น้ำหนัก ${h.weight}): ${h.actual}`).join(' | ')],
+        `${h.rule_id} ${h.rule_name}${h.source === 'synthetic' ? ' [ข้อมูลสาธิต]' : ''} (น้ำหนัก ${hitWeightText(h)}): ${h.actual}`).join(' | ')],
       ['เอกสารที่ควรขอ / จุดที่ควรตรวจ', x => (x.r.rule_hits || []).map(h => {
         const a = (typeof Learn !== 'undefined' && Learn.AUDIT_STEPS) ? Learn.AUDIT_STEPS[h.rule_id] : null;
         return a ? `${h.rule_id}: ขอ ${(a.docs || []).join(', ')} · ตรวจ ${(a.checks || []).join(', ')}` : '';
@@ -9456,7 +9504,7 @@ ${placemarks.join('\n')}
         <header class="evidence-head">
           <span class="rule-chip">${h.rule_id}</span>
           <strong>${U.esc(h.rule_name)}</strong>
-          <span class="evidence-weight" title="น้ำหนักที่บวกเข้าคะแนน">+${U.num(h.weight)}</span>
+          ${hitWeightHTML(h, 'evidence-weight')}
           ${h.source === 'synthetic' ? '<span class="badge badge-synthetic">สาธิต</span>' : ''}
         </header>
         <div class="evidence-actual">${U.esc(h.actual)}</div>
@@ -9502,8 +9550,13 @@ ${placemarks.join('\n')}
     profile.record = r;
     const band = Rules.band(r.risk_score);
     const siblings = state.records.filter(x => x.project_id === r.project_id);
-    const discount = (r.price_build > 0 && r.contract_price_agree !== null)
-      ? (1 - r.contract_price_agree / r.price_build) : null;
+    // ราคากลางเป็นของทั้งโครงการ — โครงการหลายสัญญาต้องเทียบยอดรวม ไม่ใช่สัญญาฉบับนี้ฉบับเดียว
+    const pa = state.ctx.projectAgg.get(r.project_id);
+    const projSum = pa && !pa.missing ? pa.sum : null;
+    const discount = (r.price_build > 0 && projSum !== null && projSum > 0)
+      ? (1 - projSum / r.price_build) : null;
+    const discountIsProject = pa && pa.n > 1;
+    const noDiscount = discount !== null && Math.abs(discount) < 1e-9;   // ผลรวมทศนิยมอาจคลาดในหลัก 1e-12
 
     U.$('profileTitle').textContent = r.project_name;
     U.setHTML('profileSub', `
@@ -9529,9 +9582,9 @@ ${placemarks.join('\n')}
     U.setHTML('profileKpis', `
       <div class="pk"><span>มูลค่าสัญญา</span><strong>${U.money(r.contract_price_agree)}</strong><em>บาท</em></div>
       <div class="pk"><span>ราคากลาง</span><strong>${U.money(r.price_build)}</strong><em>บาท</em></div>
-      <div class="pk${discount !== null && (discount === 0 || discount >= 0.3) ? ' is-warn' : ''}">
-        <span>ส่วนลดจากราคากลาง</span><strong>${discount === null ? '-' : (discount * 100).toFixed(1) + '%'}</strong>
-        <em>${discount === 0 ? 'ปิดเท่าราคากลางพอดี' : ''}</em></div>
+      <div class="pk${discount !== null && (noDiscount || discount >= 0.3) ? ' is-warn' : ''}">
+        <span>ส่วนลดจากราคากลาง${discountIsProject ? ' (ทั้งโครงการ)' : ''}</span><strong>${discount === null ? '-' : (discount * 100).toFixed(1) + '%'}</strong>
+        <em>${noDiscount ? 'ปิดเท่าราคากลางพอดี' : discountIsProject ? `ยอดรวม ${U.num(pa.n)} สัญญา` : ''}</em></div>
       <div class="pk"><span>ระยะเวลา</span><strong>${r.duration_days === null ? '-' : U.num(r.duration_days)}</strong><em>วัน</em></div>`);
 
     U.setHTML('profileTimeline', timelineHTML(r));
@@ -9901,7 +9954,7 @@ ${placemarks.join('\n')}
     }).filter(Boolean).join('\n');
     const hits = (r.rule_hits || []).map(h => {
       const steps = Learn.auditSteps(h.rule_id);
-      return `- ${h.rule_id} ${h.rule_name} (น้ำหนัก ${h.weight}, ระดับ ${h.severity}${h.source === 'synthetic' ? ', ข้อมูลสาธิต' : ''}): ${h.actual}` +
+      return `- ${h.rule_id} ${h.rule_name} (น้ำหนัก ${hitWeightText(h)}, ระดับ ${h.severity}${h.source === 'synthetic' ? ', ข้อมูลสาธิต' : ''}): ${h.actual}` +
         (steps ? `\n  เอกสารที่ระบบแนะนำ: ${steps.docs.join('; ')}\n  จุดที่ระบบแนะนำให้ตรวจ: ${steps.checks.join('; ')}` : '');
     }).join('\n') || '- ไม่พบ';
     const winnerRows = state.records.filter(x => x.winner_key === r.winner_key);
@@ -11440,7 +11493,8 @@ ${placemarks.join('\n')}
           ...agentCompact(r), full_name: r.project_name, project_money: r.project_money, sum_price_agree: r.sum_price_agree,
           type: r.project_type_name, work_group: workGroupLabel(r.work_group), duration_days: r.duration_days,
           announce_date: r.announce_date, geo_quality: r.geo_quality || 'ok',
-          signals: (r.rule_hits || []).map(h => ({ id: h.rule_id, name: h.rule_name, actual: h.actual, weight: h.weight, demo: h.source === 'synthetic' })),
+          signals: (r.rule_hits || []).map(h => ({ id: h.rule_id, name: h.rule_name, actual: h.actual, weight: h.weight, demo: h.source === 'synthetic',
+            ...(h.notCounted ? { not_counted: h.notCounted === 'quality' ? 'data_quality_rule' : `same_family_as_${h.coveredBy}` } : {}) })),
           peer_group: { label: peer.label, size: peer.n, percentiles: Object.fromEntries(PEER_METRICS.map(m => {
             const v = m.get(r), s = peer.sorted[m.key];
             return [m.key, v === null || s.length < 10 ? null : Math.round(percentileOf(s, v) * 100)];
@@ -13171,17 +13225,18 @@ ${labVocabText()}`;
   function ruleWhatIf(def, oldCfg, newCfg) {
     const thrChanged = Object.keys(newCfg.thresholds || {}).some(k => newCfg.thresholds[k] !== oldCfg.thresholds?.[k]);
     const needEval = newCfg.enabled !== false && (thrChanged || oldCfg.enabled === false);
+    // เกณฑ์ใหม่อาจทำให้กฎไม่เข้ากับชุดข้อมูล (เช่น เพดานที่ไม่มีสัญญาอยู่ใต้มันเลย) — evaluate() จะข้ามกฎนั้นทั้งข้อ
+    const newApplies = Rules.applicability(def, state.ctx, newCfg.thresholds).ok;
     let hitsBefore = 0, hitsAfter = 0, priBefore = 0, priAfter = 0, enter = 0, leave = 0;
     for (const r of state.records) {
-      const real = (r.rule_hits || []).filter(h => h.source === 'real');
-      const oldHit = real.some(h => h.rule_id === def.id);
-      const base = real.filter(h => h.rule_id !== def.id).reduce((s, h) => s + h.weight, 0);
+      const oldHit = (r.rule_hits || []).some(h => h.rule_id === def.id);
       let newHit = false;
-      if (newCfg.enabled !== false) {
+      if (newCfg.enabled !== false && newApplies) {
         if (needEval) { try { newHit = !!def.evaluate(r, state.ctx, newCfg.thresholds); } catch (e) { newHit = false; } } else newHit = oldHit;
       }
-      const before = Math.min(100, base + (oldHit ? oldCfg.weight : 0));
-      const after = Math.min(100, base + (newHit ? newCfg.weight : 0));
+      // คิดคะแนนด้วยนิยามเดียวกับ Rules.evaluate (family นับข้อเดียว · กฎคุณภาพข้อมูลไม่นับ)
+      const before = Rules.scoreHits(r.rule_hits, { override: { [def.id]: oldHit ? oldCfg.weight : null } }).score;
+      const after = Rules.scoreHits(r.rule_hits, { override: { [def.id]: newHit ? newCfg.weight : null } }).score;
       if (oldHit) hitsBefore++;
       if (newHit) hitsAfter++;
       if (before >= 40) priBefore++;
@@ -13977,6 +14032,7 @@ ${labVocabText()}`;
       // แท็บอื่นของ CoT — ทุกตัวอ่านของเดิมในแอป ไม่คำนวณซ้ำ เพื่อให้เลขตรงกับที่แท็บนั้นแสดง
       setRule: id => { U.$('gfRule').value = id; syncFiltersFromUI(); applyFilters(); },
       settings: () => state.settings,
+      ruleContext: () => state.ctx,
       ruleOverlap: () => computeRuleOverlap(state.records),
       coverageGaps: () => COVERAGE_GAPS,
       contractorProfiles: () => profiles(),

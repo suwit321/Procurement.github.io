@@ -19,8 +19,9 @@ window.DeepPattern = (() => {
   let status = 'idle';        // idle | loading | ready | stale | unavailable
   let error = '';
   let payload = null;         // { schema, meta, fields, rows }
-  let byKey = null;           // Map<cartKey, compactRow>  compactRow = [i, k, s, e, f?]
+  let byKey = null;           // Map<cartKey, compactRow>  compactRow = [i, k, s, e, g, f?]
   let wiredDom = false;
+  let groupFilterBuilt = false;
 
   const REQUIRED = ['rows', 'allRows', 'meta', 'dataset', 'tabId', 'markDirty', 'syncCot',
     'gotoTab', 'openDetail', 'openProfile', 'cartKey', 'clickable', 'cartBtn', 'workGroupLabel',
@@ -35,8 +36,8 @@ window.DeepPattern = (() => {
 
   /* ---------- โหลดข้อมูล (ครั้งเดียว ต่อชุดข้อมูล) ---------- */
 
-  function fields() { return payload.fields; }               // ["i","k","s","e","f"]
-  const IDX = { i: 0, k: 1, s: 2, e: 3, f: 4 };
+  function fields() { return payload.fields; }               // ["i","k","s","e","g","f"]
+  const IDX = { i: 0, k: 1, s: 2, e: 3, g: 4, f: 5 };
 
   async function load() {
     const dataset = api.dataset();
@@ -51,7 +52,7 @@ window.DeepPattern = (() => {
       const res = await fetch('data/deep_pattern.json', { cache: 'no-cache' });
       if (!res.ok) throw new Error(`ไม่พบไฟล์ (HTTP ${res.status})`);
       const data = await res.json();
-      if (data.schema !== 'deep_pattern/1') throw new Error('รูปแบบไฟล์ไม่ตรงกับที่แท็บนี้รองรับ (schema ' + data.schema + ')');
+      if (data.schema !== 'deep_pattern/2') throw new Error('รูปแบบไฟล์ไม่ตรงกับที่แท็บนี้รองรับ (schema ' + data.schema + ')');
       payload = data;
       byKey = new Map(data.rows.map(r => [r[IDX.k], r]));
       const m = data.meta;
@@ -83,7 +84,7 @@ window.DeepPattern = (() => {
       const row = byKey.get(api.cartKey(r));
       if (!row) continue;
       out.push({
-        record: r, i: row[IDX.i], s: row[IDX.s], e: row[IDX.e],
+        record: r, i: row[IDX.i], s: row[IDX.s], e: row[IDX.e], g: row[IDX.g],
         f: row.length > IDX.f ? row[IDX.f] : null,
       });
     }
@@ -114,6 +115,16 @@ window.DeepPattern = (() => {
 
   const $ = id => document.getElementById(id);
   const LEVEL_LABEL = { critical: 'วิกฤต', high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ', none: 'ไม่พบสัญญาณ' };
+
+  /** ชื่อไทยของกลุ่มงานที่ใช้เทียบ deep_score (ดู meta.peer_grouping.groups) */
+  function groupInfo(g) {
+    const groups = payload && payload.meta.peer_grouping.groups;
+    return (groups && groups[g]) || { label_th: g, n: null, merged: false };
+  }
+  function groupLabel(g) {
+    const gi = groupInfo(g);
+    return gi.n === null ? gi.label_th : `${gi.label_th} (n=${U.num(gi.n)})`;
+  }
 
   function renderStatusBanner() {
     const body = $('deepStatusBody');
@@ -157,30 +168,46 @@ window.DeepPattern = (() => {
       ['ฝึกต่อโมเดล', `~${m.folds[0].n_train} ราย`],
       ['ให้คะแนนแบบ out-of-fold', `${U.num(m.n_scored)} ราย`],
       ['ensemble', `${m.training.folds} fold × ${m.training.seeds_per_fold} seed`],
+      ['กลุ่มงานที่ใช้เทียบคะแนน', `${Object.keys(m.peer_grouping.groups).length} กลุ่ม (≥ ${m.peer_grouping.min_group_n} สัญญา/กลุ่ม)`],
       ['ระดับ Unusual Pattern', `≥ P${m.thresholds.strong_pct} (${U.num(m.thresholds.n_ge99)} ราย)`],
     ].map(([label, v]) => `<div><span>${U.esc(label)}</span><b>${U.esc(String(v))}</b></div>`).join(''));
     U.setHTML('deepOverviewNote',
       `ให้คะแนนแบบ out-of-fold: แบ่งข้อมูลเป็น ${m.training.folds} ส่วน แต่ละสัญญาได้คะแนนจากโมเดลที่ไม่เคยเห็นสัญญานั้นตอนฝึก `
       + `(ไม่ใช่โมเดลเดียวฝึกครั้งเดียวแล้วให้คะแนนข้อมูลของตัวเอง) · มาตรฐานฟีเจอร์: ${U.esc(arch.standardize)} · `
-      + `ไม่ใช้ผลของกฎ R1-R22 หรือ Isolation Forest เลยในการฝึก เพื่อให้เป็นความเห็นอิสระ`);
+      + `ไม่ใช้ผลของกฎ R1-R23 หรือ Isolation Forest เลยในการฝึก เพื่อให้เป็นความเห็นอิสระ · `
+      + `deep_score เทียบเปอร์เซ็นไทล์เฉพาะภายในกลุ่มงานเดียวกัน (จำแนกจากชื่อโครงการ) ไม่ใช่ทั้งชุดข้อมูล เพื่อไม่ให้งานก่อสร้างถูกเทียบกับงานที่ปรึกษาหรือจัดซื้อ`);
   }
 
-  const state = { filterLevel: 'all', page: 0, pageSize: 25, lastMatched: [] };
+  const state = { filterLevel: 'all', filterGroup: 'all', page: 0, pageSize: 25, lastMatched: [] };
 
   function rowsForFilter(sn) {
     const flagPct = sn.flagPct;
+    let out;
     switch (state.filterLevel) {
-      case 'ge99': return sn.matched.filter(m => m.s >= sn.meta.thresholds.strong_pct);
-      case 'ge95': return sn.matched.filter(m => m.s >= flagPct);
-      case 'agree': return sn.matched.filter(m => m.agreeCount >= 2);
-      case 'onlydeep': return sn.matched.filter(m => m.deepOnly);
-      default: return sn.matched;
+      case 'ge99': out = sn.matched.filter(m => m.s >= sn.meta.thresholds.strong_pct); break;
+      case 'ge95': out = sn.matched.filter(m => m.s >= flagPct); break;
+      case 'agree': out = sn.matched.filter(m => m.agreeCount >= 2); break;
+      case 'onlydeep': out = sn.matched.filter(m => m.deepOnly); break;
+      default: out = sn.matched;
     }
+    if (state.filterGroup !== 'all') out = out.filter(m => m.g === state.filterGroup);
+    return out;
+  }
+
+  /** สร้างตัวเลือกกลุ่มงานในตัวกรองครั้งเดียวตอนข้อมูลพร้อม (เรียงจากกลุ่มใหญ่ไปเล็ก) */
+  function populateGroupFilter() {
+    if (groupFilterBuilt) return;
+    groupFilterBuilt = true;
+    const groups = payload.meta.peer_grouping.groups;
+    const opts = Object.entries(groups).sort((a, b) => b[1].n - a[1].n)
+      .map(([g, gi]) => `<option value="${U.esc(g)}">${U.esc(gi.label_th)} (n=${U.num(gi.n)})</option>`).join('');
+    U.$('deepFilterGroup').insertAdjacentHTML('beforeend', opts);
   }
 
   function renderSummaryAndTable() {
     const sn = summarize(api.rows());
     if (!sn) return;
+    populateGroupFilter();
     const flagPct = sn.flagPct;
     const ge99 = sn.matched.filter(m => m.s >= sn.meta.thresholds.strong_pct);
     const ge95 = sn.matched.filter(m => m.s >= flagPct);
@@ -195,7 +222,8 @@ window.DeepPattern = (() => {
     ].map(([label, v]) => `<div><span>${U.esc(label)}</span><b>${U.esc(String(v))}</b></div>`).join(''));
     U.setHTML('deepSummaryNote',
       `นับเฉพาะสัญญาที่อยู่ในตัวกรองส่วนกลางตอนนี้ (${U.num(sn.nTotal)} สัญญา) และมีคะแนนจากโมเดล — `
-      + `ตัวเลขในตารางด้านล่างคือรายการเดียวกับที่นับในนี้ ระดับ ≥ P${sn.meta.thresholds.strong_pct}/P${flagPct} เป็นเปอร์เซ็นไทล์ของทั้งชุดข้อมูล ไม่ใช่ของขอบเขตที่กรองอยู่`);
+      + `ตัวเลขในตารางด้านล่างคือรายการเดียวกับที่นับในนี้ ระดับ ≥ P${sn.meta.thresholds.strong_pct}/P${flagPct} เป็นเปอร์เซ็นไทล์ `
+      + `<b>ภายในกลุ่มงานเดียวกัน</b> (คอลัมน์ "กลุ่มงาน" ในตาราง) ไม่ใช่ของทั้งชุดข้อมูลและไม่ใช่ของขอบเขตตัวกรองที่ใช้อยู่`);
 
     state.lastMatched = rowsForFilter(sn).slice().sort((a, b) => b.s - a.s);
     state.page = 0;
@@ -214,12 +242,13 @@ window.DeepPattern = (() => {
       const band = Rules.band(r.risk_score);
       return `<tr class="ub-row" data-deep-key="${U.esc(api.cartKey(r))}" tabindex="0" role="button" title="กดเพื่อดูรายละเอียด">
         <td>${api.clickable('project', r.project_id, api.truncate(r.project_name, 46))}</td>
+        <td>${U.esc(groupInfo(m.g).label_th)}</td>
         <td class="text-end" data-sort="${m.s}">${m.s.toFixed(1)}</td>
         <td class="text-end" data-sort="${r.risk_score}"><span class="badge ${band.cls}">${U.num(r.risk_score)}</span></td>
         <td class="text-end" data-sort="${r.ml_pct ?? -1}">${r.ml_pct === null || r.ml_pct === undefined ? '-' : r.ml_pct.toFixed(1)}</td>
         <td>${m.agreeCount}/${m.agreeOf}</td>
       </tr>`;
-    }).join('') || U.emptyRow(5, 'ไม่มีสัญญาตามตัวกรองนี้'));
+    }).join('') || U.emptyRow(6, 'ไม่มีสัญญาตามตัวกรองนี้'));
     U.$('deepPagerLabel').textContent = total ? `หน้า ${state.page + 1} / ${pages} (${U.num(total)} รายการ)` : '';
     U.$('deepPagerPrev').disabled = state.page <= 0;
     U.$('deepPagerNext').disabled = state.page >= pages - 1;
@@ -230,18 +259,19 @@ window.DeepPattern = (() => {
     if (!row) return;
     const r = api.allRows().find(x => api.cartKey(x) === key) || api.rows().find(x => api.cartKey(x) === key);
     if (!r) return;
-    const s = row[IDX.s], e = row[IDX.e], f = row.length > IDX.f ? row[IDX.f] : null;
+    const s = row[IDX.s], e = row[IDX.e], g = row[IDX.g], f = row.length > IDX.f ? row[IDX.f] : null;
     const band = Rules.band(r.risk_score);
     const hasIf = r.ml_pct !== null && r.ml_pct !== undefined;
     const m = payload.meta;
+    const gi = groupInfo(g);
     const engineRow = (name, score, extra, ts) => `
       <div class="profile-metric"><div class="label">${U.esc(name)}</div>
         <div class="value">${score === null ? '-' : score}</div>
         <div class="small-muted">${extra || ''}${ts ? ` · ${U.esc(ts)}` : ''}</div></div>`;
     const engines = `<div class="row g-2 mb-2">
       <div class="col-4">${engineRow('คะแนนกฎ', U.num(r.risk_score), band.label, 'คำนวณในเบราว์เซอร์ตามการตั้งค่ากฎปัจจุบัน')}</div>
-      <div class="col-4">${engineRow('Isolation Forest', hasIf ? r.ml_pct.toFixed(1) + '%' : '-', hasIf ? 'เปอร์เซ็นไทล์ทั้งชุด' : 'ไม่มีคะแนน', payload && m.data_generated_at)}</div>
-      <div class="col-4">${engineRow('Autoencoder', s.toFixed(1) + '%', `error ${e}`, m.trained_at)}</div>
+      <div class="col-4">${engineRow('Isolation Forest', hasIf ? r.ml_pct.toFixed(1) + '%' : '-', hasIf ? 'เปอร์เซ็นไทล์ทั้งชุด (ทุกประเภทงานรวมกัน)' : 'ไม่มีคะแนน', payload && m.data_generated_at)}</div>
+      <div class="col-4">${engineRow('Autoencoder', s.toFixed(1) + '%', `เทียบเฉพาะกลุ่ม "${U.esc(gi.label_th)}" (n=${U.num(gi.n)}) · error ${e}`, m.trained_at)}</div>
     </div>`;
     const why = (f || []).map(entry => {
       const [j, delta, value, peer] = entry;
@@ -254,7 +284,8 @@ window.DeepPattern = (() => {
       ${engines}
       ${why ? `<div><div class="section-label mb-1">ปัจจัยที่ทำให้ Autoencoder เห็นว่าผิดปกติ</div><ul class="mb-0">${why}</ul></div>`
         : '<p class="small-muted mb-0">สัญญานี้ไม่ติดกลุ่มที่คำนวณคำอธิบายไว้ (คำนวณเฉพาะสัญญาคะแนนสูงสุด 400 อันดับแรก)</p>'}
-      <p class="ma-note mt-2 mb-0">ทั้ง Isolation Forest และ Autoencoder ใช้ปัจจัย 12 ตัวชุดเดียวกัน การที่สองโมเดลนี้เห็นตรงกันจึงไม่ใช่หลักฐานอิสระสองชิ้น</p>`);
+      <p class="ma-note mt-2 mb-0">ทั้ง Isolation Forest และ Autoencoder ใช้ปัจจัย 12 ตัวชุดเดียวกัน การที่สองโมเดลนี้เห็นตรงกันจึงไม่ใช่หลักฐานอิสระสองชิ้น
+        อีกทั้งฐานเทียบต่างกัน (Isolation Forest เทียบทั้งชุด ส่วน Autoencoder เทียบเฉพาะกลุ่มงานเดียวกัน) ตัวเลขทั้งสองจึงเทียบตรง ๆ ไม่ได้ ใช้ดูทิศทางเดียวกันเท่านั้น</p>`);
     U.$('deepDetailCard').hidden = false;
     U.$('deepDetailCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -270,11 +301,21 @@ window.DeepPattern = (() => {
       return `<tr><td>${fo.k}</td><td class="text-end">${fo.n_train}</td><td class="text-end">${fo.n_test}</td>
         <td>${bestEpochs}${anyNotEarly ? ' <span class="badge badge-medium">ไม่ early-stop</span>' : ''}</td></tr>`;
     }).join('');
+    const pg = m.peer_grouping;
+    const groupRows = Object.entries(pg.groups).sort((a, b) => b[1].n - a[1].n).map(([g, gi]) => {
+      const bg = m.thresholds.by_group[g] || {};
+      const members = gi.merged
+        ? `<div class="small-muted">รวม: ${Object.entries(gi.members).map(([k, c]) => `${U.esc(api.workGroupLabel(k))} ${c}`).join(', ')}</div>` : '';
+      return `<tr><td>${U.esc(gi.label_th)}${members}</td><td class="text-end">${U.num(gi.n)}</td>
+        <td class="text-end">${U.num(bg.n_ge95 ?? 0)}</td><td class="text-end">${U.num(bg.n_ge99 ?? 0)}</td></tr>`;
+    }).join('');
     U.setHTML('deepValidationBody', `
       <div class="row g-3 mb-2">
         <div class="col-lg-6">
-          <div class="section-label mb-1">การกระจายค่า reconstruction error (log10)</div>
+          <div class="section-label mb-1">การกระจายค่า reconstruction error (log10, ทั้งชุด)</div>
           <div class="hx-bars" role="img" aria-label="ฮิสโทแกรม reconstruction error">${bars}</div>
+          <p class="small-muted mb-0 mt-1">ฮิสโทแกรมนี้และค่าเปรียบเทียบด้านขวาใช้ reconstruction error ดิบเทียบกันทั้งชุด (ไม่แยกกลุ่มงาน) —
+            ส่วน deep_score ที่แสดงในตารางคำนวณแยกภายในกลุ่มงานแล้ว (ดูตารางกลุ่มงานด้านล่าง)</p>
         </div>
         <div class="col-lg-6">
           <div class="section-label mb-1">เทียบกับวิธีอื่น (ทั้งชุดข้อมูล ไม่ตามตัวกรอง)</div>
@@ -286,6 +327,13 @@ window.DeepPattern = (() => {
           </ul>
         </div>
       </div>
+      <div class="section-label mb-1">กลุ่มงานที่ใช้เทียบ deep_score (≥ ${pg.min_group_n} สัญญาต่อกลุ่ม)</div>
+      <p class="small-muted mb-1">${U.esc(pg.note)}</p>
+      <div class="table-wrap mb-2"><table class="table table-sm mini-table mb-0">
+        <caption class="visually-hidden">จำนวนสัญญาและสัญญาณระดับสูงแยกตามกลุ่มงาน</caption>
+        <thead><tr><th scope="col">กลุ่มงาน</th><th scope="col" class="text-end">n</th>
+          <th scope="col" class="text-end">≥ P${m.thresholds.flag_pct}</th><th scope="col" class="text-end">≥ P${m.thresholds.strong_pct}</th></tr></thead>
+        <tbody>${groupRows}</tbody></table></div>
       <div class="table-wrap mb-2"><table class="table table-sm mini-table mb-0">
         <caption class="visually-hidden">รายละเอียดการฝึกแต่ละ fold</caption>
         <thead><tr><th scope="col">fold</th><th scope="col" class="text-end">ฝึก</th><th scope="col" class="text-end">ทดสอบ</th><th scope="col">epoch ที่ดีที่สุด (5 seed)</th></tr></thead>
@@ -337,6 +385,7 @@ window.DeepPattern = (() => {
     if (wiredDom) return;
     wiredDom = true;
     $('deepFilterLevel').addEventListener('change', e => { state.filterLevel = e.target.value; renderSummaryAndTable(); });
+    $('deepFilterGroup').addEventListener('change', e => { state.filterGroup = e.target.value; renderSummaryAndTable(); });
     $('deepPagerPrev').addEventListener('click', () => { state.page--; renderTablePage(); });
     $('deepPagerNext').addEventListener('click', () => { state.page++; renderTablePage(); });
     $('deepDetailClose').addEventListener('click', () => { $('deepDetailCard').hidden = true; });

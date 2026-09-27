@@ -494,7 +494,8 @@ const RuleLab = (() => {
         const real = (r.rule_hits || []).filter(h => h.source === 'real');
         if (real.length === 1) sole++;
         const pri = r.risk_score >= 40;
-        if (pri && Math.min(100, real.reduce((s, h) => s + h.weight, 0) - w) < 40) leave++;
+        // คะแนนเมื่อไม่มีกฎนี้ ใช้นิยามเดียวกับ Rules.evaluate (family นับข้อเดียว · กฎคุณภาพข้อมูลไม่นับ)
+        if (pri && Rules.scoreHits(r.rule_hits, { exclude: [d.id] }).score < 40) leave++;
         value += r.contract_price_agree || 0;
       }
       return { id: d.id, name: d.name, custom: !!d.custom, hits: idx.size, sole, leave, value, weight: w };

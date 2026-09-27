@@ -762,7 +762,7 @@ def main() -> int:
     print(f"  ขนาดไฟล์           {size_mb:.1f} MB")
 
     if args.verify:
-        return verify(df, payload)
+        return verify(df, payload, src)
     return 0
 
 
@@ -770,78 +770,65 @@ def main() -> int:
 # การตรวจสอบ
 # ---------------------------------------------------------------------------
 
-def verify(df: pd.DataFrame, payload: dict) -> int:
+def verify(df: pd.DataFrame, payload: dict, src: Path) -> int:
+    """ตรวจความถูกต้องของ data.json เทียบกับไฟล์ต้นทาง — ใช้ได้กับทุกชุดข้อมูล
+
+    เวอร์ชันก่อน (ถึง 2026-09) เทียบกับค่าคงที่ของชุดปีงบ 2569 ทั้งปี (10,174 แถว) และคำนวณกฎ R1-R14
+    ซ้ำใน Python จึงล้มทันทีที่เปลี่ยนชุดข้อมูล และตรรกะกฎที่คัดลอกไว้ก็ไม่ตรงกับ js/rules.js อีกต่อไป
+    ตอนนี้ตรวจเฉพาะสิ่งที่ต้องจริงเสมอ (invariant) — กฎความเสี่ยงคำนวณในเบราว์เซอร์ที่เดียว
+    ไม่ตรวจซ้ำที่นี่ ดูวิธีวัดผลกฎในหัวข้อ "การทบทวนกฎ" ของ README
+    """
     print("\n--- ตรวจสอบ ---")
     meta = payload["meta"]
     records = payload["records"]
     failures: list[str] = []
 
     def check(label, actual, expected, tol=0):
-        ok = abs(actual - expected) <= tol if isinstance(expected, (int, float)) else actual == expected
+        numeric = isinstance(expected, (int, float)) and not isinstance(expected, bool)
+        ok = abs(actual - expected) <= tol if numeric else actual == expected
         print(f"  {'ok  ' if ok else 'FAIL'}  {label}: {actual!r} (คาด {expected!r})")
         if not ok:
             failures.append(label)
 
-    check("จำนวนระเบียน", meta["total_records"], 10174)
-    check("มูลค่ารวม", meta["total_contract_value"], 28716369657.38, tol=1.0)
-    check("project_money ที่ parse ได้",
-          sum(1 for r in records if r["project_money"] is not None), 10174)
-    check("price_build ที่ parse ได้",
-          sum(1 for r in records if r["price_build"] is not None), 10174)
-    check("contract_date ที่ parse ได้",
-          sum(1 for r in records if r["contract_date"]), 10174)
-    check("วันทำสัญญาแรกสุด", meta["contract_date_min"], "2025-10-01")
-    check("วันทำสัญญาล่าสุด", meta["contract_date_max"], "2026-07-31")
-    check("แถวที่มีพิกัด", meta["geo_rows"], 6728, tol=40)
-    check("TIN ที่ถูกปิดบัง", meta["n_masked_tins"], 2205)
-    check("จำนวนจังหวัด", meta["n_provinces"], 77)
+    def note(label, value):
+        print(f"  info  {label}: {value}")
 
-    # นับ hit ของ rule ที่เคยไม่ทำงาน เพื่อยืนยันว่าปลดล็อกแล้วจริง
-    r1 = sum(1 for r in records
-             if r["project_money"] and r["contract_price_agree"] is not None
-             and (r["project_money"] - r["contract_price_agree"]) / r["project_money"] >= 0.30)
-    r2 = sum(1 for r in records
-             if r["price_build"] and r["contract_price_agree"] is not None
-             and (r["price_build"] - r["contract_price_agree"]) / r["price_build"] >= 0.30)
-    r4 = sum(1 for r in records
-             if r["project_money"] is not None and r["contract_price_agree"] is not None
-             and r["contract_price_agree"] > r["project_money"])
-    r11 = sum(1 for r in records if r["duration_days"] is not None and r["duration_days"] < 0)
-    r12 = sum(1 for r in records
-              if r["contract_price_agree"] is not None
-              and 450_000 <= r["contract_price_agree"] < 500_000)
-    r13 = sum(1 for r in records
-              if r["price_build"] and r["contract_price_agree"] is not None
-              and abs(r["contract_price_agree"] / r["price_build"] - 1.0) < 1e-9)
-    r14 = sum(1 for r in records
-              if r["price_build"] and r["project_money"]
-              and abs(r["price_build"] - r["project_money"]) < 1e-9)
+    raw = pd.read_csv(src, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    # "-" คือค่าว่างที่ระบบต้นทางใส่ไว้ (เช่น ไม่มีวันประกาศเพราะเป็นวิธีเฉพาะเจาะจง) ไม่ใช่ค่าที่ parse ไม่ได้
+    nonempty = lambda col: int((~raw[col].str.strip().isin(["", "-"])).sum()) if col in raw.columns else 0
 
-    print()
-    check("R1 ส่วนลด vs วงเงิน >=30%", r1, 711, tol=5)
-    check("R2 ส่วนลด vs ราคากลาง >=30%", r2, 610, tol=5)
-    check("R4 สัญญาเกินวงเงิน", r4, 27, tol=2)
-    check("R11 วันสิ้นสุดก่อนวันเริ่ม", r11, 10, tol=1)
-    check("R12 ราคาชิดเพดาน 500k", r12, 1789, tol=10)
-    check("R13 ราคา = ราคากลางพอดี", r13, 3264, tol=20)
-    check("R14 ราคากลาง = วงเงิน", r14, 4759, tol=20)
+    check("จำนวนระเบียน = จำนวนแถวในไฟล์ต้นทาง", meta["total_records"], len(raw))
+    check("จำนวนระเบียนใน records = meta", len(records), meta["total_records"])
+    total = sum(r["contract_price_agree"] or 0 for r in records)
+    check("มูลค่ารวมใน records = meta", round(total, 2), meta["total_contract_value"], tol=1.0)
 
-    # โมเดล: ตรวจว่ายังทำงานได้และความน่าเชื่อถือไม่ตกลง ไม่ใช่ตรวจค่าตายตัวทุกหลัก
+    # parse ได้ครบทุกช่องที่ต้นทางมีค่า — ถ้าไม่ครบแปลว่ารูปแบบตัวเลข/วันที่ในไฟล์เปลี่ยน (ต้นเหตุที่กฎเคยไม่ทำงาน 5 ข้อ)
+    for col in ("project_money", "price_build", "contract_price_agree", "sum_price_agree"):
+        check(f"{col} parse ได้ครบทุกช่องที่มีค่า", int(df[col].notna().sum()), nonempty(col))
+    for col in ("contract_date", "contract_finish_date", "announce_date"):
+        check(f"{col} parse ได้ครบทุกช่องที่มีค่า", int(sum(1 for v in df[col] if v is not None)), nonempty(col))
+    if meta["contract_date_min"] and meta["contract_date_max"]:
+        check("วันทำสัญญาแรกสุด <= ล่าสุด", meta["contract_date_min"] <= meta["contract_date_max"], True)
+
+    check("แถวที่มีพิกัด = meta", sum(1 for r in records if r.get("lat") is not None), meta["geo_rows"])
+    check("TIN ที่ถูกปิดบัง = meta", sum(1 for r in records if r.get("tin_is_masked")), meta["n_masked_tins"])
+    keys = {(r["project_id"], r["contract_no"], r["winner_tin"], r["contract_price_agree"], r["contract_date"])
+            for r in records}
+    check("คีย์ระเบียน (cartKey) ไม่ซ้ำ", len(keys), len(records))
+
+    # โมเดล: คุณภาพที่ต้องผ่านทุกชุด (check) แยกจากค่าที่บอกลักษณะของชุดข้อมูล (info — ไม่ใช่ความผิดของโค้ด)
     m = payload["models"]
     print()
-    check("ขอบเขต: ไฟล์เรียงด้วย sum_price_agree", m["scope"]["sort_key"], "sum_price_agree")
-    check("ขอบเขต: จำนวนโครงการ", m["scope"]["n_projects"], 10000)
-    check("กลุ่มงาน: ครอบคลุม >= 95%", m["work_groups"]["coverage"] >= 0.95, True)
-    check("พิกัดใช้ร่วม: จำนวนแถว", m["geo"]["shared_rows"], 1702, tol=50)
+    check("ขอบเขต: จำนวนโครงการ = project_id ไม่ซ้ำในต้นทาง", m["scope"]["n_projects"], int(raw["project_id"].nunique()))
     check("ส่วนลด: AUC แบบ cross-validation >= 0.75", m["hurdle"]["auc_cv"] >= 0.75, True)
-    check("ถนน: ตัวอย่างที่ระบุขนาด >= 60", m["road"]["n"] >= 60, True)
-    check("ถนน: พื้นที่สัมพันธ์กับราคา r >= 0.6", (m["road"]["validation"]["area_corr_price"] or 0) >= 0.6, True)
-    check("ถนน: เส้นพิกัดไม่สัมพันธ์กับราคา r < 0.3",
-          (m["road"]["validation"]["geometry_corr_price"] or 0) < 0.3, True)
     check("Isolation Forest: ความเสถียรข้าม seed (Spearman) >= 0.95",
           m["anomaly"]["stability_spearman"] >= 0.95, True)
-    check("เลขหลัก: เบนฟอร์ดติดธง >= 80% (ยืนยันว่าใช้ไม่ได้)",
-          (m["digits"]["tests"][0]["share_p05"] or 0) >= 0.8, True)
+    note("ขอบเขต: ไฟล์เรียงด้วย", m["scope"]["sort_key"])
+    note("กลุ่มงาน: ครอบคลุม (จัดกลุ่มจากชื่อได้)", f"{m['work_groups']['coverage']:.1%}")
+    note("พิกัดใช้ร่วม: จำนวนแถว", m["geo"]["shared_rows"])
+    note("ถนน: ตัวอย่างที่ระบุขนาด", m["road"]["n"])
+    note("ถนน: พื้นที่สัมพันธ์กับราคา r", m["road"]["validation"]["area_corr_price"])
+    note("เลขหลัก: สัดส่วนที่เบนฟอร์ดติดธง (ยืนยันว่าใช้ไม่ได้)", m["digits"]["tests"][0]["share_p05"])
 
     print()
     if failures:

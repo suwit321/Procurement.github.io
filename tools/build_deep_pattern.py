@@ -216,6 +216,37 @@ def rank_pct(values: np.ndarray) -> np.ndarray:
     return pd.Series(values).rank(pct=True).to_numpy()
 
 
+def build_scoring_groups(groups: pd.Series, usable: pd.Series, min_n: int = 30):
+    """กลุ่มสำหรับจัดอันดับ deep_score — งานคนละประเภทไม่ควรแข่งกันเป็น "ผิดปกติที่สุด"
+    (ก่อสร้างถนนเทียบกับก่อสร้างถนนด้วยกัน ไม่ใช่เทียบกับเช่ารถหรือที่ปรึกษา)
+
+    ใช้ work_group (dm.work_group) เป็นตัวแบ่ง แต่กลุ่มที่มีสัญญาให้คะแนนได้น้อยกว่า min_n
+    (เช่น หอถัง 1 สัญญา, มาตรวัดน้ำ 2 สัญญา) ไม่พอจะคำนวณเปอร์เซ็นไทล์ให้มีความหมาย —
+    ถูกรวมเป็นกลุ่ม "other_small" แทน เพื่อให้ทุกกลุ่มที่ใช้จัดอันดับจริงมีอย่างน้อย min_n สัญญา
+    ("other" ที่เดิมจัดกลุ่มไม่ได้จากชื่อโครงการ มีสัญญาเพียงพออยู่แล้ว จึงไม่ถูกรวม)
+    """
+    counts = groups[usable].value_counts()
+    small = sorted(k for k, c in counts.items() if c < min_n)
+    merged = groups.where(~groups.isin(small), "other_small")
+
+    info = {"variable": "work_group", "min_group_n": min_n,
+            "note": "deep_score และเกณฑ์ ≥P95/≥P99 คำนวณแยกภายในแต่ละกลุ่มนี้ (ไม่ใช่เทียบกับทั้งชุดข้อมูล) "
+                    "ส่วน vs_isolation_forest / baseline_pca / stability ยังเทียบอันดับ reconstruction error "
+                    "ดิบกันทั้งชุดเหมือนเดิม เพราะเป็นคำถามคนละเรื่อง (วิธีให้คะแนนต่างกันแค่ไหน ไม่ใช่คะแนนที่แสดงผล)",
+            "groups": {}}
+    for k, c in counts.items():
+        if k in small:
+            continue
+        info["groups"][k] = {"label_th": dm.WORK_GROUP_LABELS.get(k, k), "n": int(c), "merged": False}
+    if small:
+        info["groups"]["other_small"] = {
+            "label_th": "กลุ่มงานเฉพาะทาง (รวมกลุ่มที่มีน้อยกว่า " + str(min_n) + " สัญญา)",
+            "n": int(counts[small].sum()), "merged": True,
+            "members": {k: int(counts[k]) for k in small},
+        }
+    return merged, info
+
+
 def top_share_overlap(a: np.ndarray, b: np.ndarray, frac: float) -> float:
     n = len(a)
     k = max(1, int(round(n * frac)))
@@ -493,7 +524,10 @@ def main() -> int:
 
     single_seed_err = main_run["per_seed_err"][0]
 
-    deep_score = np.round(rank_pct(oof_err) * 100, 1)
+    scoring_group, scoring_group_info = build_scoring_groups(groups, usable, min_n=30)
+    scoring_group_usable = scoring_group[usable].to_numpy()
+    # เปอร์เซ็นไทล์แยกภายในกลุ่มงาน (ไม่ใช่ rank_pct ทั้งชุดแบบเดิม) — ดู build_scoring_groups()
+    deep_score = np.round(pd.Series(oof_err).groupby(scoring_group_usable).rank(pct=True).to_numpy() * 100, 1)
     oof_err_r = np.round(oof_err, 4)
 
     stab_alt = {"spearman": round(spearman(oof_err, alt_run["oof_err"]), 3),
@@ -534,6 +568,17 @@ def main() -> int:
         "err_p99": round(float(np.quantile(oof_err, 0.99)), 4),
         "n_ge95": int((deep_score >= 95).sum()), "n_ge99": int((deep_score >= 99).sum()),
     }
+    # ค่าเดียวกันแยกรายกลุ่ม — ใช้ตรวจสอบ/แสดงในตารางกลุ่มงาน ไม่ใช่ตัวตัดสิน deep_score (คำนวณแยกไปแล้วข้างบน)
+    by_group = {}
+    for gname in sorted(set(scoring_group_usable)):
+        m = scoring_group_usable == gname
+        ge = deep_score[m]
+        by_group[gname] = {
+            "n": int(m.sum()),
+            "err_p95": round(float(np.quantile(oof_err[m], 0.95)), 4) if m.sum() >= 2 else None,
+            "n_ge95": int((ge >= 95).sum()), "n_ge99": int((ge >= 99).sum()),
+        }
+    thresholds["by_group"] = by_group
 
     log10_err = np.log10(np.clip(oof_err, 1e-6, None))
     edges = np.linspace(log10_err.min(), log10_err.max(), 31)
@@ -566,6 +611,7 @@ def main() -> int:
         "training": {"folds": 5, "seeds_per_fold": 5, "val_frac": 0.15,
                      "note": "out-of-fold: ทุกแถวได้คะแนนจากโมเดลที่ไม่เห็นมันตอนฝึกหรือตอน early-stop"},
         "folds": main_run["fold_meta"],
+        "peer_grouping": scoring_group_info,
         "thresholds": thresholds,
         "stability": {"vs_alt_fold_split": stab_alt, "single_seed_vs_5seed_ensemble": stab_seed},
         "baseline_pca": {"n_components": 3, **vs_pca},
@@ -581,17 +627,19 @@ def main() -> int:
     json_records = ctx["json_records"]
     for row in range(n):
         i = int(positions[row])
-        entry = [i, cart_key(json_records[i]), float(deep_score[row]), float(oof_err_r[row])]
+        entry = [i, cart_key(json_records[i]), float(deep_score[row]), float(oof_err_r[row]),
+                 str(scoring_group_usable[row])]
         if row in why:
             entry.append(why[row])
         rows_out.append(entry)
 
-    payload_out = {"schema": "deep_pattern/1", "meta": meta,
-                   "fields": ["i", "k", "s", "e", "f"], "rows": rows_out}
+    payload_out = {"schema": "deep_pattern/2", "meta": meta,
+                   "fields": ["i", "k", "s", "e", "g", "f"], "rows": rows_out}
 
     # --- ยืนยันความปลอดภัยของค่าก่อนเขียนไฟล์ ---
     assert 0 <= float(np.min(deep_score)) and float(np.max(deep_score)) <= 100
-    assert all(len(r) in (4, 5) for r in rows_out)
+    assert all(len(r) in (5, 6) for r in rows_out)
+    assert all(r[4] in scoring_group_info["groups"] for r in rows_out)
     keys_out = [r[1] for r in rows_out]
     assert len(keys_out) == len(set(keys_out)), "คีย์ระเบียนซ้ำกันในผลลัพธ์"
 
@@ -637,6 +685,10 @@ def main() -> int:
     print(f"  เสถียรข้าม seed เดี่ยว vs ensemble: spearman={stab_seed['spearman']}, "
           f"top5%overlap={stab_seed['top5pct_overlap']}")
     print(f"  จำนวนที่ deep_score >= 95: {thresholds['n_ge95']} · >= 99: {thresholds['n_ge99']}")
+    print(f"  (เกณฑ์ >=95/>=99 นี้ตัดสินแยกภายในแต่ละกลุ่มงาน {len(scoring_group_info['groups'])} กลุ่ม ไม่ใช่ทั้งชุด)")
+    for gname, g in sorted(by_group.items(), key=lambda kv: -kv[1]["n"]):
+        label = scoring_group_info["groups"][gname]["label_th"]
+        print(f"    {gname} ({label}): n={g['n']} ≥P95={g['n_ge95']} ≥P99={g['n_ge99']}")
     print(f"  เวลารวม: {meta['runtime_sec']}s")
     return 0
 
