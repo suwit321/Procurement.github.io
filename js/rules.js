@@ -19,10 +19,19 @@
 const Rules = (() => {
 
   const SPECIFIC_METHOD = 'เฉพาะเจาะจง';
+  const EBIDDING_METHOD = 'ประกวดราคาอิเล็กทรอนิกส์ (e-bidding)';
   /* วงเงินที่วิธีเฉพาะเจาะจงใช้ได้โดยทั่วไป — เหนือกว่านี้ควรเปิดให้แข่งขัน
      ในข้อมูลนี้ 97.6% ของสัญญา 1-5 แสนใช้วิธีเฉพาะเจาะจง แต่เหนือ 5 แสนใช้เพียง 5.9%
      การนับรวมทุกขนาดจึงวัด "หน่วยงานนี้มีงานเล็ก" แทนที่จะวัด "หลีกเลี่ยงการแข่งขัน" */
   const DISCRETIONARY_CEILING = 500000;
+  /* ระยะเวลาเผยแพร่ประกาศประกวดราคาขั้นต่ำ (วันทำการ) ตามวงเงิน — ระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้าง
+     และการบริหารพัสดุภาครัฐ พ.ศ. 2560 ขั้นตอน "ประกาศประกวดราคา" (ใช้กับวิธี e-bidding เท่านั้น
+     วิธีคัดเลือก/เฉพาะเจาะจงมีขั้นตอนคนละแบบ ไม่ได้อยู่ในตารางนี้) เรียงจากวงเงินสูงไปต่ำ ใช้ตัวแรกที่วงเงินเกินเพดาน */
+  const EBID_MIN_DAYS = [[50_000_000, 20], [10_000_000, 12], [5_000_000, 10], [DISCRETIONARY_CEILING, 5]];
+  function ebidMinDays(projectMoney) {
+    for (const [ceiling, days] of EBID_MIN_DAYS) if (projectMoney > ceiling) return days;
+    return null;   // วงเงินไม่เกิน 5 แสน ปกติไม่ใช้ e-bidding ตารางนี้ไม่ครอบคลุม
+  }
   const STORAGE_KEY = 'pa.ruleSettings.v1';
   /* จำนวนขั้นต่ำก่อนถือว่ากฎที่อิงการกระจาย/เพดานใช้กับชุดข้อมูลนี้ได้ — ต่ำกว่านี้แสดง "ไม่เข้ากับชุดข้อมูลนี้" แทน 0 */
   const MIN_APPLICABLE = 20;
@@ -297,26 +306,31 @@ const Rules = (() => {
       }
     },
     {
-      id: 'R16', name: 'ช่วงเวลาประกาศถึงทำสัญญาสั้น',
+      id: 'R16', name: 'ช่วงเวลาประกาศถึงทำสัญญาสั้นกว่าระยะขั้นต่ำตามระเบียบ',
       severity: 'high', weight: 20, category: 'การแข่งขัน', source: 'real',
-      desc: 'ใช้วันประกาศจริงจากชุดข้อมูล (มีเฉพาะรายการที่ประกาศเชิญชวน/คัดเลือก) ' +
-        'ช่วงเวลาที่สั้นเกินไปจำกัดโอกาสของผู้เสนอราคารายอื่น · เทียบกับงานวิธีจัดหาเดียวกันในชุดข้อมูล ' +
-        '(เกณฑ์วันตายตัวใช้ข้ามชุดไม่ได้ งานขนาดใหญ่ใช้เวลานานกว่างานเล็กหลายเท่า) ' +
-        'จึงเป็นเกณฑ์เชิงเปรียบเทียบ ไม่ใช่ระยะขั้นต่ำตามระเบียบ และติดธงราว P% ของทุกกลุ่มเสมอตามนิยาม',
-      thresholds: { pct: { value: 0.05, min: 0.01, max: 0.25, step: 0.01, label: 'สั้นสุดกี่ % ของวิธีจัดหาเดียวกัน', format: 'pct' } },
-      logic: t => `announce_gap_days <= เปอร์เซ็นไทล์ที่ ${t.pct} ของวิธีจัดหาเดียวกัน (กลุ่มที่มีอย่างน้อย ${MIN_APPLICABLE} รายการ)`,
+      desc: 'ระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 กำหนดระยะเวลาเผยแพร่ ' +
+        'ประกาศประกวดราคาขั้นต่ำไว้ตามวงเงิน (5/10/12/20 วันทำการ) เฉพาะวิธี e-bidding ' +
+        'ใช้วันประกาศจริงจากชุดข้อมูล (มีเฉพาะรายการที่ประกาศเชิญชวน) เทียบกับวันทำสัญญา ' +
+        'เกณฑ์นี้เป็นวันทำการตามระเบียบ แต่ข้อมูลนับเป็นวันปฏิทิน (ไม่มีปฏิทินวันหยุดราชการ) ' +
+        'จึงติดธงเฉพาะกรณีวันปฏิทินยังน้อยกว่าวันทำการขั้นต่ำ ซึ่งเป็นไปไม่ได้ตามระเบียบไม่ว่าวันหยุดจะตรงวันไหน — ' +
+        'ไม่ใช่การเทียบเชิงสถิติ แต่เป็นข้อเท็จจริงเชิงกฎหมาย',
+      thresholds: { bufferDays: { value: 0, min: 0, max: 10, step: 1, label: 'ผ่อนปรนเพิ่ม (วัน)' } },
+      logic: t => `วิธี e-bidding, วงเงิน > ${U.num(DISCRETIONARY_CEILING)} และ announce_gap_days < ระยะขั้นต่ำตามวงเงิน (วันทำการ) - ${t.bufferDays}`,
       applicable(ctx) {
-        const n = [...ctx.methodGap.values()].filter(g => g.sorted.length >= MIN_APPLICABLE).length;
-        return n ? { ok: true }
-          : { ok: false, reason: `ไม่มีวิธีจัดหาใดที่มีวันประกาศอย่างน้อย ${MIN_APPLICABLE} รายการให้เทียบ` };
+        return ctx.ebidGapEligible >= MIN_APPLICABLE ? { ok: true }
+          : { ok: false, reason: `ชุดข้อมูลนี้มีสัญญาวิธี e-bidding ที่มีทั้งวันประกาศและวงเงินเกิน ${U.num(DISCRETIONARY_CEILING)} เพียง ` +
+              `${U.num(ctx.ebidGapEligible)} ฉบับ (ต้องมีอย่างน้อย ${MIN_APPLICABLE})` };
       },
       evaluate(r, ctx, t) {
         if (r.announce_gap_days === null || r.announce_gap_days === undefined) return null;
-        const g = ctx.methodGap.get(r.purchase_method_name || '-');
-        if (!g || g.sorted.length < MIN_APPLICABLE) return null;
-        if (g._pct !== t.pct) { g._pct = t.pct; g._cut = U.quantile(g.sorted, t.pct); }
-        return r.announce_gap_days <= g._cut
-          ? { actual: `${r.announce_gap_days} วัน (สั้นสุด ${U.pct(t.pct, 0)} ของวิธีนี้คือ ≤ ${g._cut.toFixed(0)} วัน จาก ${U.num(g.sorted.length)} รายการ)` }
+        if (r.purchase_method_name !== EBIDDING_METHOD) return null;
+        const minDays = ebidMinDays(r.project_money);
+        if (minDays === null) return null;
+        const floor = minDays - t.bufferDays;
+        // announce_gap_days นับเป็นวันปฏิทิน ส่วนเกณฑ์ระเบียบเป็นวันทำการ (วันทำการ <= วันปฏิทินเสมอ)
+        // ถ้าวันปฏิทินยังน้อยกว่าเกณฑ์วันทำการ แปลว่าต่ำกว่าขั้นต่ำแน่นอน ไม่ต้องมีปฏิทินวันหยุดราชการมายืนยัน
+        return r.announce_gap_days < floor
+          ? { actual: `${r.announce_gap_days} วัน (ปฏิทิน) ต่ำกว่าขั้นต่ำ ${minDays} วันทำการที่ระเบียบกำหนดสำหรับวงเงินนี้` }
           : null;
       }
     },
@@ -578,11 +592,15 @@ const Rules = (() => {
       history: 'ชุดปีงบ 2569 ทั้งปี พบ 254 คู่ที่มีสัญญาตั้งแต่ 5 ฉบับ สูงสุด 52 ฉบับ',
     },
     R16: {
-      fields: ['announce_date', 'contract_date', 'purchase_method_name'],
-      basis: 'ช่วงเวลาระหว่างประกาศกับทำสัญญาที่สั้นเกินไปจำกัดโอกาสของผู้เสนอราคารายอื่น ' +
-        'ใช้วันประกาศจริงแทน R6 ที่เป็นข้อมูลสาธิต · เทียบภายในวิธีจัดหาเดียวกัน เพราะระยะปกติขึ้นกับขนาดและวิธีของงาน',
-      history: 'ชุดปีงบ 2569 ทั้งปี: มีวันประกาศ 1,910 รายการ ใช้เกณฑ์ตายตัว ≤ 15 วัน · ทบทวน 2026-09: ชุดโครงการยอดสูงสุด ' +
-        'มีเปอร์เซ็นไทล์ที่ 5 = 62 วัน (มัธยฐาน 131 วัน) เกณฑ์ 15 วันจึงไม่ติดเลย เปลี่ยนเป็นเปอร์เซ็นไทล์ภายในวิธีจัดหา',
+      fields: ['announce_date', 'contract_date', 'purchase_method_name', 'project_money'],
+      basis: 'ระเบียบกระทรวงการคลังว่าด้วยการจัดซื้อจัดจ้างและการบริหารพัสดุภาครัฐ พ.ศ. 2560 กำหนดระยะเวลาเผยแพร่ ' +
+        'ประกาศประกวดราคาขั้นต่ำไว้ตามวงเงิน (เฉพาะวิธี e-bidding): เกิน 5 แสน-5 ล้าน ≥5 วันทำการ, 5-10 ล้าน ≥10 วันทำการ, ' +
+        '10-50 ล้าน ≥12 วันทำการ, เกิน 50 ล้าน ≥20 วันทำการ ต่ำกว่านี้จำกัดโอกาสของผู้เสนอราคารายอื่นและขัดระเบียบโดยตรง ' +
+        '(ไม่ใช่แค่ผิดปกติเชิงสถิติ) · ใช้วันประกาศจริงแทน R6 ที่เป็นข้อมูลสาธิต',
+      history: 'ชุดปีงบ 2569 ทั้งปี: มีวันประกาศ 1,910 รายการ ใช้เกณฑ์ตายตัว ≤ 15 วันแบบเดียวทุกวงเงิน (ไม่มีฐานอ้างอิงกฎหมาย) · ' +
+        'ทบทวน 2026-09: เปลี่ยนเป็นเทียบกับระยะขั้นต่ำตามระเบียบจริงแยกตามชั้นวงเงิน (เดิมเคยลองใช้เปอร์เซ็นไทล์ภายในวิธีจัดหา ' +
+        'แต่เป็นการเทียบเชิงสัมพัทธ์ ไม่มีฐานทางกฎหมาย จึงเปลี่ยนมาใช้ตัวเลขจากระเบียบแทน) · เกณฑ์เป็นวันทำการแต่ข้อมูลนับวันปฏิทิน ' +
+        '(ไม่มีปฏิทินวันหยุดราชการ) จึงติดธงเฉพาะกรณีวันปฏิทินยังน้อยกว่าวันทำการขั้นต่ำ ซึ่งเป็นไปไม่ได้ตามระเบียบเสมอ',
     },
     R17: {
       fields: ['project_location', 'province', 'dept_key'],
@@ -837,7 +855,7 @@ const Rules = (() => {
     const pairCounts = new Map();
     const provincePoints = new Map();
     const prices = [], specificPrices = [];
-    const methodGap = new Map();   // วิธีจัดหา -> {sorted: [announce_gap_days]}
+    let ebidGapEligible = 0;   // นับสัญญาที่ R16 ประเมินได้ (e-bidding, มีวันประกาศ, วงเงิน > เพดานเฉพาะเจาะจง)
 
     for (const r of records) {
       projectContracts.set(r.project_id, (projectContracts.get(r.project_id) || 0) + 1);
@@ -851,11 +869,9 @@ const Rules = (() => {
         prices.push(r.contract_price_agree);
         if (r.purchase_method_name === SPECIFIC_METHOD) specificPrices.push(r.contract_price_agree);
       }
-      if (r.announce_gap_days !== null && r.announce_gap_days !== undefined) {
-        const m = r.purchase_method_name || '-';
-        let g = methodGap.get(m);
-        if (!g) { g = { sorted: [] }; methodGap.set(m, g); }
-        g.sorted.push(r.announce_gap_days);
+      if (r.announce_gap_days !== null && r.announce_gap_days !== undefined
+          && r.purchase_method_name === EBIDDING_METHOD && r.project_money > DISCRETIONARY_CEILING) {
+        ebidGapEligible++;
       }
 
       if (!r.tin_is_masked && r.winner_tin && r.winner_key) {
@@ -936,7 +952,6 @@ const Rules = (() => {
 
     prices.sort((a, b) => a - b);
     specificPrices.sort((a, b) => a - b);
-    for (const g of methodGap.values()) g.sorted.sort((a, b) => a - b);
 
     /* เลขสัญญาเป็นเลขรันรายปีต่อหน่วยงาน (1/2569, 2/2569, ...) การซ้ำข้ามหน่วยงาน
        จึงเป็นเรื่องปกติ แต่การซ้ำภายในหน่วยงานเดียวกันไม่ควรเกิด */
@@ -966,7 +981,7 @@ const Rules = (() => {
     return Object.assign(
       { projectContracts, projectAgg, tinToNames, nameToTins, agencyMethod, splitGroups, pairCounts,
         provinceCentroid, deptGeo, contractNoCount, winnerProfile, specificPrior,
-        pricesSorted: prices, specificPricesSorted: specificPrices, methodGap },
+        pricesSorted: prices, specificPricesSorted: specificPrices, ebidGapEligible },
       buildRegionalPrice(records, projectAgg));
   }
 
