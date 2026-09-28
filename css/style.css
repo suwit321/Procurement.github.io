@@ -1939,6 +1939,31 @@ button.detail-clickable { text-decoration: none; }
 .chart-full { height: calc(100vh - 160px) !important; min-height: 320px; }
 .chart-full.chart-as-table { max-height: none; }
 
+/* ---------- 25d) ปรับแดชบอร์ด: ซ่อน/แสดงการ์ดในภาพรวมเป็นชุดหรือทีละใบ ---------- */
+.dash-customize { position: relative; display: inline-block; }
+.dash-customize-panel {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0;
+  width: 300px; max-width: calc(100vw - 32px);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,.14); padding: 12px;
+}
+.dash-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.dash-panel-close { width: 26px; height: 26px; font-size: var(--text-sm); }
+.dash-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.dash-presets .btn.is-on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.dash-checklist { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.dash-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 4px; border-radius: var(--radius-sm); font-size: var(--text-sm);
+  cursor: pointer;
+}
+.dash-check:hover { background: var(--surface-hover); }
+.dash-check input { flex: none; }
+@media (max-width: 575.98px) {
+  .dash-customize-panel { left: auto; right: 0; }
+}
+.dash-hidden { display: none !important; }
+
 /* ---- โหมดกระชับ: ซ่อนชั้นคำอธิบาย เหลือตัวเลขและกราฟ ----
    ซ่อนเฉพาะข้อความประกอบ ไม่ซ่อนตัวควบคุม ตาราง กราฟ หรือค่าใดๆ
    ผู้ใช้จึงยังทำงานได้ครบเหมือนเดิม ต่างแค่ไม่มีคำอธิบายกำกับ */
@@ -2283,7 +2308,9 @@ h2.card-head-el {
    ตัดส่วนควบคุมออก และกางการ์ดที่พับไว้ให้เห็นเนื้อหาครบ */
 @media print {
   .topbar, .filter-bar, .quick-filters, .tab-groupnav, .tab-subnav, .subtab-strip, .chart-tools,
-  .card-collapse-btn, .density-switch, .case-note { display: none !important; }
+  .dash-customize, .card-collapse-btn, .density-switch, .case-note { display: none !important; }
+  /* โหมดพิมพ์ต้องเห็นทุกการ์ด ไม่ว่าจะซ่อนไว้ด้วยการปรับแดชบอร์ดหรือไม่ */
+  .dash-hidden { display: revert !important; }
   .cardx.is-collapsed > *:not(.card-head-el) { display: revert !important; }
   .cardx { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
   .tab-pane { display: block !important; opacity: 1 !important; }
