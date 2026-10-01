@@ -13741,6 +13741,114 @@ ${labVocabText()}`;
 
      ตัวการ์ดยังอยู่ในหน้าเสมอ ไม่ได้ถูกซ่อนหาย ผู้ใช้จึงเห็นว่ามีข้อมูลอะไรให้ดูต่อได้บ้าง */
 
+  /* =========================================================
+     ปรับแดชบอร์ด (แท็บภาพรวม) — ซ่อน/แสดงการ์ดทั้งใบเป็นชุดหรือทีละใบ
+     =========================================================
+
+     ต่างจากการพับการ์ด (ด้านล่าง) ตรงที่การ์ดหายไปจริง ไม่เหลือหัวการ์ดค้างไว้
+     เพื่อให้คนที่อยากเห็นแค่ "คิวตรวจสอบ" ไม่ต้องเลื่อนผ่านกราฟ 10 กว่าใบทุกครั้ง
+     preset ทั้งสามคือรายชื่อการ์ดที่ "แสดง" (full = null หมายถึงแสดงทุกใบ) เลือกจากรายการ์ดเองได้
+     ผลจะกลายเป็น preset "custom" โดยอัตโนมัติ จำไว้เครื่องนี้เท่านั้น */
+
+  const DASH_KEY = 'pa_dashboard_v1';
+  const DASH_PRESETS = {
+    summary: ['ovQueueCard'],
+    detailed: ['ovRiskValueCard', 'ovCoverageCard', 'ovTreemapCard', 'ovWorkGroupCard', 'ovQueueCard'],
+    full: null,
+  };
+
+  function loadDashState() {
+    try { return JSON.parse(localStorage.getItem(DASH_KEY)); } catch (e) { return null; }
+  }
+  function saveDashState(s) {
+    try { localStorage.setItem(DASH_KEY, JSON.stringify(s)); } catch (e) { /* โหมดส่วนตัว */ }
+  }
+  function dashCards() {
+    return [...document.querySelectorAll('#tab-overview [data-collapse-id]')];
+  }
+  function dashCardLabel(card) {
+    return (card.querySelector('h2')?.textContent || card.dataset.collapseId).trim();
+  }
+  /** การ์ดที่อยู่คนเดียวในคอลัมน์กริด (col-lg-7 เป็นต้น) ต้องซ่อนทั้งคอลัมน์
+   *  ไม่ใช่แค่ตัวการ์ด ไม่เช่นนั้นจะเหลือช่องว่างกว้างเท่าคอลัมน์ในแถวเดิม */
+  function dashCardWrapper(card) {
+    let el = card;
+    while (el.parentElement && /\bcol(-\w+)*-\d+\b/.test(el.parentElement.className || '')
+        && el.parentElement.children.length === 1) el = el.parentElement;
+    return el;
+  }
+  function dashVisibleIds(preset, allIds) {
+    return preset === 'full' || !DASH_PRESETS[preset] ? allIds : DASH_PRESETS[preset];
+  }
+
+  function applyDashVisibility(hiddenIds) {
+    const hidden = new Set(hiddenIds);
+    const rows = new Set();
+    dashCards().forEach(card => {
+      dashCardWrapper(card).classList.toggle('dash-hidden', hidden.has(card.dataset.collapseId));
+      const row = card.closest('.row');
+      if (row) rows.add(row);
+    });
+    // แถวที่การ์ดในนั้นถูกซ่อนหมดทุกใบ ซ่อนทั้งแถวด้วย ไม่งั้นเหลือช่องว่างแนวตั้งจาก gutter ของแถว
+    rows.forEach(row => {
+      const inRow = [...row.querySelectorAll('[data-collapse-id]')];
+      row.classList.toggle('dash-hidden', inRow.length > 0 && inRow.every(c => hidden.has(c.dataset.collapseId)));
+    });
+    // การ์ดที่เพิ่งกางกลับมาอาจมีกราฟที่วาดไว้ตอนกว้าง 0 ต้องวัดขนาดใหม่
+    requestAnimationFrame(() => requestAnimationFrame(() => Charts.resizeIn(U.$('tab-overview'))));
+  }
+
+  function wireDashboardCustomize() {
+    const btn = U.$('dashCustomizeBtn'), panel = U.$('dashCustomizePanel');
+    if (!btn || !panel) return;
+    const cards = dashCards();
+    const allIds = cards.map(c => c.dataset.collapseId);
+    const saved = loadDashState();
+    const state = saved && Array.isArray(saved.hidden) ? saved : { preset: 'full', hidden: [] };
+
+    U.setHTML('dashChecklist', cards.map(c => {
+      const id = c.dataset.collapseId;
+      return `<label class="dash-check"><input type="checkbox" data-dash-id="${id}"` +
+        `${state.hidden.includes(id) ? '' : ' checked'}>${U.esc(dashCardLabel(c))}</label>`;
+    }).join(''));
+
+    const markPreset = () => panel.querySelectorAll('[data-dash-preset]').forEach(b =>
+      b.classList.toggle('is-on', b.dataset.dashPreset === state.preset));
+    markPreset();
+    applyDashVisibility(state.hidden);
+
+    panel.querySelectorAll('[data-dash-preset]').forEach(b => b.addEventListener('click', () => {
+      const visible = dashVisibleIds(b.dataset.dashPreset, allIds);
+      state.preset = b.dataset.dashPreset;
+      state.hidden = allIds.filter(id => !visible.includes(id));
+      saveDashState(state);
+      markPreset();
+      applyDashVisibility(state.hidden);
+      panel.querySelectorAll('[data-dash-id]').forEach(cb => { cb.checked = !state.hidden.includes(cb.dataset.dashId); });
+    }));
+
+    panel.addEventListener('change', e => {
+      const cb = e.target.closest('[data-dash-id]');
+      if (!cb) return;
+      const id = cb.dataset.dashId;
+      state.hidden = cb.checked ? state.hidden.filter(x => x !== id) : [...new Set([...state.hidden, id])];
+      state.preset = 'custom';
+      saveDashState(state);
+      markPreset();
+      applyDashVisibility(state.hidden);
+    });
+
+    const setOpen = open => { panel.hidden = !open; btn.setAttribute('aria-expanded', String(open)); };
+    btn.addEventListener('click', () => setOpen(panel.hidden));
+    U.$('dashPanelClose').addEventListener('click', () => setOpen(false));
+    document.addEventListener('click', e => {
+      if (!panel.hidden && !e.target.closest('.dash-customize')) setOpen(false);
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !panel.hidden) { setOpen(false); btn.focus(); }
+    });
+  }
+
   const CARD_STATE_KEY = 'pa_cards_collapsed';
 
   function loadCardState() {
@@ -14100,6 +14208,7 @@ ${labVocabText()}`;
     wireCases();
     wireDensity();
     wireCollapsibleCards();
+    wireDashboardCustomize();
     renderCases();
 
     // เครือข่าย

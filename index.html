@@ -23,7 +23,11 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<<<<<<< HEAD
 <link rel="stylesheet" href="css/style.css?v=157">
+=======
+<link rel="stylesheet" href="css/style.css?v=155">
+>>>>>>> 5869cc3883e03915db542809b54ace61e48a357f
 </head>
 <body>
 
@@ -259,6 +263,29 @@
 
         <!-- ขอบเขตของชุดข้อมูล: ทุกตัวเลขในระบบอธิบายได้เฉพาะภายในขอบเขตนี้ -->
         <div class="scope-note mb-3" id="scopeNote" role="note"></div>
+
+        <!-- ปรับว่าจะให้ส่วนวิเคราะห์ด้านล่าง (การ์ดทั้งหมดในแท็บนี้) แสดงอะไรบ้าง
+             เลือกชุดที่เตรียมไว้ หรือติ๊กเลือกเป็นรายการ จำไว้ในเครื่องนี้ (ดู wireDashboardCustomize ใน app.js) -->
+        <div class="dash-customize mb-3">
+          <button class="btn btn-sm btn-outline-secondary" id="dashCustomizeBtn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="dashCustomizePanel"
+                  title="เลือกว่าจะให้ส่วนวิเคราะห์ด้านล่างแสดงการ์ดใบไหนบ้าง">
+            <span aria-hidden="true">▦</span> ปรับแดชบอร์ด
+          </button>
+          <div class="dash-customize-panel" id="dashCustomizePanel" role="dialog" aria-label="ปรับแดชบอร์ด" hidden>
+            <div class="dash-panel-head">
+              <span class="section-label mb-0" aria-hidden="true">ชุดที่เตรียมไว้ให้</span>
+              <button type="button" class="icon-btn dash-panel-close" id="dashPanelClose" aria-label="ปิด">✕</button>
+            </div>
+            <div class="dash-presets" role="group" aria-label="ชุดที่เตรียมไว้ให้">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-dash-preset="summary">สรุป</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-dash-preset="detailed">ละเอียด</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-dash-preset="full">เต็ม</button>
+            </div>
+            <div class="section-label mt-2 mb-1" aria-hidden="true">หรือเลือกเองทีละใบ</div>
+            <div class="dash-checklist" id="dashChecklist"></div>
+          </div>
+        </div>
 
         <!-- กราฟภาพรวมที่เปิดไว้เป็นค่าเริ่มต้น: เห็นทันทีว่าเงินและความเสี่ยงอยู่ตรงไหน -->
         <div class="row g-3 mb-3" id="ovInsights">
@@ -2687,8 +2714,12 @@
 <script src="js/importui.js?v=9"></script>
 <script src="js/directors.js?v=2"></script>
 <script src="js/cot.js?v=11"></script>
+<<<<<<< HEAD
 <script src="js/sitestats.js?v=1"></script>
 <script src="js/app.js?v=163"></script>
+=======
+<script src="js/app.js?v=160"></script>
+>>>>>>> 5869cc3883e03915db542809b54ace61e48a357f
   <!-- ใบสรุปผู้รับจ้าง 1 หน้า: อยู่นอกสายตาตอนปกติ และเป็นสิ่งเดียวที่ถูกพิมพ์เมื่อสั่งพิมพ์ -->
   <div id="printSheet" aria-hidden="true"></div>
 </body>
