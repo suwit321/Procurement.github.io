@@ -740,32 +740,21 @@
 
     // การ์ดที่มี shortcut กดแล้วกรองให้ตรงกับตัวเลขที่การ์ดนับอยู่จริง
     // (ตัดเส้นแนวโน้มจิ๋วออกแล้ว — ผู้ใช้ขอให้การ์ดกระชับเหลือ 3 บรรทัด: ป้าย ▸ ตัวเลข ▸ คำอธิบาย)
-    const items = [
-      ['สัญญาที่แสดงอยู่', U.num(s.total), 'สัญญา', `มูลค่ารวม ${U.money(value)} บาท`, null],
-      ['ควรตรวจสอบก่อน', U.num(priority.length), 'สัญญา',
+    // accent ตามความหมาย: จำนวนทั้งหมด = ตัวเลขทั่วไป · ควรตรวจก่อน = วิกฤต/สูง · พบสัญญาณ = ข้อมูลประกอบ
+    const cardOf = (label, val, unit, sub, shortcut, accent) => U.kpiCard(label, val, {
+      unit, sub, accent, shortcut,
+      on: shortcut ? (shortcut === 'flagged' ? state.filters.flagged : state.filters.band === shortcut) : false,
+    });
+    U.setHTML('kpis', [
+      cardOf('สัญญาที่แสดงอยู่', U.num(s.total), 'สัญญา', `มูลค่ารวม ${U.money(value)} บาท`, null, null),
+      cardOf('ควรตรวจสอบก่อน', U.num(priority.length), 'สัญญา',
         `วิกฤต ${U.num(s.bandCounts.critical)} · สูง ${U.num(s.bandCounts.high)}` +
-        (s.total ? ` (${U.pct(priority.length / s.total)})` : ''), 'priority'],
-      ['มูลค่าที่ควรตรวจสอบก่อน', U.money(priorityValue), 'บาท',
-        value ? `${U.pct(priorityValue / value)} ของมูลค่ารวม` : '-', 'priority'],
-      ['พบสัญญาณอย่างน้อย 1 ข้อ', U.num(s.flagged), 'สัญญา',
-        `กฎที่ทำงานจริง ${realRules} จาก ${realApplicable} ข้อที่ใช้กับชุดนี้ได้`, 'flagged'],
-    ];
-    U.setHTML('kpis', items.map(i => {
-      const [label, val, unit, sub, shortcut] = i;
-      const on = shortcut === 'flagged' ? state.filters.flagged : state.filters.band === shortcut;
-      const tag = shortcut ? 'button' : 'div';
-      const attrs = shortcut
-        ? ` type="button" data-shortcut="${shortcut}" aria-pressed="${on}"` +
-          ` title="คลิกเพื่อกรองเฉพาะกลุ่มนี้ กดซ้ำเพื่อยกเลิก"`
-        : '';
-      return `
-      <div class="col-6 col-lg-3"><${tag} class="cardx kpi kpi-compact${shortcut ? ' kpi-clickable' : ''}${on ? ' is-on' : ''}"${attrs}>
-        <div class="small-muted">${label}</div>
-        <div class="v">${val}<span class="unit">${unit}</span></div>
-        <div class="small-muted">${sub}</div>
-        ${shortcut ? '<span class="kpi-hint" aria-hidden="true">คลิกเพื่อกรอง</span>' : ''}
-      </${tag}></div>`;
-    }).join(''));
+        (s.total ? ` (${U.pct(priority.length / s.total)})` : ''), 'priority', 'danger'),
+      cardOf('มูลค่าที่ควรตรวจสอบก่อน', U.money(priorityValue), 'บาท',
+        value ? `${U.pct(priorityValue / value)} ของมูลค่ารวม` : '-', 'priority', 'warn'),
+      cardOf('พบสัญญาณอย่างน้อย 1 ข้อ', U.num(s.flagged), 'สัญญา',
+        `กฎที่ทำงานจริง ${realRules} จาก ${realApplicable} ข้อที่ใช้กับชุดนี้ได้`, 'flagged', 'info'),
+    ].join(''));
     renderNavCounts();
     updateFilterShowBadge();
   }
@@ -1659,6 +1648,9 @@
     const b = Rules.band(score);
     return `<span class="badge ${b.cls}">${U.num(score)}</span>`;
   }
+
+  // การ์ด KPI เล็ก (.ma-kpis) สร้างที่เดียวใน util.js ใช้ร่วมกับ deeppattern.js / importui.js ด้วย
+  const { kpiTile, kpiRow } = U;
 
   /** น้ำหนักที่ hit นี้บวกเข้าคะแนนจริง พร้อมเหตุผลเมื่อไม่นับ (นิยามอยู่ที่ Rules.scoreHits) */
   function hitWeightHTML(h, cls) {
@@ -3643,11 +3635,11 @@ ${placemarks.join('\n')}
         <button type="button" class="ma-close" data-area-clear title="ลบพื้นที่ที่เลือก" aria-label="ลบพื้นที่ที่เลือก">✕</button></div>
       <p class="ma-note">${U.esc(areaLabel(a))} · ${U.num(Math.round(areaKm2(a)))} ตร.กม.${isFilter ? ' · <b>กำลังใช้เป็นตัวกรอง</b>' : ''}</p>
       ${rows.length ? `
-        <div class="ma-kpis">
-          <div><span>สัญญา</span><b>${U.num(rows.length)}</b></div>
-          <div><span>มูลค่า</span><b>${U.money(U.sum(rows.map(r => r.contract_price_agree)))}</b></div>
-          <div class="${priArea > priBase * 1.3 ? 'is-warn' : ''}"><span>ควรตรวจก่อน</span><b>${U.pct(priArea, 0)}</b><em>ทั้งแผนที่ ${U.pct(priBase, 0)}</em></div>
-        </div>
+        ${kpiRow([
+          kpiTile('สัญญา', U.num(rows.length)),
+          kpiTile('มูลค่า', U.money(U.sum(rows.map(r => r.contract_price_agree)))),
+          kpiTile('ควรตรวจก่อน', U.pct(priArea, 0), `ทั้งแผนที่ ${U.pct(priBase, 0)}`, priArea > priBase * 1.3),
+        ])}
         ${bandBarHTML(rows)}
         <div class="ma-cols">
           <div><div class="ma-list-title">หน่วยงานหลัก</div>${topAg.map(x => `<div class="ma-li">${clickable('agency', x.dept_name, truncate(x.dept_name, 30))} <b>${x.n_contracts}</b></div>`).join('')}</div>
@@ -4140,16 +4132,19 @@ ${placemarks.join('\n')}
         ? 'ช่วงเวลาที่เลือกยังไม่มีงานของรายนี้ ลองเลื่อนแถบเวลาไปทางขวา'
         : `ผู้รับจ้างรายนี้มี ${U.num(f.all.length)} สัญญา แต่ไม่มีพิกัดงานในข้อมูล${f.sharedN ? ` (มี ${U.num(f.sharedN)} จุดที่เป็นพิกัดใช้ร่วม เปิดดูได้ในตัวเลือกด้านล่าง)` : ''}`}</p>
         ${fpSettingsHTML()}` : `
-        <div class="ma-kpis">
-          <div><span>งานมีพิกัด</span><b>${U.num(f.shown.length)}</b><em>จาก ${U.num(f.all.length)} สัญญา</em></div>
-          ${f.kind === 'dept'
-            // เกณฑ์ "ระยะกลาง" ตั้งไว้เทียบผู้รับจ้าง หน่วยงานระดับประเทศย่อมได้ค่าสูงอยู่แล้วโดยไม่มีความหมาย
-            // จึงเปลี่ยนเป็นตัวเลขที่ตอบคำถามของฝั่งหน่วยงานแทน: จ้างใครบ้าง กระจุกที่รายเดียวไหม กระจายกี่จังหวัด
-            ? `<div class="${f.topShare > 0.5 && f.all.length >= 5 ? 'is-warn' : ''}"><span>ผู้รับจ้าง</span><b>${U.num(f.mixN)} ราย</b><em>รายใหญ่สุด ${U.pct(f.topShare, 0)}</em></div>
-               <div><span>กระจายใน</span><b>${U.num(f.provinces.length)} จังหวัด</b><em>${U.num(Math.round(f.hullKm2))} ตร.กม.</em></div>`
-            : `<div class="${base.km && f.shown.length >= 5 && f.medKm > base.km * 3 ? 'is-warn' : ''}"><span>ระยะกลางจากศูนย์กลาง</span><b>${fpKm(f.medKm)} กม.</b><em>ทั่วไป ${fpKm(base.km)} กม.</em></div>
-               <div class="${f.overFar ? 'is-warn' : ''}"><span>ไกลกว่า ${fpKm(f.farKm)} กม.</span><b>${U.num(f.overFar)}</b><em>ไกลสุด ${fpKm(f.maxKm)} กม.</em></div>`}
-        </div>
+        ${kpiRow([
+          kpiTile('งานมีพิกัด', U.num(f.shown.length), `จาก ${U.num(f.all.length)} สัญญา`),
+          // เกณฑ์ "ระยะกลาง" ตั้งไว้เทียบผู้รับจ้าง หน่วยงานระดับประเทศย่อมได้ค่าสูงอยู่แล้วโดยไม่มีความหมาย
+          // จึงเปลี่ยนเป็นตัวเลขที่ตอบคำถามของฝั่งหน่วยงานแทน: จ้างใครบ้าง กระจุกที่รายเดียวไหม กระจายกี่จังหวัด
+          ...(f.kind === 'dept' ? [
+            kpiTile('ผู้รับจ้าง', `${U.num(f.mixN)} ราย`, `รายใหญ่สุด ${U.pct(f.topShare, 0)}`, f.topShare > 0.5 && f.all.length >= 5),
+            kpiTile('กระจายใน', `${U.num(f.provinces.length)} จังหวัด`, `${U.num(Math.round(f.hullKm2))} ตร.กม.`),
+          ] : [
+            kpiTile('ระยะกลางจากศูนย์กลาง', `${fpKm(f.medKm)} กม.`, `ทั่วไป ${fpKm(base.km)} กม.`,
+              base.km && f.shown.length >= 5 && f.medKm > base.km * 3),
+            kpiTile(`ไกลกว่า ${fpKm(f.farKm)} กม.`, U.num(f.overFar), `ไกลสุด ${fpKm(f.maxKm)} กม.`, !!f.overFar),
+          ]),
+        ])}
         ${lock ? `<p class="fp-lock">⚠ งานทั้ง ${U.num(f.all.length)} สัญญาของรายนี้มาจากหน่วยงานเดียว —
           ${U.esc(truncate(f.mix[0][0], 44))}</p>` : fpDeptMixHTML(f)}
         ${fpZonesHTML(f)}
@@ -4210,11 +4205,11 @@ ${placemarks.join('\n')}
     const sumVal = g => g.reduce((n, x) => n + x.value, 0);
     const head = stack.tab === 'exact'
       ? `<div class="stack-head">
-          <div class="ma-kpis">
-            <div class="${exact.length ? 'is-warn' : ''}"><span>จุดที่พิกัดตรงกันเป๊ะ</span><b>${U.num(exact.length)}</b><em>ตั้งแต่ 3 สัญญาขึ้นไป</em></div>
-            <div><span>สัญญาที่ได้รับผลกระทบ</span><b>${U.num(sumRows(exact))}</b><em>${U.pct(sumRows(exact) / Math.max(1, state.filtered.length), 2)} ของที่กรองอยู่</em></div>
-            <div><span>มูลค่ารวม</span><b>${U.money(sumVal(exact))}</b><em>ปักอยู่จุดเดียว</em></div>
-          </div>
+          ${kpiRow([
+            kpiTile('จุดที่พิกัดตรงกันเป๊ะ', U.num(exact.length), 'ตั้งแต่ 3 สัญญาขึ้นไป', !!exact.length),
+            kpiTile('สัญญาที่ได้รับผลกระทบ', U.num(sumRows(exact)), `${U.pct(sumRows(exact) / Math.max(1, state.filtered.length), 2)} ของที่กรองอยู่`),
+            kpiTile('มูลค่ารวม', U.money(sumVal(exact)), 'ปักอยู่จุดเดียว'),
+          ])}
           ${exact.length ? `<label class="form-check-label stack-hide">
             <input type="checkbox" class="form-check-input" id="mapHideStacked"${state.map.hideStacked ? ' checked' : ''}>
             ซ่อนจุดเหล่านี้ออกจากแผนที่ (มีผลกับหมุด จุดร้อน และรอยเท้า)</label>` : ''}
@@ -5026,8 +5021,7 @@ ${placemarks.join('\n')}
       ['มูลค่าที่มีสัญญาณ', U.money(flaggedValue)],
       ['ระดับวิกฤต', U.num(critical.length)],
       ['กฎที่พบอย่างน้อย 1 ครั้ง', U.num([...s.counts.values()].filter(c => c.n > 0).length)],
-    ].map(i => `<div class="col-6 col-lg-3"><div class="cardx kpi">
-        <div class="small-muted">${i[0]}</div><div class="v">${i[1]}</div></div></div>`).join(''));
+    ].map((i, k) => U.kpiCard(i[0], i[1], { accent: ['info', 'info', 'danger', null][k] })).join(''));
 
     // การ์ดมิติ ทำหน้าที่เป็นตัวกรองหมวดของกฎ
     U.setHTML('fraudDims', DIMENSIONS.map(dim => {
@@ -5667,8 +5661,7 @@ ${placemarks.join('\n')}
       ['คะแนน ≥ 40', U.num(all.filter(p => p.risk.final >= 40).length)],
       ['ได้งาน ≥ 3 หน่วยงาน', U.num(all.filter(p => p.n_agencies >= 3).length)],
       ['มูลค่ารวมสูงสุด', U.money(Math.max(0, ...all.map(p => p.total_value)))],
-    ].map(i => `<div class="col-6 col-lg-3"><div class="cardx kpi">
-        <div class="small-muted">${i[0]}</div><div class="v">${i[1]}</div></div></div>`).join(''));
+    ].map((i, k) => U.kpiCard(i[0], i[1], { accent: [null, 'warn', 'info', null][k] })).join(''));
 
     const shown = list.slice(0, 200);
     U.$('contractorCount').textContent = list.length > shown.length
@@ -5834,17 +5827,14 @@ ${placemarks.join('\n')}
         e-GP เปิดเผยเฉพาะผู้ชนะ จึงตอบตรง ๆ ไม่ได้ว่าโครงการหนึ่งมีกี่รายเสนอราคาและแพ้ด้วยเหตุใด
         ด้านล่างคือสัญญาณการแข่งขันที่<b>วัดได้จริง</b>จากข้อมูลที่มี</div>
 
-      <div class="ma-kpis con-kpis">
-        <div class="${specificShare > 0.8 && b.n >= 5 ? 'is-warn' : ''}"><span>วิธีจัดหาที่ใช้มากสุด</span>
-          <b>${U.esc(truncate(b.methods[0] ? b.methods[0].label : '-', 18))}</b>
-          <em>${b.methods[0] ? U.pct(b.methods[0].share, 0) : '-'} ของสัญญา</em></div>
-        <div><span>ส่วนลดจากราคากลาง</span><b>${discPct(b.medDisc)}</b>
-          <em>ไม่ลดเลย ${b.zeroShare === null ? '-' : U.pct(b.zeroShare, 0)}</em></div>
-        <div class="${lowRel ? 'is-warn' : ''}"><span>เทียบสนามเดียวกัน</span><b>${signedPct(b.relDisc)}</b>
-          <em>${b.relN ? `จาก ${U.num(b.relN)} สัญญาที่เทียบได้` : 'ไม่มีตลาดที่ใหญ่พอให้เทียบ'}</em></div>
-        <div><span>คู่แข่งในสนามเดียวกัน</span><b>${U.num(b.rivals)} ราย</b>
-          <em>${U.num(b.marketCells)} ตลาด (จังหวัด × กลุ่มงาน)</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('วิธีจัดหาที่ใช้มากสุด', U.esc(truncate(b.methods[0] ? b.methods[0].label : '-', 18)),
+          `${b.methods[0] ? U.pct(b.methods[0].share, 0) : '-'} ของสัญญา`, specificShare > 0.8 && b.n >= 5),
+        kpiTile('ส่วนลดจากราคากลาง', discPct(b.medDisc), `ไม่ลดเลย ${b.zeroShare === null ? '-' : U.pct(b.zeroShare, 0)}`),
+        kpiTile('เทียบสนามเดียวกัน', signedPct(b.relDisc),
+          b.relN ? `จาก ${U.num(b.relN)} สัญญาที่เทียบได้` : 'ไม่มีตลาดที่ใหญ่พอให้เทียบ', lowRel),
+        kpiTile('คู่แข่งในสนามเดียวกัน', `${U.num(b.rivals)} ราย`, `${U.num(b.marketCells)} ตลาด (จังหวัด × กลุ่มงาน)`),
+      ], 'con-kpis')}
 
       <div class="con-mix mt-2"><div class="ma-list-title">วิธีจัดหา</div>${conMixBar(b.methods, b.n, 4)}</div>
 
@@ -5982,11 +5972,11 @@ ${placemarks.join('\n')}
     U.setHTML('conJv', `
       <p class="small-muted mb-2">สัญญาร่วมค้าหนึ่งฉบับถูกบันทึกเป็นหลายแถว — แถวหนึ่งเป็นชื่อกิจการค้าร่วม
         อีกหลายแถวเป็นบริษัทสมาชิกพร้อมส่วนแบ่งของตัวเอง ระบบประกอบกลับให้เห็นทั้งกลุ่ม</p>
-      <div class="ma-kpis">
-        <div><span>กลุ่มร่วมค้า</span><b>${U.num(groups.length)}</b><em>${U.num(members.size)} บริษัทสมาชิก</em></div>
-        <div><span>มูลค่ารวม</span><b>${U.money(U.sum(groups.map(g => g.memberSum)))}</b><em>นับครั้งเดียวต่อกลุ่ม</em></div>
-        <div><span>คู่ที่ร่วมค้าซ้ำ</span><b>${U.num(partners.filter(p => p.n >= 2).length)}</b><em>จาก ${U.num(partners.length)} คู่</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('กลุ่มร่วมค้า', U.num(groups.length), `${U.num(members.size)} บริษัทสมาชิก`),
+        kpiTile('มูลค่ารวม', U.money(U.sum(groups.map(g => g.memberSum))), 'นับครั้งเดียวต่อกลุ่ม'),
+        kpiTile('คู่ที่ร่วมค้าซ้ำ', U.num(partners.filter(p => p.n >= 2).length), `จาก ${U.num(partners.length)} คู่`),
+      ])}
       <div class="jv-warn">⚠ ในตารางและ KPI อื่นของแอป แถวสมาชิกถูกนับเป็นสัญญาแยกกัน
         ทั้งที่ยอดของสมาชิกรวมกันแล้วเท่ากับยอดของกิจการค้าร่วมพอดี (ตรวจแล้ว ${U.num(groups.filter(g => g.matched).length)} จาก ${U.num(groups.length)} กลุ่ม)
         การรวมยอดตรง ๆ จึงนับซ้ำ — เป็นข้อจำกัดของต้นทางข้อมูล ไม่ใช่ของการคำนวณ</div>
@@ -6139,18 +6129,16 @@ ${placemarks.join('\n')}
         <span><i class="ft-key-no"></i>ชุดข้อมูลไม่มีเดือนนี้</span>
       </div>
 
-      <div class="ma-kpis con-kpis mt-2">
-        <div class="${peakOdd ? 'is-warn' : ''}"><span>เดือนที่กระจุกที่สุด</span>
-          <b>${t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-'}</b>
-          <em>${t.peak ? `${U.num(t.peak.mine)} สัญญา ${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)}` : 'ไม่มีวันทำสัญญา'}</em></div>
-        <div class="${bigBurst ? 'is-warn' : ''}"><span>เซ็นวันเดียวมากสุด</span>
-          <b>${t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-'}</b>
-          <em>${t.bursts[0] ? U.thaiDate(t.bursts[0].date) : 'ไม่มีวันที่ซ้ำกันตั้งแต่ 3 ฉบับ'}</em></div>
-        <div><span>ประกาศถึงทำสัญญา</span><b>${t.gapMedian === null ? '-' : `${U.num(t.gapMedian)} วัน`}</b>
-          <em>${t.gapN ? `มีข้อมูล ${U.num(t.gapN)} จาก ${U.num(t.dated)} ฉบับ` : 'ชุดนี้ไม่มีวันประกาศ'}</em></div>
-        <div><span>ระยะเวลาสัญญา</span><b>${t.durMedian === null ? '-' : `${U.num(t.durMedian)} วัน`}</b>
-          <em>${t.durN ? `จาก ${U.num(t.durN)} ฉบับ` : '-'}</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('เดือนที่กระจุกที่สุด', t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-',
+          t.peak ? `${U.num(t.peak.mine)} สัญญา ${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)}` : 'ไม่มีวันทำสัญญา', peakOdd),
+        kpiTile('เซ็นวันเดียวมากสุด', t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-',
+          t.bursts[0] ? U.thaiDate(t.bursts[0].date) : 'ไม่มีวันที่ซ้ำกันตั้งแต่ 3 ฉบับ', bigBurst),
+        kpiTile('ประกาศถึงทำสัญญา', t.gapMedian === null ? '-' : `${U.num(t.gapMedian)} วัน`,
+          t.gapN ? `มีข้อมูล ${U.num(t.gapN)} จาก ${U.num(t.dated)} ฉบับ` : 'ชุดนี้ไม่มีวันประกาศ'),
+        kpiTile('ระยะเวลาสัญญา', t.durMedian === null ? '-' : `${U.num(t.durMedian)} วัน`,
+          t.durN ? `จาก ${U.num(t.durN)} ฉบับ` : '-'),
+      ], 'con-kpis mt-2')}
 
       ${t.bursts.length ? `<div class="ma-list mt-2">
         <div class="ma-list-title">วันที่เซ็นหลายฉบับพร้อมกัน (ตั้งแต่ 3 ฉบับ) · รวม ${U.num(t.burstRows)} สัญญา</div>
@@ -7321,7 +7309,7 @@ ${placemarks.join('\n')}
   }
 
   function renderDeep() {
-    loadScriptOnce('js/deeppattern.js?v=3', 'DeepPattern').then(DP => {
+    loadScriptOnce('js/deeppattern.js?v=4', 'DeepPattern').then(DP => {
       if (!DP.__wired) { DP.init(deepPatternApi()); DP.__wired = true; }
       DP.render();
     }).catch(err => {
@@ -8396,8 +8384,7 @@ ${placemarks.join('\n')}
       ['HHI > 2500 (≥5 สัญญา)', U.num(all.filter(a => a.n_contracts >= 5 && a.hhi !== null && a.hhi > 2500).length)],
       ['ให้ผู้ชนะรายเดียว ≥ 50% (≥5 สัญญา)', U.num(all.filter(a => a.n_contracts >= 5 && a.top_winner_share >= 0.5).length)],
       ['มูลค่ารวมสูงสุด', U.money(Math.max(0, ...all.map(a => a.total_value)))],
-    ].map(i => `<div class="col-6 col-lg-3"><div class="cardx kpi">
-        <div class="small-muted">${i[0]}</div><div class="v">${i[1]}</div></div></div>`).join(''));
+    ].map((i, k) => U.kpiCard(i[0], i[1], { accent: [null, 'warn', 'warn', null][k] })).join(''));
 
     const shown = list.slice(0, 200);
     U.$('agencyCount').textContent = list.length > shown.length
@@ -8560,18 +8547,16 @@ ${placemarks.join('\n')}
         <span><i class="ft-key-no"></i>ชุดข้อมูลไม่มีเดือนนี้</span>
       </div>
 
-      <div class="ma-kpis con-kpis mt-2">
-        <div class="${peakOdd ? 'is-warn' : ''}"><span>เดือนที่กระจุกที่สุด</span>
-          <b>${t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-'}</b>
-          <em>${t.peak ? `${U.num(t.peak.mine)} สัญญา ${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)}` : 'ไม่มีวันทำสัญญา'}</em></div>
-        <div class="${bigBurst ? 'is-warn' : ''}"><span>เซ็นวันเดียวมากสุด</span>
-          <b>${t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-'}</b>
-          <em>${t.bursts[0] ? U.thaiDate(t.bursts[0].date) : 'ไม่มีวันที่ซ้ำกันตั้งแต่ 3 ฉบับ'}</em></div>
-        <div><span>ประกาศถึงทำสัญญา</span><b>${t.gapMedian === null ? '-' : `${U.num(t.gapMedian)} วัน`}</b>
-          <em>${t.gapN ? `มีข้อมูล ${U.num(t.gapN)} จาก ${U.num(t.dated)} ฉบับ` : 'ชุดนี้ไม่มีวันประกาศ'}</em></div>
-        <div><span>ระยะเวลาสัญญา</span><b>${t.durMedian === null ? '-' : `${U.num(t.durMedian)} วัน`}</b>
-          <em>${t.durN ? `จาก ${U.num(t.durN)} ฉบับ` : '-'}</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('เดือนที่กระจุกที่สุด', t.peak ? TH_MONTH_SHORT[t.peak.month - 1] : '-',
+          t.peak ? `${U.num(t.peak.mine)} สัญญา ${U.pct(t.peak.myShare, 0)} · ทั้งชุด ${U.pct(t.peak.baseShare, 0)}` : 'ไม่มีวันทำสัญญา', peakOdd),
+        kpiTile('เซ็นวันเดียวมากสุด', t.bursts[0] ? `${U.num(t.bursts[0].n)} ฉบับ` : '-',
+          t.bursts[0] ? U.thaiDate(t.bursts[0].date) : 'ไม่มีวันที่ซ้ำกันตั้งแต่ 3 ฉบับ', bigBurst),
+        kpiTile('ประกาศถึงทำสัญญา', t.gapMedian === null ? '-' : `${U.num(t.gapMedian)} วัน`,
+          t.gapN ? `มีข้อมูล ${U.num(t.gapN)} จาก ${U.num(t.dated)} ฉบับ` : 'ชุดนี้ไม่มีวันประกาศ'),
+        kpiTile('ระยะเวลาสัญญา', t.durMedian === null ? '-' : `${U.num(t.durMedian)} วัน`,
+          t.durN ? `จาก ${U.num(t.durN)} ฉบับ` : '-'),
+      ], 'con-kpis mt-2')}
 
       ${t.bursts.length ? `<div class="ma-list mt-2">
         <div class="ma-list-title">วันที่เซ็นหลายฉบับพร้อมกัน (ตั้งแต่ 3 ฉบับ) · รวม ${U.num(t.burstRows)} สัญญา</div>
@@ -8826,9 +8811,6 @@ ${placemarks.join('\n')}
       ${body}
     </div>`;
 
-  const kpiTile = (label, value, sub, warn = false) =>
-    `<div class="${warn ? 'is-warn' : ''}"><span>${label}</span><b>${value}</b><em>${sub}</em></div>`;
-
   function renderAgencyMethod() {
     const scope = resolveMethodScope();
     const rows = scope.rows;
@@ -8922,13 +8904,13 @@ ${placemarks.join('\n')}
     const noGap = bd.filter(m => m.n >= 5 && m.gapN === 0).map(m => methodShort(m.method));
 
     const body = `
-      <div class="ma-kpis con-kpis">
-        ${kpiTile('ประกาศ→ลงนาม (มัธยฐาน)', gaps.length ? `${U.num(p(0.5))} วัน` : '-',
-          gaps.length ? `เร็วสุด ${U.num(gaps[0])} · ช้าสุด ${U.num(gaps[gaps.length - 1])} วัน` : 'ไม่มีวันประกาศในขอบเขตนี้')}
-        ${kpiTile('ช้ากว่าปกติ (p90)', gaps.length ? `${U.num(p(0.9))} วัน` : '-', 'ร้อยละ 90 ของงานเสร็จกระบวนการก่อนวันนี้')}
-        ${kpiTile('เซ็นเร็วกว่า 20 วัน', U.num(fast), 'ช่วงเวลาสั้นผิดปกติ ควรดูเอกสารประกอบ', fast > 0)}
-        ${kpiTile('ความครอบคลุมของวันประกาศ', U.pct(cover, 1), `มีข้อมูล ${U.num(gaps.length)} จาก ${U.num(rows.length)} สัญญา`, cover < 0.5)}
-      </div>
+      ${kpiRow([
+        kpiTile('ประกาศ→ลงนาม (มัธยฐาน)', gaps.length ? `${U.num(p(0.5))} วัน` : '-',
+          gaps.length ? `เร็วสุด ${U.num(gaps[0])} · ช้าสุด ${U.num(gaps[gaps.length - 1])} วัน` : 'ไม่มีวันประกาศในขอบเขตนี้'),
+        kpiTile('ช้ากว่าปกติ (p90)', gaps.length ? `${U.num(p(0.9))} วัน` : '-', 'ร้อยละ 90 ของงานเสร็จกระบวนการก่อนวันนี้'),
+        kpiTile('เซ็นเร็วกว่า 20 วัน', U.num(fast), 'ช่วงเวลาสั้นผิดปกติ ควรดูเอกสารประกอบ', fast > 0),
+        kpiTile('ความครอบคลุมของวันประกาศ', U.pct(cover, 1), `มีข้อมูล ${U.num(gaps.length)} จาก ${U.num(rows.length)} สัญญา`, cover < 0.5),
+      ], 'con-kpis')}
       <div id="agM2Bar" style="height:230px" class="mt-2" role="img"
            aria-label="ระยะเวลาตามสัญญามัธยฐานแยกตามวิธีจัดหา"></div>
       <p class="ma-note">แท่งด้านบนคือ<b>ระยะเวลาที่ตกลงไว้ในสัญญา</b> (duration_days) ไม่ใช่เวลาที่ใช้จริง
@@ -8972,13 +8954,11 @@ ${placemarks.join('\n')}
     const body = `
       <div id="agM3Bar" style="height:240px" role="img"
            aria-label="ส่วนลดจากราคากลางมัธยฐานแยกตามวิธีจัดหา"></div>
-      <div class="ma-kpis con-kpis mt-2">
-        ${withDisc.slice(0, 4).map(m => kpiTile(
-          methodShort(m.method),
-          m.discMed === null ? '-' : `ลด ${(m.discMed * 100).toFixed(2)}%`,
-          `ไม่ลดเลย ${U.pct(m.discZeroShare, 0)} ของ ${U.num(m.discN)} สัญญา`,
-          m.discZeroShare !== null && m.discZeroShare > 0.3)).join('')}
-      </div>
+      ${kpiRow(withDisc.slice(0, 4).map(m => kpiTile(
+        methodShort(m.method),
+        m.discMed === null ? '-' : `ลด ${(m.discMed * 100).toFixed(2)}%`,
+        `ไม่ลดเลย ${U.pct(m.discZeroShare, 0)} ของ ${U.num(m.discN)} สัญญา`,
+        m.discZeroShare !== null && m.discZeroShare > 0.3)), 'con-kpis mt-2')}
       ${hypo}
       <p class="ma-note">ส่วนลดคิดจาก (ราคากลาง − มูลค่าสัญญา) ÷ ราคากลาง · ราคากลางมีครบเกือบทุกสัญญาในชุดนี้
         จึงเป็นตัวชี้วัดความคุ้มค่าที่เชื่อถือได้ที่สุดเท่าที่ข้อมูลมี</p>
@@ -9025,12 +9005,12 @@ ${placemarks.join('\n')}
       <div class="con-nobid">⚠ <b>ชุดข้อมูลนี้ไม่มีจำนวนผู้เสนอราคาและรายชื่อผู้ยื่นซอง</b> —
         e-GP เปิดเผยเฉพาะผู้ชนะ จึงคำนวณ "ผู้เสนอราคาเฉลี่ยต่อประกวด" "สัดส่วน single bidder"
         และ "cover bidding" ไม่ได้เลย ด้านล่างคือสัญญาณการแข่งขันที่<b>วัดได้จริง</b>จากข้อมูลที่มี</div>
-      <div class="ma-kpis con-kpis mt-2">
-        ${kpiTile('ส่วนแบ่งผู้ชนะรายใหญ่สุด', U.pct(topShare, 1), U.esc(truncate(topName, 28)) || '-', topShare > 0.5)}
-        ${kpiTile('ดัชนีกระจุกตัว (HHI)', U.num(Math.round(hhi)), hhi > 2500 ? 'เกินเกณฑ์กระจุกตัวสูง (2,500)' : 'ต่ำกว่าเกณฑ์ 2,500', hhi > 2500)}
-        ${kpiTile('ไม่ลดจากราคากลางเลย', zero === null ? '-' : U.pct(zero, 1), `จาก ${U.num(disc.length)} สัญญาที่มีราคากลาง`, zero !== null && zero > 0.3)}
-        ${kpiTile('ราคาชิดราคากลาง (ลด <1%)', tight === null ? '-' : U.pct(tight, 1), 'ยิ่งสูงยิ่งไร้แรงกดดันด้านราคา', tight !== null && tight > 0.5)}
-      </div>
+      ${kpiRow([
+        kpiTile('ส่วนแบ่งผู้ชนะรายใหญ่สุด', U.pct(topShare, 1), U.esc(truncate(topName, 28)) || '-', topShare > 0.5),
+        kpiTile('ดัชนีกระจุกตัว (HHI)', U.num(Math.round(hhi)), hhi > 2500 ? 'เกินเกณฑ์กระจุกตัวสูง (2,500)' : 'ต่ำกว่าเกณฑ์ 2,500', hhi > 2500),
+        kpiTile('ไม่ลดจากราคากลางเลย', zero === null ? '-' : U.pct(zero, 1), `จาก ${U.num(disc.length)} สัญญาที่มีราคากลาง`, zero !== null && zero > 0.3),
+        kpiTile('ราคาชิดราคากลาง (ลด <1%)', tight === null ? '-' : U.pct(tight, 1), 'ยิ่งสูงยิ่งไร้แรงกดดันด้านราคา', tight !== null && tight > 0.5),
+      ], 'con-kpis mt-2')}
       ${rotation.length ? `<div class="ma-list mt-2">
         <div class="ma-list-title">คู่ผู้ชนะที่สลับกันได้งานในหน่วยงานเดียวกัน</div>
         ${rotation.map(r => `<div class="ma-li">
@@ -9100,14 +9080,14 @@ ${placemarks.join('\n')}
     </tr>`).join('');
 
     const body = `
-      <div class="ma-kpis con-kpis">
-        ${kpiTile('เฉพาะเจาะจงเกินเพดาน', U.num(ev.overCeiling.length),
-          `เกิน ${U.num(ev.ceiling)} บาท · รวม ${U.money(ev.overCeilingValue)}`, ev.overCeiling.length > 0)}
-        ${kpiTile('ชิดเพดาน', U.num(ev.nearCeiling.length),
-          `${U.num(ev.nearLo)} – ${U.num(ev.ceiling)} บาท`, ev.nearCeiling.length > 0)}
-        ${kpiTile('ชุดที่เซ็นวันเดียวกันรวมเกินเพดาน', U.num(ev.clusters.length),
-          `รวม ${U.money(ev.clusterValue)} บาท`, ev.clusters.length > 0)}
-      </div>
+      ${kpiRow([
+        kpiTile('เฉพาะเจาะจงเกินเพดาน', U.num(ev.overCeiling.length),
+          `เกิน ${U.num(ev.ceiling)} บาท · รวม ${U.money(ev.overCeilingValue)}`, ev.overCeiling.length > 0),
+        kpiTile('ชิดเพดาน', U.num(ev.nearCeiling.length),
+          `${U.num(ev.nearLo)} – ${U.num(ev.ceiling)} บาท`, ev.nearCeiling.length > 0),
+        kpiTile('ชุดที่เซ็นวันเดียวกันรวมเกินเพดาน', U.num(ev.clusters.length),
+          `รวม ${U.money(ev.clusterValue)} บาท`, ev.clusters.length > 0),
+      ], 'con-kpis')}
       <div class="ma-list-title mt-3">สัญญาวิธีเฉพาะเจาะจงที่มูลค่าเกิน ${U.num(ev.ceiling)} บาท</div>
       <div class="table-wrap"><table class="table table-sm mini-table mb-0">
         <caption class="visually-hidden">สัญญาเฉพาะเจาะจงที่เกินเพดานวงเงิน</caption>
@@ -9493,13 +9473,105 @@ ${placemarks.join('\n')}
     </ol>`;
   }
 
+  /* ---------- ชั้นตีความสัญญาณ (ต่อสัญญา × สัญญาณที่ติด) ----------
+     ไม่สร้างกลไกใหม่ซ้ำซ้อน — ประกอบจากของเดิมที่มีอยู่แล้ว: peerGroupFor/PEER_METRICS (เทียบกลุ่ม),
+     mlReasonText/ml_why (มุมมองจากโมเดล), Learn.auditSteps (เอกสารที่ควรขอ), Rules.dataGapsFor (ข้อมูลที่ยังไม่มี) */
+
+  // กฎ -> มิติที่มีให้เทียบเชิงปริมาณตรงกับสิ่งที่กฎนั้นวัด (peer = key ใน PEER_METRICS, ml = key ใน ml_why)
+  // กฎที่ไม่มีในตารางนี้ไม่มีมิติที่ตรงพอ — benchmark/modelContext จะเป็น null โดยตั้งใจ ไม่ใส่เลขเดา
+  const RULE_FOCUS = {
+    R1: { peer: 'discount', ml: 'discount' },
+    R2: { peer: 'discount', ml: 'discount' },
+    R4: { peer: 'value', ml: 'log_value_peer' },
+    R9: { peer: 'value', ml: 'roundness' },
+    R13: { peer: 'discount', ml: 'discount' },
+    R14: { peer: null, ml: 'build_vs_budget' },
+    R15: { peer: null, ml: 'pair_value_share' },
+    R16: { peer: 'duration', ml: 'log_duration_peer' },
+    R18: { peer: 'discount', ml: 'discount' },
+    R22: { peer: null, ml: 'log_winner_agencies' },
+  };
+
+  /** ตำแหน่งเทียบกลุ่มเฉพาะมิติที่ตรงกับกฎนี้ข้อเดียว (ต่างจาก peerStripHTML ที่โชว์ครบ 4 มิติ) */
+  function ruleBenchmark(r, ruleId) {
+    const focus = RULE_FOCUS[ruleId];
+    if (!focus || !focus.peer) return null;
+    const m = PEER_METRICS.find(x => x.key === focus.peer);
+    const v = m.get(r);
+    const peer = peerGroupFor(r);
+    const s = peer.sorted[m.key];
+    if (v === null || s.length < 10) return null;
+    const pct = percentileOf(s, v);
+    const side = pct >= 0.995 ? 'สูงกว่าเกือบทั้งกลุ่ม' : pct <= 0.005 ? 'ต่ำกว่าเกือบทั้งกลุ่ม'
+      : Math.abs(pct - 0.5) < 0.1 ? 'ใกล้ค่ากลางของกลุ่ม'
+        : pct > 0.5 ? `สูงกว่า ${U.pct(pct, 0)} ของกลุ่ม` : `ต่ำกว่า ${U.pct(1 - pct, 0)} ของกลุ่ม`;
+    return { label: m.label, value: m.fmt(v), median: m.fmt(U.quantile(s, 0.5)), side, peerLabel: peer.label, peerN: peer.n };
+  }
+
+  /** มุมมองจาก Isolation Forest สำหรับมิติเดียวกับกฎนี้ — คนละวิธีคำนวณจากกฎ ไม่ใช่หลักฐานซ้ำกัน */
+  function ruleModelContext(r, ruleId) {
+    const focus = RULE_FOCUS[ruleId];
+    if (!focus || !focus.ml || !(r.ml_why || []).length) return null;
+    const w = r.ml_why.find(x => x.key === focus.ml);
+    return w ? mlReasonText(w) : null;
+  }
+
+  /** หมวดกฎจริง (ไม่รวมสาธิต) ที่ติดในสัญญานี้ — ใช้ตัดสิน "เห็นตรงกันกี่หมวดอิสระ" และดึงช่องว่างข้อมูล/เอกสารที่ควรขอ */
+  function hitCategories(r) {
+    return [...new Set((r.rule_hits || []).filter(h => h.source === 'real').map(h => h.category))];
+  }
+
+  /** เอกสารที่ควรขอ รวมจากทุกกฎที่ติดในสัญญานี้ ตัดซ้ำ เรียงตามลำดับความรุนแรงของกฎที่พามา (hits ต้องเรียงมาก่อนแล้ว) */
+  function nextBestEvidenceFor(sortedHits) {
+    const seen = new Set(), out = [];
+    for (const h of sortedHits) {
+      const a = Learn.auditSteps(h.rule_id);
+      if (!a) continue;
+      for (const d of a.docs) { if (!seen.has(d)) { seen.add(d); out.push(d); } }
+    }
+    return out;
+  }
+
+  /** ความครบของข้อมูลสำหรับสัญญานี้โดยเฉพาะ (มีพิกัดจริง/มีวันประกาศ/TIN ไม่ถูกปิดบัง/กลุ่มเทียบไม่เล็กเกินไป)
+   *  ใช้คำ ไม่ใช่คะแนนตัวเลข เพื่อไม่ให้ปนกับ risk_score/ml_pct ซึ่งเป็นคนละแกนกัน */
+  function dataCompletenessWord(r) {
+    const hasGeo = r.lat !== null && r.lat !== undefined && r.geo_quality !== 'shared';
+    const n = [hasGeo, r.announce_date !== null, !r.tin_is_masked, peerGroupFor(r).n >= 30].filter(Boolean).length;
+    return n >= 3 ? 'ครบถ้วน' : n === 2 ? 'ปานกลาง' : 'มีจำกัด';
+  }
+
+  function interpretationDetailsHTML(r, h) {
+    const benchmark = ruleBenchmark(r, h.rule_id);
+    const model = ruleModelContext(r, h.rule_id);
+    const rows = [];
+    if (benchmark) {
+      rows.push(`<div class="interp-row"><strong>เทียบกับกลุ่ม:</strong> ${U.esc(benchmark.label)} ${U.esc(benchmark.value)}
+        · ${U.esc(benchmark.side)} (ค่ากลางกลุ่ม ${U.esc(benchmark.median)} · เทียบกับ ${U.esc(benchmark.peerLabel)}
+        ${U.num(benchmark.peerN)} สัญญาทั้งชุดข้อมูล)</div>`);
+    }
+    if (model) {
+      rows.push(`<div class="interp-row"><strong>มุมมองจากโมเดล (Isolation Forest คนละวิธีจากกฎนี้):</strong> ${U.esc(model)}</div>`);
+    }
+    if (!rows.length) {
+      rows.push('<div class="small-muted">กฎนี้ไม่มีมิติเปรียบเทียบเชิงปริมาณที่ตรงพอ อ่านเหตุผลจาก "ค่าที่พบ" ด้านบนแทน</div>');
+    }
+    return `<details class="audit-details"><summary>ทำไมจึงเป็นสัญญาณนี้ · ตีความเพิ่มเติม</summary>
+      <div class="interp-card">${rows.join('')}</div></details>`;
+  }
+
   /* ---------- หลักฐานรายกฎ ---------- */
 
   function evidenceHTML(r) {
     const hits = [...(r.rule_hits || [])].sort((a, b) =>
       (Rules.SEVERITY_ORDER[b.severity] - Rules.SEVERITY_ORDER[a.severity]) || (b.weight - a.weight));
     if (!hits.length) return U.emptyState('สัญญานี้ไม่เข้าเงื่อนไขของกฎใด');
-    return `<div class="evidence-list">${hits.map(h => `
+    const cats = hitCategories(r);
+    const modelAgrees = r.ml_pct !== null && r.ml_pct !== undefined && r.ml_pct >= 95;
+    const combo = cats.length >= 2
+      ? `<div class="ma-note mb-2">เห็นตรงกัน ${U.num(cats.length)} หมวดอิสระ (${cats.map(U.esc).join(', ')})${modelAgrees ? ' + สัญญาณจาก Isolation Forest' : ''}
+          — กฎที่วัดเรื่องเดียวกันนับคะแนนครั้งเดียวแล้ว (ดูป้าย "นับใน...แล้ว" ด้านล่าง) ตัวเลขนี้จึงไม่ใช่การนับซ้ำ</div>`
+      : '';
+    return `${combo}<div class="evidence-list">${hits.map(h => `
       <article class="evidence sev-${U.esc(h.severity)}${h.source === 'synthetic' ? ' is-demo' : ''}">
         <header class="evidence-head">
           <span class="rule-chip">${h.rule_id}</span>
@@ -9510,10 +9582,70 @@ ${placemarks.join('\n')}
         <div class="evidence-actual">${U.esc(h.actual)}</div>
         <div class="evidence-foot">
           ${Learn.auditSteps(h.rule_id) ? auditStepsHTML(h.rule_id) : ''}
+          ${interpretationDetailsHTML(r, h)}
           ${Diagrams.has(h.rule_id) ? `<button type="button" class="btn btn-sm btn-link p-0 detail-clickable"
             data-type="diagram" data-id="${h.rule_id}">🔍 ดูตัวอย่างรูปแบบ</button>` : ''}
         </div>
       </article>`).join('')}</div>`;
+  }
+
+  /* ---------- สรุปก่อนตรวจ (mini screening brief) ---------- */
+
+  function interpretationAiPrompt(r) {
+    const band = Rules.band(r.risk_score);
+    return `ข้างล่างนี้คือข้อมูลและสัญญาณความเสี่ยงที่ระบบคำนวณจากข้อมูลจริงแล้ว สำหรับสัญญาฉบับเดียว ` +
+      `(คะแนน ${r.risk_score} ระดับ${band.label})\n\n` +
+      'ช่วยขยายความโดย:\n' +
+      '1. อธิบายว่าสัญญาณแต่ละข้อมีความหมายอย่างไรในบริบทการจัดซื้อจัดจ้างภาครัฐไทย\n' +
+      '2. เสนอคำอธิบายทางเลือกที่สุจริตหรือเป็นเรื่องปกติของตลาดสำหรับสัญญาณแต่ละข้อ\n' +
+      '3. เสนอลำดับการตรวจสอบและเอกสารที่ควรขอจากหน่วยงานเพิ่มเติมจากที่ระบบแนะนำไว้แล้ว\n\n' +
+      'ห้ามเพิ่มตัวเลขใหม่ที่ไม่ปรากฏในข้อมูลที่แนบ ห้ามคำนวณสถิติใหม่ ถ้าต้องใช้ตัวเลขที่ไม่มีให้บอกว่าข้อมูลชุดนี้ไม่มี ' +
+      'ห้ามสรุปว่าสัญญานี้มีการทุจริตหรือกระทำผิด ให้ใช้คำว่า "ควรตรวจสอบเพิ่มเติม" เท่านั้น';
+  }
+
+  function profileBriefText(r) {
+    const hits = (r.rule_hits || []).filter(h => h.source === 'real');
+    const cats = hitCategories(r);
+    const gaps = Rules.dataGapsFor(cats);
+    const docs = nextBestEvidenceFor([...hits].sort((a, b) =>
+      (Rules.SEVERITY_ORDER[b.severity] - Rules.SEVERITY_ORDER[a.severity]) || (b.weight - a.weight)));
+    const lines = [
+      `# สรุปก่อนตรวจ · ${r.project_name}`,
+      `โครงการ: ${r.project_id} · สัญญา: ${r.contract_no || '-'} · หน่วยงาน: ${r.dept_name} · ผู้รับจ้าง: ${r.winner_name}`,
+      `มูลค่า: ${U.money(r.contract_price_agree)} บาท · คะแนนความเสี่ยง: ${r.risk_score} (${Rules.band(r.risk_score).label})`,
+      '', '## สัญญาณที่พบ',
+      ...hits.map(h => `- ${h.rule_id} ${h.rule_name} (น้ำหนัก ${hitWeightText(h)}): ${h.actual}`),
+      '', '## ยังขาดข้อมูลอะไร', ...(gaps.length ? gaps.map(g => `- ${g}`) : ['- ไม่มี (เทียบจากหมวดกฎที่ติด)']),
+      '', '## ควรตรวจเอกสารอะไรต่อ', ...(docs.length ? docs.map(d => `- ${d}`) : ['- ไม่มีคำแนะนำเฉพาะสำหรับกฎที่ติด']),
+      '', '> สรุปนี้ประกอบจากข้อมูลและกฎที่ติดจริงของสัญญานี้เท่านั้น ไม่ใช่ข้อสรุปว่ามีการทุจริต',
+    ];
+    return lines.join('\n');
+  }
+
+  function renderProfileBrief(r) {
+    const hits = (r.rule_hits || []).filter(h => h.source === 'real');
+    if (!hits.length) { U.setHTML('profileBrief', U.emptyState('สัญญานี้ไม่เข้าเงื่อนไขของกฎใด จึงยังไม่มีสรุปก่อนตรวจ')); return; }
+    const cats = hitCategories(r);
+    const modelAgrees = r.ml_pct !== null && r.ml_pct !== undefined && r.ml_pct >= 95;
+    const agreeWord = cats.length >= 2 ? `เห็นตรงกัน ${U.num(cats.length)} หมวด${modelAgrees ? ' + โมเดล' : ''}`
+      : modelAgrees ? 'กฎกับโมเดลเห็นตรงกัน' : 'สัญญาณเดียว';
+    const gaps = Rules.dataGapsFor(cats);
+    const docs = nextBestEvidenceFor([...hits].sort((a, b) =>
+      (Rules.SEVERITY_ORDER[b.severity] - Rules.SEVERITY_ORDER[a.severity]) || (b.weight - a.weight)));
+    U.setHTML('profileBrief', `
+      ${(() => { const comp = dataCompletenessWord(r); return kpiRow([
+        kpiTile('สัญญาณที่เห็นตรงกัน', agreeWord, '', cats.length >= 2),
+        kpiTile('ความครบของข้อมูล', comp, '', comp === 'มีจำกัด'),
+      ], 'mb-2'); })()}
+      ${gaps.length ? `<div class="mb-2"><div class="section-label mb-1">ยังขาดข้อมูลอะไร</div>
+        <ul class="mb-0">${gaps.map(g => `<li>${U.esc(g)}</li>`).join('')}</ul></div>` : ''}
+      ${docs.length ? `<div class="mb-2"><div class="section-label mb-1">ควรตรวจเอกสารอะไรต่อ</div>
+        <ul class="mb-0">${docs.map(d => `<li>${U.esc(d)}</li>`).join('')}</ul></div>` : ''}
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="profileBriefDownload">⬇ ดาวน์โหลดสรุป (.md)</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="profileBriefAi">✨ ถาม AI ช่วยตีความ</button>
+      </div>
+      <p class="small-muted mt-2 mb-0">สรุปนี้ประกอบจากข้อมูลและกฎที่ติดจริงของสัญญานี้เท่านั้น ไม่ใช่ข้อสรุปว่ามีการทุจริต</p>`);
   }
 
   /* ---------- แผนที่จิ๋ว ---------- */
@@ -9592,6 +9724,7 @@ ${placemarks.join('\n')}
     U.$('profileEvidenceCount').textContent = `${(r.rule_hits || []).length} สัญญาณ · คะแนน ${U.num(r.risk_score)}`;
     U.setHTML('profileEvidence', evidenceHTML(r));
     U.setHTML('profileModel', modelSectionHTML(r) || '<div class="small-muted">ไม่มีผลจากโมเดลสำหรับสัญญานี้</div>');
+    renderProfileBrief(r);
 
     U.$('profileSiblingsCard').hidden = siblings.length <= 1;
     if (siblings.length > 1) {
@@ -9640,6 +9773,23 @@ ${placemarks.join('\n')}
       if (sib && !sib.disabled) {
         const r = recordByCartKey(sib.dataset.profileKey);
         if (r) { profile.index = profile.list.indexOf(r); showProfile(r); U.$('profileBody').scrollTop = 0; }
+        return;
+      }
+      if (e.target.closest('#profileBriefDownload')) {
+        const r = profile.record;
+        if (!r) return;
+        const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        downloadBlob(new Blob(['﻿' + profileBriefText(r)], { type: 'text/markdown;charset=utf-8' }),
+          `สรุปก่อนตรวจ-${r.project_id}-${day}.md`);
+        return;
+      }
+      if (e.target.closest('#profileBriefAi')) {
+        const r = profile.record;
+        if (!r) return;
+        closeProfile();
+        gotoTab('pill-ai'); renderAI();
+        labSendToAssistant(`🔎 ตีความสัญญา · ${truncate(r.project_name, 40)}`,
+          interpretationAiPrompt(r), profileBriefText(r));
       }
     });
 
@@ -11959,13 +12109,14 @@ ${placemarks.join('\n')}
     U.setHTML('labResult', `
       <div class="lab-rule-read"><span class="badge ${Rules.BANDS.find(x => x.key === r.severity)?.cls || 'badge-medium'}">${U.esc(r.severity)}</span>
         <strong>${U.esc(r.name)}</strong><p>${U.esc(RuleLab.describe(r))}</p></div>
-      <div class="ma-kpis lab-kpis">
-        <div><span>ติดกฎ (ทั้งชุด)</span><b>${U.num(b.hitCount)}</b><em>${U.pct(b.share, 1)} · ในตัวกรอง ${U.num(inFilter)}</em></div>
-        <div><span>มูลค่า</span><b>${U.money(b.value)}</b><em>${U.num(b.agencies)} หน่วยงาน · ${U.num(b.contractors)} ผู้รับจ้าง</em></div>
-        <div class="${b.newPriority ? 'is-warn' : ''}"><span>จะเข้าระดับควรตรวจก่อนเพิ่ม</span><b>${U.num(b.newPriority)}</b><em>ถ้าให้น้ำหนัก ${r.weight}</em></div>
-        <div><span>ยังไม่ติดกฎเดิมเลย</span><b>${U.num(b.unflagged)}</b><em>ความครอบคลุมใหม่</em></div>
-        <div class="${b.mlLift && b.mlLift >= 1.5 ? 'is-good' : ''}"><span>สอดคล้องโมเดลความผิดปกติ</span><b>${b.mlLift === null ? '-' : '×' + b.mlLift.toFixed(2)}</b><em>${b.hitMlShare === null ? '' : `${U.pct(b.hitMlShare, 0)} vs ปกติ ${U.pct(b.baseMl, 0)}`}</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('ติดกฎ (ทั้งชุด)', U.num(b.hitCount), `${U.pct(b.share, 1)} · ในตัวกรอง ${U.num(inFilter)}`),
+        kpiTile('มูลค่า', U.money(b.value), `${U.num(b.agencies)} หน่วยงาน · ${U.num(b.contractors)} ผู้รับจ้าง`),
+        kpiTile('จะเข้าระดับควรตรวจก่อนเพิ่ม', U.num(b.newPriority), `ถ้าให้น้ำหนัก ${r.weight}`, b.newPriority ? 'warn' : null),
+        kpiTile('ยังไม่ติดกฎเดิมเลย', U.num(b.unflagged), 'ความครอบคลุมใหม่'),
+        kpiTile('สอดคล้องโมเดลความผิดปกติ', b.mlLift === null ? '-' : '×' + b.mlLift.toFixed(2),
+          b.hitMlShare === null ? '' : `${U.pct(b.hitMlShare, 0)} vs ปกติ ${U.pct(b.baseMl, 0)}`, b.mlLift && b.mlLift >= 1.5 ? 'good' : null),
+      ], 'lab-kpis')}
       <div class="small-muted mb-1">ระดับความเสี่ยงปัจจุบันของสัญญาที่ติด · ทดสอบใน ${ms.toFixed(0)} มิลลิวินาที</div>
       ${bandBar}
       ${b.overlaps.length ? `<div class="ma-list"><div class="ma-list-title">ทับซ้อนกับกฎเดิม (Jaccard ยิ่งสูงยิ่งซ้ำซ้อน)</div>
@@ -12111,11 +12262,12 @@ ${labVocabText()}`;
     const sensRules = Rules.DEFS.filter(d => d.source === 'real' && Object.keys(d.thresholds || {}).length);
     const keepRule = U.$('labSensRule')?.value || sensRules[0]?.id;
     U.setHTML('labHealthResult', `
-      <div class="ma-kpis lab-kpis">
-        <div><span>กฎที่ทำงาน (ข้อมูลจริง)</span><b>${h.active.length}</b><em>ไม่ติดเลย ${h.silent.length}: ${U.esc(h.silent.map(s => s.id).join(', ') || '-')}</em></div>
-        <div class="${h.redundant.length ? 'is-warn' : ''}"><span>คู่กฎที่ซ้ำซ้อนสูง</span><b>${h.redundant.length}</b><em>Jaccard ≥ 0.5</em></div>
-        <div><span>ขับเข้าระดับควรตรวจก่อนมากสุด</span><b>${U.esc(h.marginal[0]?.id || '-')}</b><em>${h.marginal[0] ? `ถ้าปิด ${U.num(h.marginal[0].leave)} สัญญาจะหลุด` : ''}</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('กฎที่ทำงาน (ข้อมูลจริง)', h.active.length, `ไม่ติดเลย ${h.silent.length}: ${U.esc(h.silent.map(s => s.id).join(', ') || '-')}`),
+        kpiTile('คู่กฎที่ซ้ำซ้อนสูง', h.redundant.length, 'Jaccard ≥ 0.5', h.redundant.length > 0),
+        kpiTile('ขับเข้าระดับควรตรวจก่อนมากสุด', U.esc(h.marginal[0]?.id || '-'),
+          h.marginal[0] ? `ถ้าปิด ${U.num(h.marginal[0].leave)} สัญญาจะหลุด` : ''),
+      ], 'lab-kpis')}
       ${h.redundant.length ? `<div class="ma-list"><div class="ma-list-title">คู่ที่ติดพร้อมกันบ่อยจนอาจนับซ้ำ (คะแนนบวกซ้อนจากสาเหตุเดียวกัน)</div>
         ${h.redundant.slice(0, 6).map(p => `<div class="ma-li"><span><b>${p.a}</b> ${U.esc(truncate(Rules.BY_ID.get(p.a)?.name || '', 26))} ↔ <b>${p.b}</b> ${U.esc(truncate(Rules.BY_ID.get(p.b)?.name || '', 26))}</span>
           <span class="small-muted">${U.num(p.both)} สัญญา · ${U.pct(p.containA, 0)} ของ ${p.a} · ${U.pct(p.containB, 0)} ของ ${p.b}</span><b>J ${p.jaccard.toFixed(2)}</b></div>`).join('')}</div>` : ''}
@@ -12460,12 +12612,12 @@ ${labVocabText()}`;
     const dist = Object.entries(res.byCount).sort((a, b) => a[0] - b[0]);
 
     U.setHTML('nlGroups', `
-      <div class="ma-kpis nl-kpis">
-        <div><span>ครอบคลุม</span><b>${U.pct(res.coverage, 1)}</b><em>${U.num(res.matched)} จาก ${U.num(res.n)} สัญญา</em></div>
-        <div class="${res.unmatchedTotal > res.n * 0.15 ? 'is-warn' : ''}"><span>ยังไม่เข้ากลุ่ม</span><b>${U.num(res.unmatchedTotal)}</b><em>${U.pct(res.unmatchedTotal / (res.n || 1), 1)} ของทั้งหมด</em></div>
-        <div><span>เข้าได้หลายกลุ่ม</span><b>${U.pct(res.multiShare, 1)}</b><em>ระบบเก็บเฉพาะกลุ่มแรกที่ตรง</em></div>
-        <div><span>จำนวนกลุ่ม</span><b>${U.num(nameLab.groups.length)}</b><em>${U.num(nameLab.groups.filter(g => g.source === 'custom').length)} กลุ่มที่เพิ่มเอง</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('ครอบคลุม', U.pct(res.coverage, 1), `${U.num(res.matched)} จาก ${U.num(res.n)} สัญญา`),
+        kpiTile('ยังไม่เข้ากลุ่ม', U.num(res.unmatchedTotal), `${U.pct(res.unmatchedTotal / (res.n || 1), 1)} ของทั้งหมด`, res.unmatchedTotal > res.n * 0.15),
+        kpiTile('เข้าได้หลายกลุ่ม', U.pct(res.multiShare, 1), 'ระบบเก็บเฉพาะกลุ่มแรกที่ตรง'),
+        kpiTile('จำนวนกลุ่ม', U.num(nameLab.groups.length), `${U.num(nameLab.groups.filter(g => g.source === 'custom').length)} กลุ่มที่เพิ่มเอง`),
+      ], 'nl-kpis')}
 
       <details class="lab-section" open><summary>พจนานุกรมกลุ่มงาน <small class="small-muted">(ลำดับมีความหมาย กลุ่มแรกที่ตรงคือกลุ่มหลัก)</small></summary>
         ${dictTableHTML(nameLab.groups, 'groups', res)}
@@ -12531,10 +12683,10 @@ ${labVocabText()}`;
     U.setHTML('nlPurpose', `
       <p class="small-muted">วัตถุประสงค์อ่านจากคำในชื่อ เช่น "ขยายเขต" คืองานเพิ่มบริการ ส่วน "ซ่อม/ปรับปรุง" คืองานบำรุงรักษา
         ใช้ดูว่าเงินของหน่วยงานหนึ่งลงไปกับอะไรเทียบกับหน่วยงานอื่น</p>
-      <div class="ma-kpis nl-kpis">
-        <div><span>ครอบคลุม</span><b>${U.pct(res.coverage, 1)}</b><em>${U.num(res.matched)} จาก ${U.num(res.n)} สัญญา</em></div>
-        <div><span>ยังไม่เข้าหมวด</span><b>${U.num(res.unmatchedTotal)}</b><em>เพิ่มคำได้ในตารางด้านล่าง</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('ครอบคลุม', U.pct(res.coverage, 1), `${U.num(res.matched)} จาก ${U.num(res.n)} สัญญา`),
+        kpiTile('ยังไม่เข้าหมวด', U.num(res.unmatchedTotal), 'เพิ่มคำได้ในตารางด้านล่าง'),
+      ], 'nl-kpis')}
 
       <div class="nl-mixbar" role="img" aria-label="สัดส่วนวัตถุประสงค์">
         ${nameLab.purposes.map((p, i) => {
@@ -13075,12 +13227,13 @@ ${labVocabText()}`;
     const ciBar = s => `<span class="prec-ci" title="ค่าประมาณ ${pct(s.mean)} · ช่วงความเชื่อมั่น 90% ${pct(s.lo)}-${pct(s.hi)} จาก ${s.n} ป้าย">
       <i style="left:${(s.lo * 100).toFixed(1)}%;width:${Math.max(1, (s.hi - s.lo) * 100).toFixed(1)}%"></i><b style="left:${(s.mean * 100).toFixed(1)}%"></b></span>`;
     U.setHTML('labPrecision', `
-      <div class="ma-kpis lab-kpis">
-        <div><span>ติดป้ายแล้ว</span><b>${U.num(f.labeled.length)}</b><em>✓ ${f.counts.tp} · ✗ ${f.counts.fp} · ? ${f.counts.unsure}</em></div>
-        <div><span>ความแม่นยำรวม (สัญญาที่ติดธง)</span><b>${f.overall.tp + f.overall.fp ? pct(f.overall.mean) : '-'}</b><em>${f.overall.tp}/${f.overall.tp + f.overall.fp} เสี่ยงจริง</em></div>
-        <div class="${f.perRule.some(p => p.status === 'low') ? 'is-warn' : ''}"><span>กฎที่ผลบวกลวงสูง</span><b>${f.perRule.filter(p => p.status === 'low').length}</b><em>${U.esc(f.perRule.filter(p => p.status === 'low').map(p => p.id).join(', ') || 'ยังไม่พบ')}</em></div>
-        <div><span>กฎที่ป้ายยังไม่พอ</span><b>${f.perRule.filter(p => p.status === 'need' && p.hits > 0).length}</b><em>ต้องมีอย่างน้อย 5 ป้ายต่อกฎ</em></div>
-      </div>
+      ${kpiRow([
+        kpiTile('ติดป้ายแล้ว', U.num(f.labeled.length), `✓ ${f.counts.tp} · ✗ ${f.counts.fp} · ? ${f.counts.unsure}`),
+        kpiTile('ความแม่นยำรวม (สัญญาที่ติดธง)', f.overall.tp + f.overall.fp ? pct(f.overall.mean) : '-', `${f.overall.tp}/${f.overall.tp + f.overall.fp} เสี่ยงจริง`),
+        kpiTile('กฎที่ผลบวกลวงสูง', f.perRule.filter(p => p.status === 'low').length,
+          U.esc(f.perRule.filter(p => p.status === 'low').map(p => p.id).join(', ') || 'ยังไม่พบ'), f.perRule.some(p => p.status === 'low')),
+        kpiTile('กฎที่ป้ายยังไม่พอ', f.perRule.filter(p => p.status === 'need' && p.hits > 0).length, 'ต้องมีอย่างน้อย 5 ป้ายต่อกฎ'),
+      ], 'lab-kpis')}
       <p class="ma-note">⚠ ค่าเหล่านี้ประมาณจากสัญญาที่คุณเลือกติดป้าย ถ้าเลือกดูแต่รายการคะแนนสูง ความแม่นยำจะดูดีกว่าความจริง ควรติดป้ายหลากหลายระดับ</p>
 
       <details class="lab-section" open><summary>คิวแนะนำให้ติดป้ายต่อ <small class="small-muted">(เลือกกฎที่ยังมีป้ายน้อยที่สุดก่อน)</small></summary>
@@ -14017,6 +14170,9 @@ ${labVocabText()}`;
 
     U.$('provenanceBtn').addEventListener('click', showProvenance);
     U.$('chartResetBtn').addEventListener('click', () => { Charts.resetAllVisible(); cartToast('รีเซ็ตกราฟที่แสดงอยู่ทั้งหมดแล้ว'); });
+
+    // ตัวนับการเข้าชม + ข้อมูลระบบ (ปุ่มจางมุมขวาล่าง) — ดู js/sitestats.js
+    SiteStats.init({ meta: () => state.payload.meta, dataset: () => state.dataset, records: () => state.records.length });
 
     // ไล่เหตุผล (CoT) — ดู js/cot.js · สื่อสารผ่าน api นี้เท่านั้น
     CoT.init({

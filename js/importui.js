@@ -268,12 +268,12 @@ const ImportUI = (() => {
         <div class="card-title-row mt-3"><h3 class="h6 mb-0">ผลการตรวจก่อนนำเข้า</h3>
           <span class="badge badge-derived">คำนวณในเบราว์เซอร์</span></div>
 
-        <div class="ma-kpis imp-kpis">
-          <div><span>แถวที่ใช้ได้</span><b>${U.num(rep.kept)}</b><em>จาก ${U.num(rep.inputRows)} แถว${rep.dropped ? ` · ทิ้ง ${U.num(rep.dropped)}` : ''}</em></div>
-          <div><span>ช่วงวันที่ทำสัญญา</span><b>${rep.dateMin ? U.thaiDate(rep.dateMin) : '-'}</b><em>ถึง ${rep.dateMax ? U.thaiDate(rep.dateMax) : '-'}</em></div>
-          <div><span>มีพิกัด</span><b>${pct(rep.geoPct)}</b><em>${U.num(rep.withGeo)} สัญญา${rep.geoMeta && rep.geoMeta.shared_rows ? ` · ใช้พิกัดร่วม ${U.num(rep.geoMeta.shared_rows)}` : ''}</em></div>
-          <div class="${rep.dupes ? 'is-warn' : ''}"><span>คีย์สัญญาซ้ำ</span><b>${U.num(rep.dupes)}</b><em>${rep.dupes ? 'ตรวจว่าไฟล์มีแถวซ้ำหรือไม่' : 'ไม่พบ'}</em></div>
-        </div>
+        ${U.kpiRow([
+          U.kpiTile('แถวที่ใช้ได้', U.num(rep.kept), `จาก ${U.num(rep.inputRows)} แถว${rep.dropped ? ` · ทิ้ง ${U.num(rep.dropped)}` : ''}`),
+          U.kpiTile('ช่วงวันที่ทำสัญญา', rep.dateMin ? U.thaiDate(rep.dateMin) : '-', `ถึง ${rep.dateMax ? U.thaiDate(rep.dateMax) : '-'}`),
+          U.kpiTile('มีพิกัด', pct(rep.geoPct), `${U.num(rep.withGeo)} สัญญา${rep.geoMeta && rep.geoMeta.shared_rows ? ` · ใช้พิกัดร่วม ${U.num(rep.geoMeta.shared_rows)}` : ''}`),
+          U.kpiTile('คีย์สัญญาซ้ำ', U.num(rep.dupes), rep.dupes ? 'ตรวจว่าไฟล์มีแถวซ้ำหรือไม่' : 'ไม่พบ', !!rep.dupes),
+        ], 'imp-kpis')}
 
         ${rep.dropped ? `<p class="ma-note">แถวที่ทิ้ง: ${Object.entries(rep.dropReasons).map(([k, v]) => `${esc(k)} ${U.num(v)}`).join(' · ')}</p>` : ''}
         ${dateBits ? `<p class="ma-note">รูปแบบวันที่ทำสัญญาที่พบ — ${dateBits}</p>` : ''}

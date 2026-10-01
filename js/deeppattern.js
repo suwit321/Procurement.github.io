@@ -170,7 +170,7 @@ window.DeepPattern = (() => {
       ['ensemble', `${m.training.folds} fold × ${m.training.seeds_per_fold} seed`],
       ['กลุ่มงานที่ใช้เทียบคะแนน', `${Object.keys(m.peer_grouping.groups).length} กลุ่ม (≥ ${m.peer_grouping.min_group_n} สัญญา/กลุ่ม)`],
       ['ระดับ Unusual Pattern', `≥ P${m.thresholds.strong_pct} (${U.num(m.thresholds.n_ge99)} ราย)`],
-    ].map(([label, v]) => `<div><span>${U.esc(label)}</span><b>${U.esc(String(v))}</b></div>`).join(''));
+    ].map(([label, v]) => U.kpiTile(U.esc(label), U.esc(String(v)))).join(''));
     U.setHTML('deepOverviewNote',
       `ให้คะแนนแบบ out-of-fold: แบ่งข้อมูลเป็น ${m.training.folds} ส่วน แต่ละสัญญาได้คะแนนจากโมเดลที่ไม่เคยเห็นสัญญานั้นตอนฝึก `
       + `(ไม่ใช่โมเดลเดียวฝึกครั้งเดียวแล้วให้คะแนนข้อมูลของตัวเอง) · มาตรฐานฟีเจอร์: ${U.esc(arch.standardize)} · `
@@ -219,7 +219,7 @@ window.DeepPattern = (() => {
       [`Requires Further Review (≥ P${flagPct})`, U.num(ge95.length)],
       ['ทุก engine เห็นตรงกัน (≥ 2 จาก 3)', U.num(agree.length)],
       ['Deep จับได้ตัวเดียว', U.num(deepOnly.length)],
-    ].map(([label, v]) => `<div><span>${U.esc(label)}</span><b>${U.esc(String(v))}</b></div>`).join(''));
+    ].map(([label, v]) => U.kpiTile(U.esc(label), U.esc(String(v)))).join(''));
     U.setHTML('deepSummaryNote',
       `นับเฉพาะสัญญาที่อยู่ในตัวกรองส่วนกลางตอนนี้ (${U.num(sn.nTotal)} สัญญา) และมีคะแนนจากโมเดล — `
       + `ตัวเลขในตารางด้านล่างคือรายการเดียวกับที่นับในนี้ ระดับ ≥ P${sn.meta.thresholds.strong_pct}/P${flagPct} เป็นเปอร์เซ็นไทล์ `

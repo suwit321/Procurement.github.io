@@ -296,7 +296,43 @@ const U = (() => {
     URL.revokeObjectURL(url);
   }
 
+  /* ---------- การ์ด KPI เล็กในกลุ่ม .ma-kpis — จุดเดียวที่สร้าง markup นี้ทั้งแอป ----------
+     เดิมแต่ละแท็บเขียน <div><span>label</span><b>value</b></div> เองซ้ำ ๆ กว่า 20 จุด ทำให้สีกำกับความหมาย
+     (is-warn ฯลฯ) ใส่ไม่สม่ำเสมอ อยู่ใน util.js เพราะ app.js, deeppattern.js, importui.js ใช้ร่วมกัน
+
+     accent: null | true (= warn รูปแบบเดิม) | 'warn' | 'danger' | 'good' | 'info'
+     ให้สีตามความหมายจริงของตัวเลข ไม่ใช่เพื่อความสวยงาม label/value/sub ไม่ถูก escape (เหมือนเดิม)
+     ผู้เรียกต้อง U.esc ค่าที่มาจากข้อมูลเองเมื่อจำเป็น */
+  function kpiTile(label, value, sub = '', accent = null) {
+    const cls = accent === true ? 'is-warn' : accent ? `is-${accent}` : '';
+    return `<div class="${cls}"><span>${label}</span><b>${value}</b>${sub ? `<em>${sub}</em>` : ''}</div>`;
+  }
+
+  /** ห่อ tile เป็นแถว .ma-kpis เดียว — tiles รับได้ทั้ง HTML string (จาก kpiTile) หรือ [label, value, sub, accent] */
+  function kpiRow(tiles, extraClass = '') {
+    const html = tiles.map(t => (Array.isArray(t) ? kpiTile(...t) : t)).join('');
+    return `<div class="ma-kpis${extraClass ? ' ' + extraClass : ''}">${html}</div>`;
+  }
+
+  /** การ์ด KPI ใหญ่ (.cardx.kpi) ในกริด .analytics-kpi-grid — สีแถบซ้ายกำหนดด้วย accent ตามความหมาย
+   *  (เดิมใช้ nth-child ไล่สีตามตำแหน่ง ทำให้สีไม่สื่ออะไรและเปลี่ยนความหมายเมื่อสลับลำดับการ์ด)
+   *  accent: null (เขียวหลัก = ตัวเลขทั่วไป) | 'info' | 'warn' | 'danger'
+   *  opts: unit, sub, clickable (data-shortcut), on (aria-pressed), hint, title */
+  function kpiCard(label, value, { accent = null, unit = '', sub = '', shortcut = null, on = false, title = '' } = {}) {
+    const tag = shortcut ? 'button' : 'div';
+    const attrs = shortcut
+      ? ` type="button" data-shortcut="${shortcut}" aria-pressed="${on}" title="${title || 'คลิกเพื่อกรองเฉพาะกลุ่มนี้ กดซ้ำเพื่อยกเลิก'}"` : '';
+    const cls = `cardx kpi${unit || sub ? ' kpi-compact' : ''}${accent ? ` kpi-${accent}` : ''}${shortcut ? ' kpi-clickable' : ''}${on ? ' is-on' : ''}`;
+    return `<div class="col-6 col-lg-3"><${tag} class="${cls}"${attrs}>
+        <div class="small-muted">${label}</div>
+        <div class="v">${value}${unit ? `<span class="unit">${unit}</span>` : ''}</div>
+        ${sub ? `<div class="small-muted">${sub}</div>` : ''}
+        ${shortcut ? '<span class="kpi-hint" aria-hidden="true">คลิกเพื่อกรอง</span>' : ''}
+      </${tag}></div>`;
+  }
+
   return {
+    kpiTile, kpiRow, kpiCard,
     num, money, baht, pct, esc,
     thaiDate, monthKey, thaiMonthLabel, THAI_MONTHS_SHORT,
     sum, mean, median, quantile, stddev, cv, iqrBounds,

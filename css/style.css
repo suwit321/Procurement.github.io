@@ -885,14 +885,12 @@ button.detail-clickable { text-decoration: none; }
   width: 4px;
   background: var(--primary);
 }
-/* ไล่สีตามตำแหน่งการ์ด ใช้ได้กับทุกกลุ่ม (#kpis, #fraudKpis, #contractorKpis, #agencyKpis ฯลฯ)
-   เพราะทุกกลุ่มผูก class .analytics-kpi-grid ไว้เหมือนกัน และแต่ละกลุ่มมี 4 การ์ดเท่ากันเสมอ
-   เดิมใบที่ 1-2 ใช้ --primary/--secondary ซึ่งเป็นเขียวอมฟ้าสองเฉดที่ใกล้กันเกินไป แยกด้วยตาไม่ออก
-   จึงเปลี่ยนใบที่ 2 เป็น --cyan (โทนน้ำเงิน) ให้ทั้ง 4 ใบเป็นคนละสีจริง ๆ (เขียว/ฟ้า/ส้ม/แดง) */
-.analytics-kpi-grid > [class*="col-"]:nth-child(1) .kpi::before { background: var(--primary); }
-.analytics-kpi-grid > [class*="col-"]:nth-child(2) .kpi::before { background: var(--cyan); }
-.analytics-kpi-grid > [class*="col-"]:nth-child(3) .kpi::before { background: var(--warning); }
-.analytics-kpi-grid > [class*="col-"]:nth-child(4) .kpi::before { background: var(--danger); }
+/* สีแถบซ้ายตามความหมายของตัวเลข กำหนดผ่าน U.kpiCard(..., { accent }) ไม่ใช่ตามตำแหน่งการ์ด
+   (เดิมใช้ nth-child ไล่ เขียว/ฟ้า/ส้ม/แดง ซึ่งไม่สื่ออะไรและเพี้ยนเมื่อสลับลำดับหรือเพิ่มการ์ด)
+   ไม่ระบุ accent = เขียวหลัก (ตัวเลขทั่วไป) · info = ข้อมูลประกอบ · warn = ควรระวัง · danger = วิกฤต */
+.kpi.kpi-info::before { background: var(--sev-2); }
+.kpi.kpi-warn::before { background: var(--sev-3); }
+.kpi.kpi-danger::before { background: var(--sev-4); }
 
 /* ---------- 5) ตัวกรองและฟอร์ม ---------- */
 
@@ -4243,6 +4241,10 @@ body.profile-open { overflow: hidden; }
 .ma-kpis em { display: block; font-style: normal; font-size: .66rem; color: var(--muted); }
 .ma-kpis .is-warn { background: var(--sev-3-bg); border-color: color-mix(in srgb, var(--sev-3) 40%, var(--mix-base)); }
 .ma-kpis .is-warn b { color: var(--warning-text); }
+.ma-kpis .is-danger { background: var(--sev-4-bg); border-color: color-mix(in srgb, var(--sev-4) 40%, var(--mix-base)); }
+.ma-kpis .is-danger b { color: var(--sev-4-ink); }
+.ma-kpis .is-info { background: var(--sev-2-bg); border-color: color-mix(in srgb, var(--sev-2) 35%, var(--mix-base)); }
+.ma-kpis .is-info b { color: var(--sev-2-ink); }
 .ma-bandbar { display: flex; gap: 1px; height: 8px; border-radius: 999px; overflow: hidden; background: var(--surface-hover); margin-bottom: 7px; }
 .ma-bandbar i { display: block; min-width: 2px; }
 .ma-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -5798,3 +5800,45 @@ mark.ai-unverified { background: none; color: inherit; padding: 0; text-decorati
 .hx-bars { display: flex; align-items: flex-end; gap: 1px; height: 90px; border-bottom: 1px solid var(--border); }
 .hx-bar { flex: 1 1 0; min-width: 2px; background: var(--primary); border-radius: 2px 2px 0 0; opacity: .8; }
 .hx-bar:hover { opacity: 1; }
+
+/* =====================================================================
+   58. ชั้นตีความสัญญาณ (Interpretation Layer) ในลิ้นชักรายละเอียดสัญญา
+   ===================================================================== */
+
+/* กล่องตีความต่อสัญญาณ (เทียบกลุ่ม/มุมมองโมเดล) — ใช้ขนาดตัวอักษรและสีเดียวกับ .audit-next ที่อยู่ข้างกัน */
+.interp-card { font-size: var(--text-sm); line-height: 1.5; color: var(--text-soft); }
+.interp-row + .interp-row { margin-top: 6px; }
+.interp-row strong { color: var(--text); }
+
+/* ===================================================================
+   59. ตัวนับการเข้าชม / ข้อมูลระบบ (js/sitestats.js)
+   ปุ่มจางมุมขวาล่าง — เห็นชัดเมื่อ hover/โฟกัส เพื่อไม่รบกวนหน้าแรก
+   =================================================================== */
+.sitestats-btn {
+  position: fixed; right: 10px; bottom: 10px; z-index: 1040;
+  width: 28px; height: 28px; padding: 0; border-radius: 50%;
+  border: 1px solid transparent; background: transparent; color: var(--bs-secondary-color, #6c757d);
+  font-size: 15px; line-height: 1; opacity: .22; cursor: pointer;
+  transition: opacity .15s, background-color .15s;
+}
+.sitestats-btn:hover, .sitestats-btn:focus-visible, .sitestats-btn.is-open {
+  opacity: 1; background: var(--bs-body-bg, #fff); border-color: var(--bs-border-color, #dee2e6);
+}
+.sitestats-panel {
+  position: fixed; right: 10px; bottom: 46px; z-index: 1041;
+  width: min(380px, calc(100vw - 20px)); max-height: min(78vh, 640px); overflow: auto;
+  background: var(--bs-body-bg, #fff); color: var(--bs-body-color, #212529);
+  border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+}
+.sitestats-panel[hidden] { display: none; }
+.sitestats-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--bs-border-color, #dee2e6); }
+.sitestats-head h2 { font-size: 1rem; margin: 0; }
+.sitestats-x { border: 0; background: transparent; color: inherit; font-size: 14px; padding: 4px 6px; border-radius: 6px; }
+.sitestats-body { padding: 12px 14px 14px; font-size: .85rem; }
+.sitestats-table { width: 100%; border-collapse: collapse; }
+.sitestats-table th, .sitestats-table td { padding: 3px 0; vertical-align: top; border-bottom: 1px solid var(--bs-border-color-translucent, rgba(0,0,0,.08)); }
+.sitestats-table th { font-weight: 500; color: var(--bs-secondary-color, #6c757d); width: 42%; padding-right: 8px; }
+.sitestats-table td { word-break: break-word; }
+.sitestats-note ul { padding-left: 1.1rem; margin-top: 6px; }
+.sitestats-note summary { cursor: pointer; color: var(--bs-secondary-color, #6c757d); }
